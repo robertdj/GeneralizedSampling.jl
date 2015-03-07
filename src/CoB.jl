@@ -117,11 +117,19 @@ end
 # ------------------------------------------------------------
 # (Row) Weigthed matrices
 
+function freq2Haar( T::Array{Complex{Float64},2}, weights::AbstractVector )
+	@assert size(T,1) == length(weights)
+
+	broadcast!(*, T, weights, T)
+
+	return T
+end
+
 function freq2Haar( xi::Vector, J::Int, weights::AbstractVector )
 	@assert length(xi) == length(weights)
 
 	T = freq2Haar( xi, J )
-	broadcast!(*, T, weights, T)
+	freq2Haar( T, weights )
 
 	return T
 end
@@ -131,7 +139,7 @@ function freq2Haar( xi::Vector, J::Vector{Int}, weights::AbstractVector )
 	@assert length(xi) == length(weights)
 
 	T = freq2Haar( xi, J )
-	broadcast!(*, T, weights, T)
+	freq2Haar( T, weights )
 
 	return T
 end
@@ -139,4 +147,44 @@ end
 
 # ------------------------------------------------------------
 # 2D functions
+
+# Rectangular domain xi_x by xi_y in the frequency plane
+
+function freq2Haar( xi_x::Vector, xi_y::Vector, J::Int )
+	Tx = freq2Haar(xi_x, J)
+	Ty = freq2Haar(xi_y, J)
+
+	return Tx, Ty
+end
+
+
+# General points in 2D
+#
+# Input:
+# xi: M-by-2 matrix
+
+function freq2Haar( xi::AbstractMatrix, J::Int )
+	M = size(xi,1)
+	T = Array(Complex{Float64}, M, 4^J)
+
+	k = [0:2^J-1;]
+	Tx = FourHaarScaling( xi[:,1], J, k)
+	Ty = FourHaarScaling( xi[:,2], J, k)
+
+	for m = 1:M
+		T[m,:] = kron( Tx[m,:], Ty[m,:] )
+	end
+
+	return T
+end
+
+# With row weighing
+
+function freq2Haar( xi::AbstractMatrix, J::Int, weights::AbstractVector )
+	T = freq2Haar( xi, J )
+	freq2Haar( T, weights )
+
+	return T
+end
+
 
