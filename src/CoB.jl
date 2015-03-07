@@ -112,3 +112,27 @@ function FourHaarWavelet(xi::Vector, J::Int, k::Vector)
 	return y
 end
 
+
+# ------------------------------------------------------------
+# (Row) Weigthed matrices
+
+function freq2Haar( xi::Vector, J::Int, weights::AbstractVector )
+	@assert length(xi) == length(weights)
+
+	T = freq2Haar( xi, J )
+	broadcast!(*, T, weights, T)
+
+	return T
+end
+
+
+function freq2Haar( xi::Vector, J::Vector{Int}, weights::AbstractVector )
+	@assert length(xi) == length(weights)
+
+	T = freq2Haar( xi, J )
+	broadcast!(*, T, weights, T)
+
+	return T
+end
+
+
