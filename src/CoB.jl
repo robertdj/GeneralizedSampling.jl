@@ -49,7 +49,7 @@ end
 
 function FourHaarScaling(xi::Number)
 	if xi == 0
-		return 1.0
+		return complex(1.0)
 	else
 		return (1.0 - exp(-2.0*pi*im*xi)) / (2.0*pi*im*xi)
 	end
@@ -83,7 +83,7 @@ end
 
 function FourHaarWavelet(xi::Number)
 	if xi == 0
-		return 0.0
+		return complex(0.0)
 	else
 		return (1.0 - exp(-pi*im*xi))^2.0 / (2.0*pi*im*xi)
 	end
@@ -135,4 +135,7 @@ function freq2Haar( xi::Vector, J::Vector{Int}, weights::AbstractVector )
 	return T
 end
 
+
+# ------------------------------------------------------------
+# 2D functions
 
