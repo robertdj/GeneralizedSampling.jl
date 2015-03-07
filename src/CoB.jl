@@ -26,18 +26,19 @@ end
 
 function freq2Haar( xi::Vector, J::Vector{Int} )
 	M = length(xi)
-	N = cumsum( 2.^J )
+	J2 = 2.^J
+	N = cumsum( J2 )
 
 	T = Array(Complex{Float64}, M, N[end])
 
 	# Scaling functions
-	k = [0:2^J[1]-1;]
+	k = [0:N[1]-1;]
 	@inbounds T[:, 1:N[1]] = FourHaarScaling( xi, J[1], k )
 
 	# Wavelet functions
 	for n = 2:length(J)
 		j = J[n]
-		k = [0:2^j-1;]
+		k = [0:J2[n]-1;]
 		@inbounds T[:, N[n-1]+1:N[n]] = FourHaarWavelet( xi, j, k )
 	end
 
@@ -96,7 +97,7 @@ end
 # Entry (n,m) is the Fourier transform at translation k[m] in xi[n]
 
 function FourHaarWavelet(xi::Vector, J::Int, k::Int)
-	y = exp( -2*pi*im*2.0^J*k*xi ) .* 2.0^(-J/2) .* FourHaarWavelet(2.0^J*xi);
+	y = exp( -2*pi*im*2.0^(-J)*k*xi ) .* 2.0^(-J/2) .* FourHaarWavelet(2.0^(-J)*xi);
 end
 
 function FourHaarWavelet(xi::Vector, J::Int, k::Vector)
