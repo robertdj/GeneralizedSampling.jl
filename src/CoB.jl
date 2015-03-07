@@ -161,7 +161,7 @@ end
 # General points in 2D
 #
 # Input:
-# xi: M-by-2 matrix
+# xi: M-by-2 matrix, where M is the number of observations
 
 function freq2Haar( xi::AbstractMatrix, J::Int )
 	M = size(xi,1)
@@ -181,6 +181,8 @@ end
 # With row weighing
 
 function freq2Haar( xi::AbstractMatrix, J::Int, weights::AbstractVector )
+	@assert size(xi,1) == length(weights)
+
 	T = freq2Haar( xi, J )
 	freq2Haar( T, weights )
 
