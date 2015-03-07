@@ -16,7 +16,7 @@ epsilon = 0.25
 J = floor(Int, log2(M))
 
 # Sampling points
-xi = [-M:epsilon:M;]
+xi = [-M:M;]*epsilon
 
 # Change of basis matrix
 T = freq2Haar(xi, J)
