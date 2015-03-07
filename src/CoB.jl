@@ -1,3 +1,50 @@
+# ------------------------------------------------------------
+# 1D functions
+
+# Change of basis matrix from frequencies to Haar wavelets 
+
+# Input:
+# xi: The frequencies 
+# J: Scale of the wavelet transform
+# 
+# Output:
+# T: Change of basis matrix from frequencies to dilated Haar scaling functions
+
+function freq2Haar( xi::Vector, J::Int )
+	k = [0:2^J-1;]
+
+	T = FourHaarScaling( xi, J, k )
+end
+
+# Input:
+# xi: The frequencies 
+# J: The scales of the wavelet transform
+# 
+# Output:
+# T: Change of basis matrix from frequencies to Haar scaling and wavelet functions
+# Scaling functions are at scale J[1] and wavelet functions are at scale J[2:end]
+
+function freq2Haar( xi::Vector, J::Vector{Int} )
+	M = length(xi)
+	N = cumsum( 2.^J )
+
+	T = Array(Complex{Float64}, M, N[end])
+
+	# Scaling functions
+	k = [0:2^J[1]-1;]
+	@inbounds T[:, 1:N[1]] = FourHaarScaling( xi, J[1], k )
+
+	# Wavelet functions
+	for n = 2:length(J)
+		j = J[n]
+		k = [0:2^j-1;]
+		@inbounds T[:, N[n-1]+1:N[n]] = FourHaarWavelet( xi, j, k )
+	end
+
+	return T
+end
+
+
 # Fourier transform of Haar scaling function
 
 function FourHaarScaling(xi::Number)
