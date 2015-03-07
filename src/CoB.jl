@@ -172,7 +172,7 @@ function freq2Haar( xi::AbstractMatrix, J::Int )
 	Ty = FourHaarScaling( xi[:,2], J, k)
 
 	for m = 1:M
-		T[m,:] = kron( Tx[m,:], Ty[m,:] )
+		@inbounds T[m,:] = kron( Tx[m,:], Ty[m,:] )
 	end
 
 	return T
