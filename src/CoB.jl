@@ -10,6 +10,12 @@
 # Output:
 # T: Change of basis matrix from frequencies to dilated Haar scaling functions
 
+@doc """
+	freq2Haar(xi::Vec, J::Int) -> T
+
+Change of basis matrix from frequency responses at `xi` to coefficients of
+Haar scaling functions at scale `J`.
+"""->
 function freq2Haar( xi::Vector, J::Int )
 	k = [0:2^J-1;]
 
@@ -24,6 +30,13 @@ end
 # T: Change of basis matrix from frequencies to Haar scaling and wavelet functions
 # Scaling functions are at scale J[1] and wavelet functions are at scale J[2:end]
 
+@doc """
+	freq2Haar(xi::Vec, J::Vec{Int}) -> T
+
+Change of basis matrix from frequency responses at `xi` to coefficients of
+Haar scaling functions at scale `J[1]` and Haar wavelet functions at scales 
+`J[2:end]`.
+"""->
 function freq2Haar( xi::Vector, J::Vector{Int} )
 	M = length(xi)
 	J2 = 2.^J
@@ -117,6 +130,11 @@ end
 # ------------------------------------------------------------
 # (Row) Weigthed matrices
 
+@doc """
+	freq2Haar(xi, J, weights) -> T
+
+The rows of `freq2Haar(xi, J)` weighted by the vector `weights`.
+"""->
 function freq2Haar( T::Array{Complex{Float64},2}, weights::AbstractVector )
 	@assert size(T,1) == length(weights)
 
@@ -150,6 +168,11 @@ end
 
 # Rectangular domain xi_x by xi_y in the frequency plane
 
+@doc """
+	freq2Haar(xi1::Vector, xi2::Vector, J) -> T
+
+Change of basis matrix from 2D frequency responses in rectangular area `xi1`-by-`xi2`.
+"""->
 function freq2Haar( xi_x::Vector, xi_y::Vector, J::Int )
 	Tx = freq2Haar(xi_x, J)
 	Ty = freq2Haar(xi_y, J)
@@ -163,6 +186,11 @@ end
 # Input:
 # xi: M-by-2 matrix, where M is the number of observations
 
+@doc """
+	freq2Haar(xi::Matrix, J) -> T
+
+Change of basis matrix from 2D frequency responses at the rows of `xi`.
+"""->
 function freq2Haar( xi::AbstractMatrix, J::Int )
 	M = size(xi,1)
 	T = Array(Complex{Float64}, M, 4^J)
