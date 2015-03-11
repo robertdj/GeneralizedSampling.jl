@@ -3,13 +3,6 @@
 
 # Change of basis matrix from frequencies to Haar wavelets 
 
-# Input:
-# xi: The frequencies 
-# J: Scale of the wavelet transform
-# 
-# Output:
-# T: Change of basis matrix from frequencies to dilated Haar scaling functions
-
 @doc """
 	freq2Haar(xi::Vec, J::Int) -> T
 
@@ -21,14 +14,6 @@ function freq2Haar( xi::Vector, J::Int )
 
 	T = FourHaarScaling( xi, J, k )
 end
-
-# Input:
-# xi: The frequencies 
-# J: The scales of the wavelet transform
-# 
-# Output:
-# T: Change of basis matrix from frequencies to Haar scaling and wavelet functions
-# Scaling functions are at scale J[1] and wavelet functions are at scale J[2:end]
 
 @doc """
 	freq2Haar(xi::Vec, J::Vec{Int}) -> T
@@ -61,6 +46,11 @@ end
 
 # Fourier transform of Haar scaling function
 
+@doc """
+	FourHaarScaling(xi)
+
+The Fourier transform of the Haar scaling function evaluated at `xi`.
+"""->
 function FourHaarScaling(xi::Number)
 	if xi == 0
 		return complex(1.0)
@@ -72,13 +62,21 @@ end
 @vectorize_1arg Number FourHaarScaling
 
 
-# Fourier transform of Haar scaling function with translation (J) and dilation (k)
-# Entry (n,m) is the Fourier transform at translation k[m] in xi[n]
 
+@doc """
+	FourHaarScaling(xi, J, k::Int)
+
+The Fourier transform of the Haar scaling function on scale `J` and translation `k` evaluated at `xi`.
+"""->
 function FourHaarScaling(xi::Vector, J::Int, k::Int)
 	y = exp( -2.0*pi*im*2.0^(-J)*k*xi ) .* 2.0^(-J/2) .* FourHaarScaling(2.0^(-J)*xi)
 end
 
+@doc """
+	FourHaarScaling(xi, J, k::Vector) -> F
+
+`F[n,m]` is the Fourier transform at translation `k[m]` evaluated at `xi[n]`.
+"""->
 function FourHaarScaling(xi::Vector, J::Int, k::Vector{Int})
 	M = length(xi)
 	N = length(k)
@@ -95,6 +93,11 @@ end
 
 # Fourier transform of Haar wavelet
 
+@doc """
+	FourHaarWavelet(xi)
+
+The Fourier transform of the Haar wavelet evaluated at `xi`.
+"""->
 function FourHaarWavelet(xi::Number)
 	if xi == 0
 		return complex(0.0)
@@ -109,10 +112,20 @@ end
 # Fourier transform of Haar scaling function with translation (J) and dilation (k)
 # Entry (n,m) is the Fourier transform at translation k[m] in xi[n]
 
+@doc """
+	FourHaarWavelet(xi, J, k)
+
+The Fourier transform of the Haar wavelet on scale `J` and translation `k` evaluated at `xi`.
+"""->
 function FourHaarWavelet(xi::Vector, J::Int, k::Int)
 	y = exp( -2*pi*im*2.0^(-J)*k*xi ) .* 2.0^(-J/2) .* FourHaarWavelet(2.0^(-J)*xi);
 end
 
+@doc """
+	FourHaarWavelet(xi, J, k::Vector) -> F
+
+`F[n,m]` is the Fourier transform at translation `k[m]` evaluated at `xi[n]`.
+"""->
 function FourHaarWavelet(xi::Vector, J::Int, k::Vector)
 	M = length(xi)
 	N = length(k)
@@ -130,7 +143,7 @@ end
 # ------------------------------------------------------------
 # (Row) Weigthed matrices
 
-@doc """
+@doc """ 
 	freq2Haar(xi, J, weights) -> T
 
 The rows of `freq2Haar(xi, J)` weighted by the vector `weights`.
@@ -166,8 +179,6 @@ end
 # ------------------------------------------------------------
 # 2D functions
 
-# Rectangular domain xi_x by xi_y in the frequency plane
-
 @doc """
 	freq2Haar(xi1::Vector, xi2::Vector, J) -> T
 
@@ -182,9 +193,6 @@ end
 
 
 # General points in 2D
-#
-# Input:
-# xi: M-by-2 matrix, where M is the number of observations
 
 @doc """
 	freq2Haar(xi::Matrix, J) -> T
@@ -208,6 +216,11 @@ end
 
 # With row weighing
 
+@doc """ 
+	freq2Haar(xi::Matrix, J, weights) -> T
+
+The rows of `freq2Haar(xi, J)` weighted by the vector `weights`.
+"""->
 function freq2Haar( xi::AbstractMatrix, J::Int, weights::AbstractVector )
 	@assert size(xi,1) == length(weights)
 
