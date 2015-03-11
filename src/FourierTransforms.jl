@@ -6,30 +6,30 @@
 The Fourier transform of the Daubechies `N` scaling function evaluated at `xi`.
 `N` is the number of zeros at -1.
 """->
-function FourDaubScaling( xi::Real, N::Int; prec=sqrt(eps()) )
-	xi /= 2
+function FourDaubScaling( xi::Real, N::Int; prec=sqrt(eps()), M::Int=20 )
+	xi /= 2.0
 	y = DaubLowPass(xi, Val{N})
 	Y = copy(y)
 
-	n = 1
-	while abs(y) <= 1-prec && n <= 30
-		xi /= 2
+	m = 1
+	while abs(y) <= 1-prec && m <= M
+		xi /= 2.0
 		y = DaubLowPass(xi, Val{N})
 		Y *= y
 
-		n += 1
+		m += 1
 	end
 
 	return Y
 end
 
 # Vectorized version
-function FourDaubScaling{T<:Real}(xi::Array{T}, N::Int)
-	map( xi -> FourDaubScaling(xi, N), xi )
+function FourDaubScaling{T<:Real}( xi::Array{T}, N::Int; arg... )
+	map( xi -> FourDaubScaling(xi, N; arg...), xi )
 end
 
 
 function DaubLowPass(xi::Real, ::Type{Val{0}})
-	return 0.5*(1 + exp(im*xi))
+	return 0.5*(1.0 + exp(im*xi))
 end
 
