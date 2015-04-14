@@ -115,12 +115,12 @@ to control this there are optional arguments:
 """->
 function FourDaubScaling( xi::Real, N::Int; prec=eps(), M::Int=20 )
 	xi /= 2.0
-	Y = y = DaubLowPass(xi, Val{N})
+	Y = y = DaubLowPass(xi, N)
 
 	m = 1
 	while abs(y) <= 1-prec && m <= M
 		xi /= 2.0
-		y = DaubLowPass(xi, Val{N})
+		y = DaubLowPass(xi, N)
 		Y *= y
 
 		m += 1
@@ -135,8 +135,24 @@ function FourDaubScaling{T<:Real}( xi::Array{T}, N::Int; arg... )
 end
 
 
-function DaubLowPass(xi::Real, ::Type{Val{0}})
+@doc """
+	DaubLowPass(xi::Real, N::Int)
+
+Low-pass filter for Daubechies `N` wavelet.
+Uses the Wavelets package.
+"""->
+function DaubLowPass(xi::Real, N::Int)
 	# For Fourier transform with exp(-i*xi*x)
-	return 0.5*(1.0 + exp(im*xi))
+	#return 0.5*(1.0 + exp(im*xi))
+
+	# For Fourier transform with exp(-2*pi*i*xi*x)
+	# Coefficients in the low-pass filter
+	# TODO: Don't recompute the coefficients
+	C = qmf(wavelet( WT.Daubechies{N}() ))
+	C = scale!(C, 1/sum(C))
+
+	Y = dot(C, exp(-2*pi*im*xi*[0:2*N-1;]))
+
+	return Y
 end
 

@@ -1,5 +1,7 @@
 module GeneralizedSampling
 
+using Wavelets
+
 # package code goes here
 include("CoB.jl")
 include("FourierTransforms.jl")
