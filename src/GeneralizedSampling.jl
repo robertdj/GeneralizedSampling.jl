@@ -1,6 +1,6 @@
 module GeneralizedSampling
 
-using Wavelets
+import Wavelets: qmf, wavelet
 
 # package code goes here
 include("CoB.jl")

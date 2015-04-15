@@ -113,41 +113,44 @@ to control this there are optional arguments:
 - `prec`: Include factors that are numerically smaller than 1-prec.
 - `M`: The maximum number of factors.
 """->
-function FourDaubScaling( xi::Real, N::Int; prec=eps(), M::Int=20 )
-	xi /= 2.0
-	Y = y = DaubLowPass(xi, N)
+function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), M::Int=20 )
+	Z = Array(Complex{Float64}, size(XI))
+	N_xi = length(XI)
 
-	m = 1
-	while abs(y) <= 1-prec && m <= M
-		xi /= 2.0
-		y = DaubLowPass(xi, N)
-		Y *= y
+	# Fixed factor in the complex exponential
+	Four_idx = -2*pi*im*[0:2*N-1;]
 
-		m += 1
+	# Filter coefficients
+	C = qmf(wavelet( WT.Daubechies{N}() ))
+	C = scale!(C, 1/sum(C))
+
+	# The infinite product for each xi
+	for n = 1:N_xi
+		xi = XI[n] / 2.0
+		Y = y = dot(C, exp(xi*Four_idx))
+
+		m = 1
+		while abs(y) <= 1-prec && m <= M
+			xi /= 2.0
+			y = dot(C, exp(xi*Four_idx))
+			Y *= y
+
+			m += 1
+		end
+
+		Z[n] = Y
 	end
 
-	return Y
+	return Z
 end
-
-# Vectorized version
-function FourDaubScaling{T<:Real}( xi::Array{T}, N::Int; arg... )
-	map( xi -> FourDaubScaling(xi, N; arg...), xi )
-end
-
 
 @doc """
-	DaubLowPass(xi::Real, N::Int)
+	DaubLowPass(xi, N::Int)
 
 Low-pass filter for Daubechies `N` wavelet.
-Uses the Wavelets package.
+Uses the Wavelets package to compute the filter coefficients.
 """->
 function DaubLowPass(xi::Real, N::Int)
-	# For Fourier transform with exp(-i*xi*x)
-	#return 0.5*(1.0 + exp(im*xi))
-
-	# For Fourier transform with exp(-2*pi*i*xi*x)
-	# Coefficients in the low-pass filter
-	# TODO: Don't recompute the coefficients
 	C = qmf(wavelet( WT.Daubechies{N}() ))
 	C = scale!(C, 1/sum(C))
 
