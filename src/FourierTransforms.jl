@@ -99,10 +99,10 @@ end
 
 # ------------------------------------------------------------
 
-# Fourier transform of Daubechies scaling function
+# Fourier transform of Daubechies wavelets
 
 @doc """
-### FourDaubScaling(xi, N)
+### FourDaubScaling(xi, N; ...)
 
 The Fourier transform of the Daubechies `N` scaling function evaluated at `xi`.
 `N` is the number of zeros at -1.
@@ -118,13 +118,13 @@ function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), M::
 	N_xi = length(XI)
 
 	# Fixed factor in the complex exponential
-	Four_idx = -2*pi*im*[0:2*N-1;]
+	Four_idx = 2*pi*im*[0:2*N-1;]
 
 	# Filter coefficients
 	C = qmf(wavelet( WT.Daubechies{N}() ))
 	C = scale!(C, 1/sum(C))
 
-	# The infinite product for each xi
+	# The infinite product of low pass filters for each xi
 	for n = 1:N_xi
 		xi = XI[n] / 2.0
 		Y = y = dot(C, exp(xi*Four_idx))
@@ -154,8 +154,46 @@ function DaubLowPass(xi::Real, N::Int)
 	C = qmf(wavelet( WT.Daubechies{N}() ))
 	C = scale!(C, 1/sum(C))
 
-	Y = dot(C, exp(-2*pi*im*xi*[0:2*N-1;]))
+	Y = dot(C, exp(2*pi*im*xi*[0:2*N-1;]))
 
 	return Y
+end
+
+
+@doc """
+### FourDaubWavelet(xi, N; ...)
+
+The Fourier transform of the Daubechies `N` wavelet function evaluated at `xi`.
+`N` is the number of zeros at -1.
+
+The optional arguments are passed to `FourDaubScaling`.
+"""->
+function FourDaubWavelet{T<:Real}( XI::AbstractArray{T}, N::Int; args... )
+	# Fixed factor in the complex exponential
+	Four_idx = 2*pi*im*[0:2*N-1;]
+
+	# Filter coefficients
+	C = qmf(wavelet( WT.Daubechies{N}() ))
+	C = scale!(C, 1/sum(C))
+
+	# Fourier transform of low pass filter
+	XI /= 2
+	Z = FourDaubScaling(XI, N; args...)
+
+	N_xi = length(XI)
+
+	# The infinite product for each xi
+	# TODO: Vectorize this?
+	for n = 1:N_xi
+		xi = XI[n]
+
+		# High pass filter
+		H = conj(dot( C, exp((xi+0.5)*Four_idx) ))
+
+		# Fourier transform of wavelet
+		Z[n] *= exp( 2*pi*im*xi )*H
+	end
+
+	return Z
 end
 
