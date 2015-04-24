@@ -111,11 +111,10 @@ The function is computed as an 'infinite' product;
 to control this there are optional arguments:
 
 - `prec`: Include factors that are numerically smaller than 1-prec.
-- `M`: The maximum number of factors.
+- `maxM`: The maximum number of factors.
 """->
-function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), M::Int=20 )
+function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), maxM=20 )
 	Z = Array(Complex{Float64}, size(XI))
-	N_xi = length(XI)
 
 	# Fixed factor in the complex exponential
 	Four_idx = 2*pi*im*[0:2*N-1;]
@@ -124,17 +123,31 @@ function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), M::
 	C = qmf(wavelet( WT.Daubechies{N}() ))
 	C = scale!(C, 1/sum(C))
 
+	N_xi = length(XI)
+	almost1 = 1 - prec
+
 	# The infinite product of low pass filters for each xi
 	for n = 1:N_xi
 		xi = XI[n] / 2.0
 		Y = y = dot(C, exp(xi*Four_idx))
 
+		# When xi is (almost) an even integer y is approx 1.
+		# To ensure that the while loop below does not exit 
+		# prematurely, a minimum number of iterations is set,
+		# which is the number of iterations needed for abs(xi) < 1
+		M = (abs(xi) > 1.0 ? ceil(Int, log2(abs(xi))) : 1)
+
+		# Factors in the product
 		m = 1
-		while abs(y) <= 1-prec && m <= M
+		y_almost1 = false
+		while !y_almost1 && m <= maxM
 			xi /= 2.0
 			y = dot(C, exp(xi*Four_idx))
 			Y *= y
 
+			if m > M
+				y_almost1 = abs(y) <= almost1
+			end
 			m += 1
 		end
 
@@ -143,6 +156,7 @@ function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), M::
 
 	return Z
 end
+
 
 @doc """
 	DaubLowPass(xi, N::Int)
