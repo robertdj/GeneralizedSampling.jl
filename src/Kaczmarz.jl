@@ -1,15 +1,10 @@
-# General Kaczmarz algorithm for solving Ax = b
-#
-# Input:
-# A : Coefficient matrix
-# b : Vector
-# x0 : Initial estimate
-#
-# K : Max number of iterations
+@doc """
+	Kaczmarz(A, b; maxiter)
 
-#@doc """
-#""" ->
-@debug function Kaczmarz(A::Matrix, b::Vector; prec::Float64=1e-2)
+General Kaczmarz algorithm for solving `Ax = b` for complex `A` and `b`.
+By default, `maxiter=100`.
+""" ->
+function Kaczmarz(A::Matrix, b::Vector; maxiter=100)
 	M, N = size(A)
 
 	# Create alias tables for sampling row and column indices
@@ -30,30 +25,16 @@
 	z = deepcopy(b)
 	zold = deepcopy(b)
 
-	for iter = 1:N^2
+	for iter = 1:maxiter
 		col_index = rand(col_sampler)
 		col = A[:,col_index]
 		z -= dot(col, z)/col_norm[col_index] * col
 
 		row_index = rand(row_sampler)
 		row = vec( A[row_index, :] )
-		x += (b[row_index] - z[row_index] - mydot(x,row))/row_norm[row_index] * conj(row)
-
-		@printf("%u : %f\n", iter, norm(x))
+		x += (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] * conj(row)
 	end
 
 	return x
-end
-
-#function mydot{T<:Number}(a::Vector{T}, b::Vector{T})
-function mydot(a::Vector, b::Vector)
-	N = length(a)
-
-	d = 0.0
-	for n = 1:N
-		d += a[n]*b[n]
-	end
-
-	return d
 end
 
