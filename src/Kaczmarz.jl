@@ -25,24 +25,21 @@
 	col_sampler = sampler(col_distribution)
 
 	# The Kaczmarz solver
-	# TODO: These are imaginary
-	x = zeros(Float64, N)
+	x = fill(0.0 + 0.0*im, N)
 	xold = zeros(Float64, N)
 	z = deepcopy(b)
 	zold = deepcopy(b)
 
 	for iter = 1:N^2
-		row_index = rand(row_sampler)
-		row = vec( A[row_index, :] )
-		#x += (b[row_index] - z[row_index] - dot(x,row))/row_norm[row_index] * row
-		x += (b[row_index] - mydot(x,row))/row_norm[row_index] * conj(row)
-
 		col_index = rand(col_sampler)
 		col = A[:,col_index]
-		# TODO: Conjugate z?
-		z -= mydot(col, z)/col_norm[col_index] * col
+		z -= dot(col, z)/col_norm[col_index] * col
 
-		#@printf("%u : %f\n", iter, norm(x))
+		row_index = rand(row_sampler)
+		row = vec( A[row_index, :] )
+		x += (b[row_index] - z[row_index] - mydot(x,row))/row_norm[row_index] * conj(row)
+
+		@printf("%u : %f\n", iter, norm(x))
 	end
 
 	return x
