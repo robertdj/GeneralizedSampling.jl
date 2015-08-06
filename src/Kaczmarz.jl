@@ -1,11 +1,12 @@
-@doc """
-	Kaczmarz(A, b; maxiter)
-
-General Kaczmarz algorithm for solving `Ax = b` for complex `A` and `b`.
-By default, `maxiter=100`.
-""" ->
-function Kaczmarz(A::Matrix, b::Vector; maxiter=100)
+#@doc """
+#	Kaczmarz(A, b; prec)
+#
+#General Kaczmarz algorithm for solving `Ax = b` for complex `A` and `b`.
+#By default, `prec=1e-4`.
+#""" ->
+function Kaczmarz(A::Matrix, b::Vector; prec=1e-4)
 	M, N = size(A)
+	maxiter = N^2
 
 	# Create alias tables for sampling row and column indices
 	A_squared = abs(A).^2
@@ -24,24 +25,43 @@ function Kaczmarz(A::Matrix, b::Vector; maxiter=100)
 	z = deepcopy(b)
 
 	for iter = 1:maxiter
+		# Update z
 		col_index = rand(col_sampler)
 		col = A[:,col_index]
-		z -= dot(col, z)/col_norm[col_index] * col
+		zdiff = dot(col, z)/col_norm[col_index] * col
+		z -= zdiff
 
+		# Update x
 		row_index = rand(row_sampler)
 		row = vec( A[row_index, :] )
-		x += (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] * conj(row)
+		xdiff = (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] * conj(row)
+		x += xdiff
+
+		# Check for convergence
+		if mod(iter,8*N) == 0
+			xnorm = norm(x)
+			test1 = norm(A*x - b + z)/(matrix_norm*xnorm)
+			test2 = norm(A'*z)/(matrix_norm^2*xnorm)
+
+			if test1 < prec && test2 < prec
+				println("Number of iterations: ", iter)
+				break
+			end
+		end
 	end
 
 	return x
 end
 
-function Kaczmarz(xi::Vector, b::Vector, x0::Vector, J::Integer; prec::Float64=1e-2, maxiter=100)
-	# TODO: Test input
+function Kaczmarz(xi::Vector, b::Vector, x0::Vector; prec::Float64=1e-2, maxiter=100)
 	M = length(xi)
 	N = length(x0)
 
+	# Wavelet scale
+	J = Int(log2(N))
+
 	# Squared norms of rows, columns and matrix
+	# TODO: This is only for Haar
 	wavelet_fourier = FourHaarScaling(xi, J, 0)
 	row_norm = N*abs(wavelet_fourier).^2
 	matrix_norm = sum(row_norm)
@@ -51,8 +71,7 @@ function Kaczmarz(xi::Vector, b::Vector, x0::Vector, J::Integer; prec::Float64=1
 	row_dist = Categorical( row_norm/matrix_norm )
 	row_sampler = sampler(row_dist)
 
-	#col_sampler = [1:N;]
-	col_sampler = sampler(Categorical( ones(Float64,N)/N ))
+	col_sampler = [1:N;]
 
 	# The Kaczmarz solver
 	x = complex(deepcopy(x0))
@@ -63,6 +82,7 @@ function Kaczmarz(xi::Vector, b::Vector, x0::Vector, J::Integer; prec::Float64=1
 		col_index = rand(col_sampler)
 		col = exp(-2.0*pi*im*2.0^(-J)*(col_index-1)*xi)
 		broadcast!(*, col, col, wavelet_fourier)
+		#had!(col, wavelet_fourier)
 		z -= dot(col, z)/col_norm * col
 
 		# Update x
@@ -74,3 +94,8 @@ function Kaczmarz(xi::Vector, b::Vector, x0::Vector, J::Integer; prec::Float64=1
 
 	return x
 end
+
+
+function Kaczmarz(xi::Vector, weights::Vector, Jstart::Integer, Jend::Integer; prec::Float64=1e-3, maxiter=100)
+end
+
