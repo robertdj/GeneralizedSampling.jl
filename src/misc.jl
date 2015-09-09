@@ -1,7 +1,7 @@
 @doc """
 In-place Hadamard product/element-wise matrix multiplication.
 """->
-function had!{T<:Number}(A::Matrix{T},B::Matrix{T})
+function had!{T<:Number}(A::Matrix{T}, B::Matrix{T})
 	m,n = size(A)
 	@assert (m,n) == size(B)
 	for j in 1:n
@@ -33,6 +33,16 @@ function upscale(x::Vector)
 	kron(x, ones(2))
 end
 
+
+@doc """
+	isuniform(x)
+
+Test if the sampling points in `x` are on a uniform grid.
+""" ->
+function isuniform(x::Vector)
+	# TODO: Implement!
+	return true
+end
 
 @doc """
 	weights(xi, bandwidth)
