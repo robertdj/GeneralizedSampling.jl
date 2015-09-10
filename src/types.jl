@@ -74,7 +74,7 @@ end
 `M` is the number of samples and `N` is the number of reconstruction functions.
 """->
 function Base.size(T::Freq2wave1D)
-	(length(T.samples), 2^T.J)
+	(size(T,1), size(T,2))
 end
 
 function Base.size(T::Freq2wave1D, d::Int)
@@ -118,5 +118,10 @@ function H(T::Freq2wave1D, x::Vector{Complex{Float64}})
 	D = conj(T.diag)
 	y = had!(D, x)
 	z = nfft_adjoint(T.FFT, y)
+end
+
+function H{T<:Number}(C::Freq2wave1D, x::Vector{T})
+	z = complex(float(x))
+	return H(C, z)
 end
 
