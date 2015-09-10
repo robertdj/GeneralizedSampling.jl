@@ -71,7 +71,7 @@ Compute
 
 	Freq2wave1D * vector
 """->
-function *(T::Freq2wave1D, x::Vector{Complex{Float64}})
+function Base.(:(*))(T::Freq2wave1D, x::Vector{Complex{Float64}})
 	@assert 2^T.J == length(x)
 
 	Tx = nfft(T.FFT, x)
@@ -80,10 +80,8 @@ function *(T::Freq2wave1D, x::Vector{Complex{Float64}})
 	return Tx
 end
 
-#= function *{T<:Number}(T::Freq2wave1D, x::Vector{T}) =#
-#= 	z = complex(float(x)) =#
-function *(T::Freq2wave1D, x::Vector{Float64})
-	z = complex(x)
-	return T*z
+function Base.(:(*)){T<:Number}(C::Freq2wave1D, x::Vector{T})
+	z = complex(float(x))
+	return C*z
 end
 
