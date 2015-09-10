@@ -6,6 +6,7 @@ type Freq2wave1D
 	# Reconstruction
 	wave::String
 	column::Vector{Complex{Float64}}
+	# TODO: J is redundant; remove?
 	J::Int
 
 	# Multiplication with FFT: T*x = diag*NFFT(x)
@@ -36,6 +37,7 @@ function freq2wave(samples::Vector, wave::String, J::Int)
 	p = NFFTPlan(xi_frac, N)
 
 	# Evaluate the first column in change of basis matrix
+	# TODO: Parse strings such as "db4"
 	func = string("Four", wave, "Scaling")
 	basis = eval(parse(func))( samples, J, 0 )
 	diag = basis .* cis(-pi*N*xi_frac)
@@ -43,21 +45,45 @@ function freq2wave(samples::Vector, wave::String, J::Int)
 	if isuniform(samples)
 		weights = false
 	else
+		# TODO: Bandwidth?
 		weights = weights(samples, B)
 	end
 
-	T = Freq2wave1D(samples, weights, wave, basis, J, diag, p)
-
-	return T
+	return Freq2wave1D(samples, weights, wave, basis, J, diag, p)
 end
 
 
-function Base.show(io::IO, C::Freq2wave1D)
+function Base.show(io::IO, T::Freq2wave1D)
 	println(io, "1D change of basis matrix")
 
-	typeof(C.weights) == Bool ?  U = " " : U = " non-"
+	typeof(T.weights) == Bool ?  U = " " : U = " non-"
 
-	println(io, "From: ", length(C.samples), U, "uniform frequency samples")
-	print(io, "To: ", 2^C.J, " ", C.wave, " wavelets")
+	println(io, "From: ", length(T.samples), U, "uniform frequency samples")
+	print(io, "To: ", 2^T.J, " ", T.wave, " wavelets")
+end
+
+
+# ------------------------------------------------------------
+# Basic operations for Freq2wave1D
+
+@doc """
+Compute 
+
+	Freq2wave1D * vector
+"""->
+function *(T::Freq2wave1D, x::Vector{Complex{Float64}})
+	@assert 2^T.J == length(x)
+
+	Tx = nfft(T.FFT, x)
+	had!(Tx, T.diag)
+
+	return Tx
+end
+
+#= function *{T<:Number}(T::Freq2wave1D, x::Vector{T}) =#
+#= 	z = complex(float(x)) =#
+function *(T::Freq2wave1D, x::Vector{Float64})
+	z = complex(x)
+	return T*z
 end
 
