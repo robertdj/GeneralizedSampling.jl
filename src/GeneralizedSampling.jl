@@ -1,15 +1,37 @@
 module GeneralizedSampling
 
-import Wavelets: qmf, wavelet
+# TODO: qmf no longer available from Wavelets
+#import Wavelets: qmf, wavelet
+import Distributions: Categorical, sampler, rand
+using NFFT
 
 # package code goes here
-include("CoB.jl")
+include("types.jl")
+include("misc.jl")
 include("FourierTransforms.jl")
+include("CoB.jl")
+include("Kaczmarz.jl")
 
 export
+	# Types
+	Freq2wave1D,
+	freq2wave,
+
+	# Fourier transforms
 	freq2Haar,
 	FourHaarScaling,
 	FourHaarWavelet,
-	FourDaubScaling
+	FourDaubScaling,
+
+	# Linear equation solvers
+	Kaczmarz,
+
+	# misc
+	had!,
+	isuniform,
+	weights,
+	density,
+	frac,
+	frac!
 
 end # module
