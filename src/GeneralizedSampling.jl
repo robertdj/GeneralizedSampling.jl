@@ -16,6 +16,7 @@ export
 	# Types
 	Freq2wave1D,
 	freq2wave,
+	H,
 
 	# Fourier transforms
 	freq2Haar,
