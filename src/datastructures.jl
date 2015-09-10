@@ -1,49 +1,63 @@
-type freq2wave
+type Freq2wave1D
 	# Sampling
 	samples::Vector{Float64}
 	weights::Union{Bool, Vector{Float64}}
-	M::Int
 
 	# Reconstruction
-	#= wave::Function =#
 	wave::String
-	basis::Vector{Complex{Float64}}
+	column::Vector{Complex{Float64}}
 	J::Int
+
+	# Multiplication with FFT: T*x = diag*NFFT(x)
+	diag::Vector{Complex{Float64}}
+	FFT::NFFT.NFFTPlan
+
+	#Freq2wave1D() = new()
 end
+
 
 @doc """
 	freq2wave(samples::Vector, wave::String, J::Int)
 
-Make change of basis type for switching between frequency responses and wavelets.
+Make change of basis for switching between frequency responses and wavelets.
 
 - `samples` are the sampling locations.
 - `wave` is the name of the wavelet; see documentation for possibilities.
 - `J` is the scale of the wavelet transform to reconstruct.
 """->
 function freq2wave(samples::Vector, wave::String, J::Int)
+	M = length(samples)
+	# TODO: Warning if J is too big
+
+	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
+	N = 2^J
+	xi = scale(samples, 1/N)
+	xi_frac = frac(xi)
+	p = NFFTPlan(xi_frac, N)
+
+	# Evaluate the first column in change of basis matrix
+	func = string("Four", wave, "Scaling")
+	basis = eval(parse(func))( samples, J, 0 )
+	diag = basis .* cis(-pi*N*xi_frac)
+
 	if isuniform(samples)
 		weights = false
 	else
 		weights = weights(samples, B)
 	end
 
-	M = length(samples)
+	T = Freq2wave1D(samples, weights, wave, basis, J, diag, p)
 
-	#= basis = wave(samples, J) =#
-	basis = FourHaarWavelet(samples, J, 0)
-
-	C = freq2wave(samples, weights, M, wave, basis, J)
+	return T
 end
 
 
-function Base.show(io::IO, C::freq2wave)
-	if C.weights == false
-		U = " uniform frequency samples"
-	else
-		U = " non-uniform frequency samples"
-	end
+function Base.show(io::IO, C::Freq2wave1D)
+	println(io, "1D change of basis matrix")
 
-	println(io, "Change of basis matrix:")
-	println(io, "From ", C.M, U, " to ", 2^C.J, " ", C.wave, " wavelets")
+	typeof(C.weights) == Bool ?  U = " " : U = " non-"
+
+	println(io, "From: ", length(C.samples), U, "uniform frequency samples")
+	print(io, "To: ", 2^C.J, " ", C.wave, " wavelets")
 end
 

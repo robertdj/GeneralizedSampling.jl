@@ -139,7 +139,10 @@ end
 The fractional part of x as a number in [-0.5, 0.5).
 """->
 function frac(x::Array{Float64})
-	x - round(x)
+	y = deepcopy(x)
+	frac!(y)
+
+	return y
 end
 
 function frac!(x::Array{Float64})
