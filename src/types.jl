@@ -18,38 +18,47 @@ end
 
 
 @doc """
-	freq2wave(samples::Vector, wave::String, J::Int)
+	freq2wave(samples::Vector, wave::String, J::Int; B=0)
 
 Make change of basis for switching between frequency responses and wavelets.
 
 - `samples` are the sampling locations.
 - `wave` is the name of the wavelet; see documentation for possibilities.
 - `J` is the scale of the wavelet transform to reconstruct.
+- `B` is the bandwidth of the samples; only needed `samples` are non-uniform.
+
+If the samples *are* uniform, `weights` in the output if `false`.
+
+If the samples are *not* uniform, `weights` contains the weights as a vector and `basis` and `diag` are scaled with `sqrt(weights)`.
 """->
-function freq2wave(samples::Vector, wave::String, J::Int)
+function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	M = length(samples)
 	# TODO: Warning if J is too big
-
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
-	N = 2^J
-	xi = scale(samples, 1/N)
-	xi_frac = frac(xi)
-	p = NFFTPlan(xi_frac, N)
 
 	# Evaluate the first column in change of basis matrix
 	# TODO: Parse strings such as "db4"
 	func = string("Four", wave, "Scaling")
 	basis = eval(parse(func))( samples, J, 0 )
-	diag = basis .* cis(-pi*N*xi_frac)
 
 	if isuniform(samples)
-		weights = false
+		W = false
 	else
-		# TODO: Bandwidth?
-		weights = weights(samples, B)
+		if B <= 0.0
+			error("Samples are not uniform; supply bandwidth")
+		end
+
+		W = weights(samples, B)
+		had!(basis, complex(sqrt(W)))
 	end
 
-	return Freq2wave1D(samples, weights, wave, basis, J, diag, p)
+	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
+	N = 2^J
+	xi = scale(samples, 1/N)
+	frac!(xi)
+	p = NFFTPlan(xi, N)
+	diag = basis .* cis(-pi*N*xi)
+
+	return Freq2wave1D(samples, W, wave, basis, J, diag, p)
 end
 
 

@@ -35,12 +35,28 @@ end
 
 
 @doc """
-	isuniform(x)
+	isuniform(x; prec)
 
-Test if the sampling points in `x` are on a uniform grid.
+Test if the sampling points in `x` are on a uniform grid with precision `prec`.
 """ ->
-function isuniform(x::Vector)
-	# TODO: Implement!
+function isuniform(x::Vector; prec::Float64=eps())
+	N = length(x)
+
+	if N == 1
+		error("The vector must have at least two elements")
+	elseif N == 2
+		return true
+	end
+
+	diff = abs(x[1] - x[2])
+
+	for n = 3:N
+		d = abs(x[n-1] - x[n])
+		if abs(d - diff) > prec
+			return false
+		end
+	end
+
 	return true
 end
 
@@ -51,6 +67,7 @@ Compute weights for sampling points `xi`.
 When `xi` is a vector it is assumed to be *sorted*.
 """->
 function weights(xi::Vector, bandwidth::Real)
+	# TODO: Remove this assumption?
 	@assert issorted(xi)
 
 	# TODO: Check that bandwidth is sufficiently large
@@ -59,11 +76,11 @@ function weights(xi::Vector, bandwidth::Real)
 	mu = Array(Float64, N)
 
 	# Boundary cases
-	lower_boundary = xi[N] - 2*bandwidth
-	mu[1] = 0.5*(xi[2] - lower_boundary)
+	L = xi[N] - 2*bandwidth
+	mu[1] = 0.5*(xi[2] - L)
 
-	upper_boundary = xi[1] + 2*bandwidth
-	mu[N] = 0.5*(upper_boundary - xi[N])
+	U = xi[1] + 2*bandwidth
+	mu[N] = 0.5*(U - xi[N])
 
 	# Non-boundary cases
 	for n = 2:N-1
