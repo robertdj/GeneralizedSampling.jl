@@ -125,3 +125,22 @@ function H{T<:Number}(C::Freq2wave1D, x::Vector{T})
 	return H(C, z)
 end
 
+
+@doc """
+	collect(Freq2wave1D)
+
+Return the full change of basis matrix.
+"""->
+function Base.collect(T::Freq2wave1D)
+	# TODO: Check if the matrix fits in memory
+
+	# Fourier matrix
+	J = T.J
+	k = [0:2^J-1;]'
+	xk = T.samples*k
+	scale!(xk, -2*pi*2.0^(-J))
+	F = cis(xk)
+
+	broadcast!(*, F, F, T.column)
+end
+
