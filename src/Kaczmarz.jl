@@ -1,9 +1,9 @@
-#@doc """
-#	Kaczmarz(A, b; prec)
-#
-#General Kaczmarz algorithm for solving the least squares problem `Ax ≈ b` for complex `A` and `b`.
-#By default, `prec=1e-4`.
-#""" ->
+@doc """
+	Kaczmarz(A, b; prec)
+
+General Kaczmarz algorithm for solving the least squares problem `Ax ≈ b` for complex `A` and `b`.
+By default, `prec=1e-4`.
+""" ->
 function Kaczmarz{T<:Number}(A::Matrix{T}, b::Vector{T}; prec=1e-4)
 	M, N = size(A)
 	maxiter = N^2
@@ -54,17 +54,14 @@ function Kaczmarz{T<:Number}(A::Matrix{T}, b::Vector{T}; prec=1e-4)
 end
 
 
-#=
 @doc """
-	Kaczmarz(xi::Vector, b::Vector, x0::Vector; prec::Float64=1e-2, maxiter=100)
+	Kaczmarz(T::Freq2wave1D, b, x0; prec)
 
-Kaczmarz algorithm for 
+Kaczmarz algorithm for solving `T*x = b` with starting point `x0`.
 """ ->
-=#
-function Kaczmarz(xi::Vector, b::Vector, x::Vector; prec::Float64=1e-2)
+function Kaczmarz(T::Freq2wave1D, b::Vector, x::Vector; prec::Float64=1e-4)
+	M, N = size(T)
 	# TODO: Test if x/b are complex
-	M = length(xi)
-	N = length(x)
 	maxiter = N^2
 
 	# Wavelet scale
@@ -72,8 +69,7 @@ function Kaczmarz(xi::Vector, b::Vector, x::Vector; prec::Float64=1e-2)
 
 	# Squared norms of rows, columns and matrix
 	# TODO: This is only for Haar
-	wavelet_fourier = FourHaarScaling(xi, J, 0)
-	row_norm = N*abs(wavelet_fourier).^2
+	row_norm = N*abs(T.column1).^2
 	matrix_norm = sum(row_norm)
 	col_norm = matrix_norm / N
 
@@ -89,18 +85,15 @@ function Kaczmarz(xi::Vector, b::Vector, x::Vector; prec::Float64=1e-2)
 	for iter = 1:maxiter
 		# Update z
 		col_index = rand(col_sampler)
-		#col = exp(-2.0*pi*im*2.0^(-J)*(col_index-1)*xi)
 		col = cis(-2.0*pi*2.0^(-J)*(col_index-1)*xi)
-		broadcast!(*, col, col, wavelet_fourier)
-		#had!(col, wavelet_fourier)
+		had!(col, T.column1)
 		zdiff = dot(col, z)/col_norm * col
 		z -= zdiff
 
 		# Update x
 		row_index = rand(row_sampler)
-		#row = exp(-2.0*pi*im*2.0^(-J)*[0:N-1;]*xi[row_index])
 		row = cis(-2.0*pi*2.0^(-J)*[0:N-1;]*xi[row_index])
-		scale!(row, wavelet_fourier[row_index])
+		scale!(row, T.column1[row_index])
 		#conj!(row) # Fix previous/next line as well!
 		xdiff = (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] * conj(row)
 		x += xdiff
@@ -109,7 +102,8 @@ function Kaczmarz(xi::Vector, b::Vector, x::Vector; prec::Float64=1e-2)
 		if mod(iter,8*N) == 0
 			println(iter)
 			xnorm = norm(x)
-			Ax, Atz = mul(xi, x, z)
+			Ax = T*x
+			Atz = H(T,z)
 			test1 = norm(Ax - b + z)/(matrix_norm*xnorm)
 			test2 = norm(Atz)/(matrix_norm^2*xnorm)
 

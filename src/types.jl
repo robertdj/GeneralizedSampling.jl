@@ -5,7 +5,7 @@ type Freq2wave1D
 
 	# Reconstruction
 	wave::String
-	column::Vector{Complex{Float64}}
+	column1::Vector{Complex{Float64}}
 	# TODO: J is redundant; remove?
 	J::Int
 
@@ -150,6 +150,6 @@ function Base.collect(T::Freq2wave1D)
 	scale!(xk, -2*pi*2.0^(-J))
 	F = cis(xk)
 
-	broadcast!(*, F, F, T.column)
+	broadcast!(*, F, F, T.column1)
 end
 
