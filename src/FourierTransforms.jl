@@ -19,6 +19,7 @@ end
 @vectorize_1arg Number FourHaarScaling
 
 
+# TODO: FourHaarScaling(xi, J)?
 
 @doc """
 	FourHaarScaling(xi, J, k::Int)
@@ -135,7 +136,7 @@ function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), max
 		# To ensure that the while loop below does not exit 
 		# prematurely, a minimum number of iterations is set,
 		# which is the number of iterations needed for abs(xi) < 1
-		M = (abs(xi) > 1.0 ? ceil(Int, log2(abs(xi))) : 1)
+		minM = (abs(xi) > 1.0 ? ceil(Int, log2(abs(xi))) : 1)
 
 		# Factors in the product
 		m = 1
@@ -145,7 +146,7 @@ function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), max
 			y = dot(C, exp(xi*Four_idx))
 			Y *= y
 
-			if m > M
+			if m > minM
 				y_almost1 = abs(y) <= almost1
 			end
 			m += 1
