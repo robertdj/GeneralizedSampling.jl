@@ -1,12 +1,11 @@
 @doc """
-	Kaczmarz(A, b; prec)
+	REK(A, b; prec)
 
-General Kaczmarz algorithm for solving the least squares problem `Ax ≈ b` for complex `A` and `b`.
+General Random Extended Kaczmarz algorithm for solving the least squares problem `Ax ≈ b` for complex `A` and `b`.
 By default, `prec=1e-4`.
 """ ->
-function Kaczmarz{T<:Number}(A::Matrix{T}, b::Vector{T}; prec=1e-4)
+function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x::Vector{T}; prec=1e-4, maxiter::Int=size(A,2)^2)
 	M, N = size(A)
-	maxiter = N^2
 
 	# Create alias tables for sampling row and column indices
 	A_squared = abs(A).^2
@@ -21,7 +20,6 @@ function Kaczmarz{T<:Number}(A::Matrix{T}, b::Vector{T}; prec=1e-4)
 	col_sampler = sampler(col_distribution)
 
 	# The Kaczmarz solver
-	x = zeros(T, N)
 	z = deepcopy(b)
 
 	for iter = 1:maxiter
@@ -34,6 +32,7 @@ function Kaczmarz{T<:Number}(A::Matrix{T}, b::Vector{T}; prec=1e-4)
 		# Update x
 		row_index = rand(row_sampler)
 		row = vec( A[row_index, :] )
+		# BLAS: scal!
 		xdiff = (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] * conj(row)
 		x += xdiff
 
@@ -55,20 +54,20 @@ end
 
 
 @doc """
-	Kaczmarz(T::Freq2wave1D, b, x0; prec)
+	REK(T::Freq2wave1D, b, x0; prec)
 
-Kaczmarz algorithm for solving `T*x = b` with starting point `x0`.
+Random Extended Kaczmarz algorithm for solving `T*x = b` with starting point `x0`.
 """ ->
-function Kaczmarz(T::Freq2wave1D, b::Vector, x::Vector; prec::Float64=1e-4)
+function REK(T::Freq2wave1D, b::Vector, x::Vector; prec::Float64=1e-4, maxiter::Int=length(x)^2)
 	M, N = size(T)
 	# TODO: Test if x/b are complex
-	maxiter = N^2
+
+	# TODO: Scale b with weights
 
 	# Wavelet scale
 	J = Int(log2(N))
 
 	# Squared norms of rows, columns and matrix
-	# TODO: This is only for Haar
 	row_norm = N*abs(T.column1).^2
 	matrix_norm = sum(row_norm)
 	col_norm = matrix_norm / N
@@ -85,14 +84,14 @@ function Kaczmarz(T::Freq2wave1D, b::Vector, x::Vector; prec::Float64=1e-4)
 	for iter = 1:maxiter
 		# Update z
 		col_index = rand(col_sampler)
-		col = cis(-2.0*pi*2.0^(-J)*(col_index-1)*xi)
+		col = cis(-2.0*pi*2.0^(-J)*(col_index-1)*T.samples)
 		had!(col, T.column1)
 		zdiff = dot(col, z)/col_norm * col
 		z -= zdiff
 
 		# Update x
 		row_index = rand(row_sampler)
-		row = cis(-2.0*pi*2.0^(-J)*[0:N-1;]*xi[row_index])
+		row = cis(-2.0*pi*2.0^(-J)*[0:N-1;]*T.samples[row_index])
 		scale!(row, T.column1[row_index])
 		#conj!(row) # Fix previous/next line as well!
 		xdiff = (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] * conj(row)
@@ -100,7 +99,6 @@ function Kaczmarz(T::Freq2wave1D, b::Vector, x::Vector; prec::Float64=1e-4)
 
 		# Check for convergence
 		if mod(iter,8*N) == 0
-			println(iter)
 			xnorm = norm(x)
 			Ax = T*x
 			Atz = H(T,z)

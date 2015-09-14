@@ -109,13 +109,13 @@ end
 
 
 @doc """
-	density(xi, bandwidth)
+	density(xi, K)
 
-Compute the density of the sampling points `xi` with bandwidth `bandwidth`:
+Compute the density of the sampling points `xi` with bandwidth `K`:
 
 - In 1D, `xi` must be a vector of *sorted* points and the density is the largest difference between two consecutive points in `xi`.
 - In 2D, `xi` must be an `M-by-2` matrix and the density is the smallest number δ that allows a covering of the "bandwidth area" with circles centered in the points of `xi` and radii δ.
-Currently, the "bandwidth area" is a square centered at the origin and with sidelength `2*bandwidth`. 
+Currently, the "bandwidth area" is a square centered at the origin and with sidelength `2*K`. 
 """->
 function density(xi::Vector, bandwidth::Number)
 	@assert issorted(xi)
@@ -132,7 +132,7 @@ function density(xi::Vector, bandwidth::Number)
 
 	# Non-boundary cases
 	for n = 2:N
-		diff = xi[n] - xi[n-1]
+		@inbounds diff = xi[n] - xi[n-1]
 		if diff > density
 			density = diff
 		end

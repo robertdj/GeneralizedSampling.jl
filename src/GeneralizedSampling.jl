@@ -25,7 +25,7 @@ export
 	FourDaubScaling,
 
 	# Linear equation solvers
-	Kaczmarz,
+	REK,
 
 	# misc
 	had!,
