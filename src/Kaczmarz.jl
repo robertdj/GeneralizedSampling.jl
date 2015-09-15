@@ -8,7 +8,8 @@ function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x::Vector{T}; prec=1e-4, max
 	M, N = size(A)
 
 	# Create alias tables for sampling row and column indices
-	A_squared = abs(A).^2
+	# TODO: Try NumericExtensions package
+	A_squared = abs2(A)
 	row_norm = vec( sum(A_squared,2) )
 	col_norm = vec( sum(A_squared,1) )
 	matrix_norm = sum(col_norm)
@@ -22,25 +23,31 @@ function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x::Vector{T}; prec=1e-4, max
 	# The Kaczmarz solver
 	z = deepcopy(b)
 
+	#= col = zeros(Complex{Float64}, M) =#
+	#= row = zeros(Complex{Float64}, N) =#
+
 	for iter = 1:maxiter
 		# Update z
 		col_index = rand(col_sampler)
 		col = A[:,col_index]
-		zdiff = dot(col, z)/col_norm[col_index] * col
-		z -= zdiff
+		col_val = -BLAS.dotc(M,col,1,z,1)/col_norm[col_index]
+		BLAS.axpy!(M, col_val, col, 1, z, 1) # z = z + col_val*col
 
 		# Update x
 		row_index = rand(row_sampler)
 		row = vec( A[row_index, :] )
-		# BLAS: scal!
-		xdiff = (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] * conj(row)
-		x += xdiff
+		row_val = (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] 
+		conj!(row)
+		BLAS.axpy!(N, row_val, row, 1, x, 1) # x = x + row_val*row
 
 		# Check for convergence
 		if mod(iter,8*N) == 0
 			xnorm = norm(x)
-			test1 = norm(A*x - b + z)/(matrix_norm*xnorm)
-			test2 = norm(A'*z)/(matrix_norm^2*xnorm)
+			# Pre-allocate?
+			Ax = A*x
+			Atz = A'*z
+			test1 = norm(Ax - b + z)/(matrix_norm*xnorm)
+			test2 = norm(Atz)/(matrix_norm^2*xnorm)
 
 			if test1 < prec && test2 < prec
 				println("Number of iterations: ", iter)
