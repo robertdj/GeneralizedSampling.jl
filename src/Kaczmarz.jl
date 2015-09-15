@@ -22,22 +22,19 @@ function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x::Vector{T}; prec=1e-4, max
 
 	# The Kaczmarz solver
 	z = deepcopy(b)
-
-	#= col = zeros(Complex{Float64}, M) =#
-	#= row = zeros(Complex{Float64}, N) =#
+	AH = A'
 
 	for iter = 1:maxiter
 		# Update z
 		col_index = rand(col_sampler)
-		col = A[:,col_index]
+		col = view(A, :, col_index)
 		col_val = -BLAS.dotc(M,col,1,z,1)/col_norm[col_index]
 		BLAS.axpy!(M, col_val, col, 1, z, 1) # z = z + col_val*col
 
 		# Update x
 		row_index = rand(row_sampler)
-		row = vec( A[row_index, :] )
-		row_val = (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] 
-		conj!(row)
+		row = view(AH, :, row_index)
+		row_val = (b[row_index] - z[row_index] - BLAS.dotc(N,row,1,x,1))/row_norm[row_index] 
 		BLAS.axpy!(N, row_val, row, 1, x, 1) # x = x + row_val*row
 
 		# Check for convergence
