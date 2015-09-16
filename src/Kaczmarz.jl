@@ -1,10 +1,10 @@
 @doc """
-	REK(A, b; prec)
+	REK(A, b, x0; prec)
 
 General Random Extended Kaczmarz algorithm for solving the least squares problem `Ax ≈ b` for complex `A` and `b`.
 By default, `prec=1e-4`.
 """ ->
-function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x::Vector{T}; prec=1e-4, maxiter::Int=size(A,2)^2)
+function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=1e-4, maxiter::Int=size(A,2)^2)
 	M, N = size(A)
 
 	# Create alias tables for sampling row and column indices
@@ -22,6 +22,7 @@ function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x::Vector{T}; prec=1e-4, max
 
 	# The Kaczmarz solver
 	z = deepcopy(b)
+	x = deepcopy(x0)
 	AH = A'
 
 	for iter = 1:maxiter
@@ -29,18 +30,18 @@ function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x::Vector{T}; prec=1e-4, max
 		col_index = rand(col_sampler)
 		col = view(A, :, col_index)
 		col_val = -BLAS.dotc(M,col,1,z,1)/col_norm[col_index]
-		BLAS.axpy!(M, col_val, col, 1, z, 1) # z = z + col_val*col
+		BLAS.axpy!(col_val, col, z) # z = z + col_val*col
 
 		# Update x
 		row_index = rand(row_sampler)
 		row = view(AH, :, row_index)
 		row_val = (b[row_index] - z[row_index] - BLAS.dotc(N,row,1,x,1))/row_norm[row_index] 
-		BLAS.axpy!(N, row_val, row, 1, x, 1) # x = x + row_val*row
+		BLAS.axpy!(row_val, row, x) # x = x + row_val*row
 
 		# Check for convergence
 		if mod(iter,8*N) == 0
 			xnorm = norm(x)
-			# Pre-allocate?
+			# TODO: Pre-allocate?
 			Ax = A*x
 			Atz = A'*z
 			test1 = norm(Ax - b + z)/(matrix_norm*xnorm)
@@ -57,12 +58,15 @@ function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x::Vector{T}; prec=1e-4, max
 end
 
 
+#=
 @doc """
 	REK(T::Freq2wave1D, b, x0; prec)
 
 Random Extended Kaczmarz algorithm for solving `T*x = b` with starting point `x0`.
 """ ->
-function REK(T::Freq2wave1D, b::Vector, x::Vector; prec::Float64=1e-4, maxiter::Int=length(x)^2)
+=#
+#@debug function REK(T::Freq2wave1D, b::Vector, x0::Vector; prec::Float64=1e-4, maxiter::Int=length(x)^2)
+function REK(T::Freq2wave1D, b::Vector, x0::Vector; prec::Float64=1e-4, maxiter::Int=length(x)^2)
 	M, N = size(T)
 	# TODO: Test if x/b are complex
 
@@ -84,22 +88,28 @@ function REK(T::Freq2wave1D, b::Vector, x::Vector; prec::Float64=1e-4, maxiter::
 
 	# The Kaczmarz solver
 	z = deepcopy(b)
+	x = deepcopy(x0)
+
+	column = cis(-2.0*pi*2.0^(-J)*T.samples)
+	ccolumn1 = conj(T.column1)
+	cis_base = 2.0*pi*2.0^(-J)*[0:N-1;]
 
 	for iter = 1:maxiter
 		# Update z
 		col_index = rand(col_sampler)
-		col = cis(-2.0*pi*2.0^(-J)*(col_index-1)*T.samples)
+		col = column.^(col_index-1)
 		had!(col, T.column1)
-		zdiff = dot(col, z)/col_norm * col
-		z -= zdiff
+		col_val = -BLAS.dotc(M,col,1,z,1)/col_norm
+		#BLAS.axpy!(col_val, col, z) # z = z + col_val*col
+		z += col_val*col
 
 		# Update x
 		row_index = rand(row_sampler)
-		row = cis(-2.0*pi*2.0^(-J)*[0:N-1;]*T.samples[row_index])
-		scale!(row, T.column1[row_index])
-		#conj!(row) # Fix previous/next line as well!
-		xdiff = (b[row_index] - z[row_index] - BLAS.dotu(N,x,1,row,1))/row_norm[row_index] * conj(row)
-		x += xdiff
+		row = cis(cis_base*T.samples[row_index])
+		scale!(row, ccolumn1[row_index])
+		row_val = (b[row_index] - z[row_index] - BLAS.dotc(N,row,1,x,1))/row_norm[row_index]
+		#BLAS.axpy!(row_val, row, x) # x = x + row_val*row
+		x += row_val*row
 
 		# Check for convergence
 		if mod(iter,8*N) == 0
@@ -114,21 +124,6 @@ function REK(T::Freq2wave1D, b::Vector, x::Vector; prec::Float64=1e-4, maxiter::
 				break
 			end
 		end
-	end
-
-	return x
-end
-
-function Kaczmarz(xi::Vector, weights::Vector, Jstart::Integer, Jend::Integer; prec::Float64=1e-3, maxiter=100)
-	x = zeros(Complex, 2^(Jstart-1))
-
-	M = length(xi)
-	z = zeros(Complex, M)
-
-	for J = Jstart:Jend
-		x = upscale(x)
-
-		x, z = Kaczmarz(xi, z, x; prec=prec)
 	end
 
 	return x
