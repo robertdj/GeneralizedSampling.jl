@@ -12,12 +12,12 @@ include("misc.jl")
 include("FourierTransforms.jl")
 include("CoB.jl")
 include("Kaczmarz.jl")
+include("CGNR.jl")
 
 export
 	# Types
 	Freq2wave1D,
 	freq2wave,
-	H,
 
 	# Fourier transforms
 	freq2Haar,
@@ -27,6 +27,7 @@ export
 
 	# Linear equation solvers
 	REK,
+	cgnr,
 
 	# misc
 	had!,

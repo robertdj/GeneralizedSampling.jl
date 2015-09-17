@@ -11,10 +11,10 @@ The iteration stops when `norm(xnew - xold) < prec` or after at most `maxiter` i
 """->
 function cgnr{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=sqrt(eps()), maxiter=length(x))
 	# Initialize
-	x = deepcopy(x0)
+	x = copy(x0)
 	r = b - A*x
 	z = A'*r
-	p = deepcopy(z)
+	p = copy(z)
 
 	for iter = 1:maxiter
 		ztz = norm(z)^2
@@ -37,4 +37,41 @@ function cgnr{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=sqrt(ep
 	return x
 end
 
+
+function cgnr(T::Freq2wave1D, b::Vector{Complex{Float64}}, x0::Vector{Complex{Float64}}; prec=sqrt(eps()), maxiter=length(x))
+	# Initialize
+	x = copy(x0)
+
+	y = similar(b)
+	mul!(T, x, y) # y = T*x
+	r = b - y
+
+	z = similar(x0)
+	mulT!(T, r, z) # z = T'*r
+	p = copy(z)
+
+	for iter = 1:maxiter
+		ztz = norm(z)^2
+		mul!(T, p, y) # y = T*x
+		mu = ztz / norm(y)^2
+		x = x + mu*p
+		#BLAS.axpy!(mu, p, x) # x = x + mu*p
+		r = r - mu*y
+		mulT!(T, r, z) # z = T'*r
+		tau = norm(z)^2 / ztz
+		p = z + tau*p
+		#scale!(p, tau)
+		#BLAS.axpy!(1.0, z, p)
+
+		# Check for convergence: |xnew - xold|
+		#=
+		if mu*norm(p) < prec
+			println("Number of iterations: ", iter)
+			break
+		end
+		=#
+	end
+
+	return x
+end
 
