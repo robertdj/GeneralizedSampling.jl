@@ -122,11 +122,10 @@ function mulT!(T::Freq2wave1D, v::Vector{Complex{Float64}}, z::Vector{Complex{Fl
 	@assert size(T,1) == length(v)
 	@assert size(T,2) == length(z)
 
-	# TODO: As in mul!
-	fill!(z, 0.0+0.0*im)
-
 	D = conj(T.diag)
 	had!(D, v)
+	# TODO: As in mul!
+	fill!(z, 0.0+0.0*im)
 	NFFT.nfft_adjoint!(T.FFT, D, z)
 end
 
@@ -165,8 +164,7 @@ function Base.collect(T::Freq2wave1D)
 
 	# Fourier matrix
 	J = T.J
-	k = [0:2^J-1;]'
-	xk = T.samples*k
+	xk = T.samples*[0:2^J-1;]'
 	scale!(xk, -2*pi*2.0^(-J))
 	F = cis(xk)
 

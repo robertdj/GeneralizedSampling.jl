@@ -35,6 +35,8 @@ export
 	weights,
 	density,
 	frac,
-	frac!
+	frac!,
+	mul!,
+	mulT!
 
 end # module
