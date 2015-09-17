@@ -1,5 +1,7 @@
 @doc """
-In-place Hadamard product/element-wise matrix multiplication.
+	had!(A, B)
+
+In-place Hadamard product/element-wise matrix multiplication; the first argument is modified.
 """->
 function had!{T<:Number}(A::Matrix{T}, B::Matrix{T})
 	m,n = size(A)
@@ -9,7 +11,6 @@ function had!{T<:Number}(A::Matrix{T}, B::Matrix{T})
 			@inbounds A[i,j] *= B[i,j]
 		end
 	end
-	return A
 end
 
 function had!{T<:Number}(A::Vector{T}, B::Vector{T})
@@ -18,8 +19,6 @@ function had!{T<:Number}(A::Vector{T}, B::Vector{T})
 	for i in 1:m
 		@inbounds A[i] *= B[i]
 	end
-
-	return A
 end
 
 

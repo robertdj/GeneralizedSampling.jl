@@ -98,40 +98,59 @@ end
 
 
 @doc """
-Compute `Freq2wave * vector`
+	mul!(T::Freq2wave1D, x::Vector, y::Vector)
+	
+Replace `y` with `T*x`.
 """->
-function Base.(:(*))(T::Freq2wave1D, x::Vector{Complex{Float64}})
+function mul!(T::Freq2wave1D, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
+	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
-	y = nfft(T.FFT, x)
-	had!(y, T.diag)
+	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
+	fill!(y, 0.0+0.0*im)
 
+	NFFT.nfft!(T.FFT, x, y)
+	had!(y, T.diag)
+end
+
+@doc """
+	mulT!(T::Freq2wave1D, v::Vector, z::Vector)
+	
+Replace `z` with `T'*v`.
+"""->
+function mulT!(T::Freq2wave1D, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
+	@assert size(T,1) == length(v)
+	@assert size(T,2) == length(z)
+
+	D = conj(T.diag)
+	had!(D, v)
+	# TODO: As in mul!
+	fill!(z, 0.0+0.0*im)
+	NFFT.nfft_adjoint!(T.FFT, D, z)
+end
+
+
+@doc """
+	*(T::Freq2wave, x::vector)
+
+Compute `T*x`.
+"""->
+function Base.(:(*))(T::Freq2wave1D, x::Vector)
+	y = Array(Complex{Float64}, size(T,1))
+	mul!(T, complex(x), y)
 	return y
 end
 
-function Base.(:(*)){T<:Number}(C::Freq2wave1D, x::Vector{T})
-	z = complex(float(x))
-	return C*z
-end
-
-
-# TODO: Find a better name for multiplication with the adjoint
 @doc """
-	H(T::Freq2wave1D, x)
+	Ac_mul_B(T::Freq2wave1D, x::vector)
+	'*(T::Freq2wave1D, x::vector)
 
 Compute `T'*x`.
 """->
-function H(T::Freq2wave1D, x::Vector{Complex{Float64}})
-	@assert size(T,1) == length(x)
-
-	D = conj(T.diag)
-	y = had!(D, x)
-	z = nfft_adjoint(T.FFT, y)
-end
-
-function H{T<:Number}(C::Freq2wave1D, x::Vector{T})
-	z = complex(float(x))
-	return H(C, z)
+function Base.Ac_mul_B(T::Freq2wave1D, x::Vector{Complex{Float64}})
+	y = Array(Complex{Float64}, size(T,2))
+	mulT!(T, complex(x), y)
+	return y
 end
 
 
@@ -145,8 +164,7 @@ function Base.collect(T::Freq2wave1D)
 
 	# Fourier matrix
 	J = T.J
-	k = [0:2^J-1;]'
-	xk = T.samples*k
+	xk = T.samples*[0:2^J-1;]'
 	scale!(xk, -2*pi*2.0^(-J))
 	F = cis(xk)
 
