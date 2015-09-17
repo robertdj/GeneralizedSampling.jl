@@ -4,7 +4,7 @@ module GeneralizedSampling
 #import Wavelets: qmf, wavelet
 import Distributions: Categorical, sampler, rand
 using NFFT
-import ArrayViews: view, rowvec_view
+import ArrayViews: view
 
 # package code goes here
 include("types.jl")
