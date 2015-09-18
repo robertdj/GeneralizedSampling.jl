@@ -115,7 +115,7 @@ function REK(T::Freq2wave1D, b::Vector{Complex{Float64}}, x0::Vector{Complex{Flo
 		if mod(iter,8*N) == 0
 			xnorm = norm(x)
 			Ax = T*x
-			Atz = H(T,z)
+			Atz = T'*z
 			test1 = norm(Ax - b + z)/(matrix_norm*xnorm)
 			test2 = norm(Atz)/(matrix_norm^2*xnorm)
 

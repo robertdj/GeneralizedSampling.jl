@@ -13,8 +13,7 @@ b = rand(M) + rand(M)*im
 x = A \ b
 
 x0 = complex(zeros(N))
-prec = 1e-4
-x1 = REK(T, b, x0; prec=prec)
+x1 = REK(T, b, x0; prec=1e-6)
 
 #@show norm(x - x1, Inf)
 @test_approx_eq_eps( x, x1, 0.01 )

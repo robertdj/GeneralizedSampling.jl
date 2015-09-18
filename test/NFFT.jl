@@ -1,3 +1,4 @@
+# TODO: Is this doing the same as mul.jl?
 using GeneralizedSampling
 using Base.Test
 
@@ -28,12 +29,12 @@ y2 = A*b
 
 # Multiplication with adjoint change of basis matrix
 c = rand(M)
-z1 = H(T, c)
+z1 = T'*c
 z2 = A'*c
 @test_approx_eq_eps(z1, z2, 1e-4) 
 
 c += rand(M)*im
-z1 = H(T, c)
+z1 = T'*c
 z2 = A'*c
 @test_approx_eq_eps(z1, z2, 1e-4) 
 
