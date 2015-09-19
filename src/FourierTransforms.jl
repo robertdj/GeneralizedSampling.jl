@@ -120,7 +120,7 @@ end
 
 
 @doc """
-### FourDaubWavelet(xi, N; ...)
+### FourDaubWavelet(xi, N[, J, k]; ...)
 
 The Fourier transform of the Daubechies `N` wavelet function evaluated at `xi`.
 `N` is the number of zeros at -1.
@@ -139,20 +139,38 @@ function FourDaubWavelet{T<:Real}( XI::AbstractArray{T}, N::Int; args... )
 	XI /= 2
 	Z = FourDaubScaling(XI, N; args...)
 
-	N_xi = length(XI)
+	M = length(XI)
 
 	# The infinite product for each xi
 	# TODO: Vectorize this?
-	for n = 1:N_xi
-		xi = XI[n]
-
+	for m = 1:M
+		xi = XI[m]
 		# High pass filter
 		H = conj(dot( C, exp((xi+0.5)*Four_idx) ))
 
-		# Fourier transform of wavelet
-		Z[n] *= exp( 2*pi*im*xi )*H
+		Z[m] *= exp( 2*pi*im*xi )*H
 	end
 
 	return Z
+end
+
+# Vectorize and add dilation/scale and translation. 
+# Identical for scaling and wavelet
+for name in [:FourDaubScaling, :FourDaubWavelet]
+	@eval begin
+		function $name{T<:Real}(xi::Vector{T}, N::Int, J::Int; args...)
+			scale_xi = scale( 2.0^(-J), xi )
+			y = $name( scale_xi, N; args... )
+			scale!( 2.0^(-J/2), y )
+			return y
+		end
+
+		function $name{T<:Real}(xi::Vector{T}, N::Int, J::Int, k::Int; args...)
+			y = $name(xi, N, J; args... )
+			D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
+			had!(y, D)
+			return y
+		end
+	end
 end
 
