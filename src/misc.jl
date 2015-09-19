@@ -168,3 +168,42 @@ function frac!(x::Array{Float64})
 	end
 end
 
+
+@doc """
+	wavename(name)
+
+Return the characteristics of a wavelet needed for computations.
+"""->
+function wavename(name::String)
+	lname = lowercase(name)
+
+	if lname == "haar"
+		return "Haar"
+	elseif lname[1:2] == "db" && typeof(parse(lname[3:end])) <: Integer
+		return ("Daubechies", parse(lname[3:end]))
+	else
+		error("Uknown wavelet name")
+	end
+end
+
+@doc """
+	wavefilter(name)
+
+Return the low pass filter coefficients of the wavelet `name`.
+
+Uses the `Wavelets` package.
+"""->
+function wavefilter(name::String)
+	parsed_name = wavename(name)
+
+	if parsed_name == "Haar"
+		C = wavelet( WT.Haar() )
+	elseif parsed_name[1] == "Daubechies"
+		C = wavelet( WT.Daubechies{parsed_name[2]}() )
+	else
+		error("Uknown wavelet name")
+	end
+
+	return C.qmf
+end
+

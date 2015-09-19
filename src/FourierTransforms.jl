@@ -1,12 +1,11 @@
 # ------------------------------------------------------------
 # Exact Fourier transforms of Haar wavelet/scaling function
 
-# Fourier transform of Haar scaling function
-
 @doc """
-	FourHaarScaling(xi)
+	FourHaarScaling(xi[, J, k])
 
-The Fourier transform of the Haar scaling function evaluated at `xi`.
+The Fourier transform of the Haar scaling function on scale `J` and translation `k` evaluated at `xi`.
+If not supplied, `J = 0` and `k = 0`.
 """->
 function FourHaarScaling{T<:Real}(xi::T)
 	if xi == 0
@@ -16,115 +15,53 @@ function FourHaarScaling{T<:Real}(xi::T)
 	end
 end
 
-@vectorize_1arg Real FourHaarScaling
-
-
 @doc """
-	FourHaarScaling(xi, J)
+	FourHaarWavelet(xi[, J, k])
 
-The Fourier transform of the Haar scaling function at `xi` on scale `J`.
-"""->
-function FourHaarScaling{T<:Real}(xi::Vector{T}, J::Int)
-	M = length(xi)
-	C2 = 2.0^(-J)
-	C = 2.0^(-J/2)
-
-	y = Array(Complex{Float64}, M)
-	for m = 1:M
-		y[m] = C*FourHaarScaling( C2*xi[m] )
-	end
-
-	return y
-end
-
-
-@doc """
-	FourHaarScaling(xi, J, k::Int)
-
-The Fourier transform of the Haar scaling function on scale `J` and translation `k` evaluated at `xi`.
-"""->
-function FourHaarScaling{T<:Real}(xi::Vector{T}, J::Int, k::Int)
-	y = FourHaarScaling(xi, J)
-	D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
-	had!(y, D)
-
-	return y
-end
-
-@doc """
-	FourHaarScaling(xi, J, k::Vector) -> F
-
-`F[n,m]` is the Fourier transform at translation `k[m]` evaluated at `xi[n]`.
-"""->
-function FourHaarScaling(xi::Vector, J::Int, k::Vector{Int})
-	M = length(xi)
-	N = length(k)
-
-	y = Array(Complex{Float64}, M, N)
-
-	for n = 1:N
-		@inbounds y[:,n] = FourHaarScaling(xi, J, k[n])
-	end
-
-	return y
-end
-
-
-# Fourier transform of Haar wavelet
-
-@doc """
-	FourHaarWavelet(xi)
-
-The Fourier transform of the Haar wavelet evaluated at `xi`.
+The Fourier transform of the Haar wavelet on scale `J` and translation `k` evaluated at `xi`.
+If not supplied, `J = 0` and `k = 0`.
 """->
 function FourHaarWavelet(xi::Number)
 	if xi == 0
-		return complex(0.0)
+		return zero(Complex{Float64})
 	else
-		return (1.0 - exp(-pi*im*xi))^2.0 / (2.0*pi*im*xi)
+		return (1.0 - exp(-pi*im*xi))^2 / (2.0*pi*im*xi)
 	end
 end
 
-@vectorize_1arg Number FourHaarWavelet
 
+# Vectorize and add dilation/scale and translation. 
+# Identical for scaling and wavelet
+for name in [:FourHaarScaling, :FourHaarWavelet]
+	@eval begin
+		@vectorize_1arg Real $name
 
-# Fourier transform of Haar scaling function with translation (J) and dilation (k)
-# Entry (n,m) is the Fourier transform at translation k[m] in xi[n]
+		function $name{T<:Real}(xi::Vector{T}, J::Int)
+			M = length(xi)
+			C2 = 2.0^(-J)
+			C = 2.0^(-J/2)
+			y = Array(Complex{Float64}, M)
+			for m = 1:M
+				@inbounds y[m] = C*$name( C2*xi[m] )
+			end
+			return y
+		end
 
-@doc """
-	FourHaarWavelet(xi, J, k)
-
-The Fourier transform of the Haar wavelet on scale `J` and translation `k` evaluated at `xi`.
-"""->
-function FourHaarWavelet(xi::Vector, J::Int, k::Int)
-	y = exp( -2*pi*im*2.0^(-J)*k*xi ) .* 2.0^(-J/2) .* FourHaarWavelet(2.0^(-J)*xi);
-end
-
-@doc """
-	FourHaarWavelet(xi, J, k::Vector) -> F
-
-`F[n,m]` is the Fourier transform at translation `k[m]` evaluated at `xi[n]`.
-"""->
-function FourHaarWavelet(xi::Vector, J::Int, k::Vector)
-	M = length(xi)
-	N = length(k)
-
-	y = Array(Complex{Float64}, M, N)
-
-	for n = 1:N
-		@inbounds y[:,n] = FourHaarWavelet(xi, J, k[n])
+		function $name{T<:Real}(xi::Vector{T}, J::Int, k::Int)
+			y = $name(xi, J)
+			D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
+			had!(y, D)
+			return y
+		end
 	end
-
-	return y
 end
 
 
 # ------------------------------------------------------------
-
 # Fourier transform of Daubechies wavelets
 
 @doc """
-### FourDaubScaling(xi, N; ...)
+	FourDaubScaling(xi, N; ...)
 
 The Fourier transform of the Daubechies `N` scaling function evaluated at `xi`.
 `N` is the number of zeros at -1.
@@ -133,66 +70,52 @@ The function is computed as an 'infinite' product;
 to control this there are optional arguments:
 
 - `prec`: Include factors that are numerically smaller than 1-prec.
-- `maxM`: The maximum number of factors.
+- `maxCount`: The maximum number of factors.
 """->
-function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), maxM=20 )
+function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), maxCount=100)
 	Z = Array(Complex{Float64}, size(XI))
 
-	# Fixed factor in the complex exponential
-	Four_idx = 2*pi*im*[0:2*N-1;]
-
 	# Filter coefficients
-	C = qmf(wavelet( WT.Daubechies{N}() ))
-	C = scale!(C, 1/sum(C))
+	C = wavefilter( string("db", N) )
+	scale!(C, 1/sum(C))
 
-	N_xi = length(XI)
-	almost1 = 1 - prec
+	M = length(XI)
+	almost1 = 1.0 - prec
+
+	# Fixed factor in the complex exponential
+	Four_idx = 2.0*pi*im*[0:2*N-1;]
+	Y = y = zero(Complex{Float64})
 
 	# The infinite product of low pass filters for each xi
-	for n = 1:N_xi
-		xi = XI[n] / 2.0
+	for m = 1:M
+		xi = XI[m] / 2.0
 		Y = y = dot(C, exp(xi*Four_idx))
 
-		# When xi is (almost) an even integer y is approx 1.
+		# When xi is (almost) an even integer y is (approx) 1.
 		# To ensure that the while loop below does not exit 
 		# prematurely, a minimum number of iterations is set,
 		# which is the number of iterations needed for abs(xi) < 1
-		minM = (abs(xi) > 1.0 ? ceil(Int, log2(abs(xi))) : 1)
+		minCount = (abs(xi) > 1.0 ? ceil(Int, log2(abs(xi))) : 1)
+		for count = 1:minCount
+			xi /= 2.0
+			Y *= dot(C, exp(xi*Four_idx))
+		end
 
-		# Factors in the product
-		m = 1
+		count = 1
 		y_almost1 = false
-		while !y_almost1 && m <= maxM
+		while !y_almost1 && count <= maxCount
 			xi /= 2.0
 			y = dot(C, exp(xi*Four_idx))
 			Y *= y
 
-			if m > minM
-				y_almost1 = abs(y) <= almost1
-			end
-			m += 1
+			y_almost1 = abs(y) <= almost1
+			count += 1
 		end
 
-		Z[n] = Y
+		Z[m] = Y
 	end
 
 	return Z
-end
-
-
-@doc """
-	DaubLowPass(xi, N::Int)
-
-Low-pass filter for Daubechies `N` wavelet.
-Uses the Wavelets package to compute the filter coefficients.
-"""->
-function DaubLowPass(xi::Real, N::Int)
-	C = qmf(wavelet( WT.Daubechies{N}() ))
-	C = scale!(C, 1/sum(C))
-
-	Y = dot(C, exp(2*pi*im*xi*[0:2*N-1;]))
-
-	return Y
 end
 
 
@@ -209,7 +132,7 @@ function FourDaubWavelet{T<:Real}( XI::AbstractArray{T}, N::Int; args... )
 	Four_idx = 2*pi*im*[0:2*N-1;]
 
 	# Filter coefficients
-	C = qmf(wavelet( WT.Daubechies{N}() ))
+	C = wavefilter( string("db", N) )
 	C = scale!(C, 1/sum(C))
 
 	# Fourier transform of low pass filter

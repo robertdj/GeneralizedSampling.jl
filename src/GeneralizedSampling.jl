@@ -1,9 +1,8 @@
 module GeneralizedSampling
 
-# TODO: qmf no longer available from Wavelets
-#import Wavelets: qmf, wavelet
-import Distributions: Categorical, sampler, rand
 using NFFT
+import Distributions: Categorical, sampler, rand
+import Wavelets: wavelet
 import ArrayViews: view
 
 # package code goes here
