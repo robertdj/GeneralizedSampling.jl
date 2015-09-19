@@ -10,7 +10,6 @@ import ArrayViews: view
 include("types.jl")
 include("misc.jl")
 include("FourierTransforms.jl")
-include("CoB.jl")
 include("Kaczmarz.jl")
 include("CGNR.jl")
 
@@ -20,7 +19,6 @@ export
 	freq2wave,
 
 	# Fourier transforms
-	freq2Haar,
 	FourHaarScaling,
 	FourHaarWavelet,
 	FourDaubScaling,

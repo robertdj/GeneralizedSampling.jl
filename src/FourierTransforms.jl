@@ -8,26 +8,47 @@
 
 The Fourier transform of the Haar scaling function evaluated at `xi`.
 """->
-function FourHaarScaling(xi::Number)
+function FourHaarScaling{T<:Real}(xi::T)
 	if xi == 0
-		return complex(1.0)
+		return one(Complex{Float64})
 	else
 		return (1.0 - exp(-2.0*pi*im*xi)) / (2.0*pi*im*xi)
 	end
 end
 
-@vectorize_1arg Number FourHaarScaling
+@vectorize_1arg Real FourHaarScaling
 
 
-# TODO: FourHaarScaling(xi, J)?
+@doc """
+	FourHaarScaling(xi, J)
+
+The Fourier transform of the Haar scaling function at `xi` on scale `J`.
+"""->
+function FourHaarScaling{T<:Real}(xi::Vector{T}, J::Int)
+	M = length(xi)
+	C2 = 2.0^(-J)
+	C = 2.0^(-J/2)
+
+	y = Array(Complex{Float64}, M)
+	for m = 1:M
+		y[m] = C*FourHaarScaling( C2*xi[m] )
+	end
+
+	return y
+end
+
 
 @doc """
 	FourHaarScaling(xi, J, k::Int)
 
 The Fourier transform of the Haar scaling function on scale `J` and translation `k` evaluated at `xi`.
 """->
-function FourHaarScaling(xi::Vector, J::Int, k::Int)
-	y = exp( -2.0*pi*im*2.0^(-J)*k*xi ) .* 2.0^(-J/2) .* FourHaarScaling(2.0^(-J)*xi)
+function FourHaarScaling{T<:Real}(xi::Vector{T}, J::Int, k::Int)
+	y = FourHaarScaling(xi, J)
+	D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
+	had!(y, D)
+
+	return y
 end
 
 @doc """

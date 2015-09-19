@@ -38,7 +38,7 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	# Evaluate the first column in change of basis matrix
 	# TODO: Parse strings such as "db4"
 	func = string("Four", wave, "Scaling")
-	basis = eval(parse(func))( samples, J, 0 )
+	column1 = eval(parse(func))( samples, J )
 
 	if isuniform(samples)
 		W = false
@@ -48,7 +48,8 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 		end
 
 		W = weights(samples, B)
-		had!(basis, complex(sqrt(W)))
+		mu = complex( sqrt(W) )
+		had!(basis, mu)
 	end
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
@@ -56,9 +57,9 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	xi = scale(samples, 1/N)
 	frac!(xi)
 	p = NFFTPlan(xi, N)
-	diag = basis .* cis(-pi*N*xi)
+	diag = column1 .* cis(-pi*N*xi)
 
-	return Freq2wave1D(samples, W, wave, basis, J, diag, p)
+	return Freq2wave1D(samples, W, wave, column1, J, diag, p)
 end
 
 
@@ -168,6 +169,6 @@ function Base.collect(T::Freq2wave1D)
 	scale!(xk, -2*pi*2.0^(-J))
 	F = cis(xk)
 
-	broadcast!(*, F, F, T.column1)
+	broadcast!(*, F, T.column1, F)
 end
 
