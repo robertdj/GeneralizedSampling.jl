@@ -3,7 +3,6 @@ using GeneralizedSampling
 using Base.Test
 
 include("mul.jl")
-#include("NFFT.jl")
 include("Kaczmarz.jl")
 include("CGNR.jl")
 

@@ -49,7 +49,7 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 
 		W = weights(samples, B)
 		mu = complex( sqrt(W) )
-		had!(basis, mu)
+		had!(column1, mu)
 	end
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
