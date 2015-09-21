@@ -1,5 +1,8 @@
+# TODO: Should these load lines be present in every test file?
 using GeneralizedSampling
 using Base.Test
 
-# write your own tests here
-@test 1 == 1
+include("mul.jl")
+include("Kaczmarz.jl")
+include("CGNR.jl")
+
