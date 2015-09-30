@@ -25,9 +25,9 @@ Make change of basis for switching between frequency responses and wavelets.
 - `samples` are the sampling locations.
 - `wave` is the name of the wavelet; see documentation for possibilities.
 - `J` is the scale of the wavelet transform to reconstruct.
-- `B` is the bandwidth of the samples; only needed `samples` are non-uniform.
+- `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
 
-If the samples *are* uniform, `weights` in the output if `false`.
+If the samples *are* uniform, `weights` in the output is `false`.
 
 If the samples are *not* uniform, `weights` contains the weights as a vector and `basis` and `diag` are scaled with `sqrt(weights)`.
 """->
@@ -57,7 +57,7 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	xi = scale(samples, 1/N)
 	frac!(xi)
 	p = NFFTPlan(xi, N)
-	diag = column1 .* cis(-pi*N*xi)
+	diag = column1 .* cis(-pi*samples)
 
 	return Freq2wave1D(samples, W, wave, column1, J, diag, p)
 end
@@ -91,10 +91,19 @@ function Base.size(T::Freq2wave1D, d::Int)
 	if d == 1
 		length(T.samples)
 	elseif d == 2
-		2^T.J
+		2^wscale(T)
 	else
 		error("Dimension does not exist")
 	end
+end
+
+@doc """
+	wscale(T::Freq2wave1D)
+
+Return the scale of the wavelet coefficients.
+"""->
+function wscale(T::Freq2wave1D)
+	T.J
 end
 
 
@@ -164,7 +173,7 @@ function Base.collect(T::Freq2wave1D)
 	# TODO: Check if the matrix fits in memory
 
 	# Fourier matrix
-	J = T.J
+	J = wscale(T)
 	xk = T.samples*[0:2^J-1;]'
 	scale!(xk, -2*pi*2.0^(-J))
 	F = cis(xk)

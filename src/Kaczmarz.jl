@@ -1,7 +1,7 @@
 @doc """
 	REK(A::Matrix, b, x0; prec, maxiter)
 
-General Random Extended Kaczmarz algorithm for solving the least squares problem `min norm(Ax - b)` for complex `A` and `b` with starting point `x0`..
+General Random Extended Kaczmarz algorithm for solving the least squares problem `min norm(Ax - b)` for complex `A` and `b` with starting point `x0`.
 """ ->
 function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=1e-6, maxiter::Int=size(A,2)^2)
 	M, N = size(A)
@@ -94,22 +94,20 @@ function REK(T::Freq2wave1D, b::Vector{Complex{Float64}}, x0::Vector{Complex{Flo
 
 	for iter = 1:maxiter
 		# Update z
-		col_index = rand(col_sampler)-1
+		col_index = rem(rand(col_sampler)-1, N)
 		for m = 1:M
 			@inbounds col[m] = T.column1[m]*column[m]^col_index
 		end
 		col_val = -BLAS.dotc(M,col,1,z,1)/col_norm
 		BLAS.axpy!(col_val, col, z) # z = z + col_val*col
-		#z += col_val*col
 
 		# Update x
 		row_index = rand(row_sampler)
 		for n = 1:N
-			row[n] = cis( row_base[n]*T.samples[row_index] )*conj(T.column1[row_index])
+			@inbounds row[n] = cis( row_base[n]*T.samples[row_index] )*conj(T.column1[row_index])
 		end
 		row_val = (b[row_index] - z[row_index] - BLAS.dotc(N,row,1,x,1))/row_norm[row_index]
 		BLAS.axpy!(row_val, row, x) # x = x + row_val*row
-		#x += row_val*row
 
 		# Check for convergence
 		if mod(iter,8*N) == 0

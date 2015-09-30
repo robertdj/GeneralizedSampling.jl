@@ -19,12 +19,12 @@ The theory behind generalized sampling can be found in e.g.:
 
 ## Dependencies
 
-The following Julia packages are required for `GeneralizedSampling`:
+The following Julia packages are required for GeneralizedSampling:
 
 - [NFFT](https://github.com/tknopp/NFFT.jl)
 - [Wavelets](https://github.com/JuliaDSP/Wavelets.jl)
 
-In order to use the Kaczmarz algorithm for solving least squares problem you also need
+In order to use the Kaczmarz algorithm for solving least squares problems you also need
 
 - [Distributions](https://github.com/JuliaStats/Distributions.jl)
 - [ArrayViews](https://github.com/JuliaLang/ArrayViews.jl)

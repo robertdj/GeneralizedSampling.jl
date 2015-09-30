@@ -30,6 +30,7 @@ export
 	had!,
 	isuniform,
 	weights,
+	wscale,
 	density,
 	frac,
 	frac!,
