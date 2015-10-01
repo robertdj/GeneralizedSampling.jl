@@ -59,6 +59,11 @@ function isuniform(x::Vector; prec::Float64=eps())
 	return true
 end
 
+function isuniform(x::Matrix; prec::Float64=eps())
+	return true
+end
+
+
 @doc """
 	weights(xi, bandwidth)
 
@@ -140,10 +145,22 @@ function density(xi::Vector, bandwidth::Number)
 	return density
 end
 
-function density(xi::Matrix, bandwidth::Number)
+function density(xi::Matrix{Float64}, bandwidth::Number)
 	M, dim = size(xi)
 	@assert dim == 2
 
+	# Compute Voronoi tesselation
+	reval("library(deldir)")
+	globalEnv[:x] = RObject( xi[:,1] )
+	globalEnv[:y] = RObject( xi[:,2] )
+	globalEnv[:K] = RObject( bandwidth )
+	reval("V = deldir(x, y, rw=c(-K,K,-K,K))")
+
+	# Corners of Voronoi cells
+	x1 = rcopy(reval("V\$dirsgs\$x1"))
+	y1 = rcopy(reval("V\$dirsgs\$y1"))
+	x2 = rcopy(reval("V\$dirsgs\$x2"))
+	y2 = rcopy(reval("V\$dirsgs\$y2"))
 
 	error("Not implemented yet")
 end
@@ -155,7 +172,7 @@ end
 The fractional part of x as a number in [-0.5, 0.5).
 """->
 function frac(x::Array{Float64})
-	y = deepcopy(x)
+	y = copy(x)
 	frac!(y)
 
 	return y
