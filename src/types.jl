@@ -223,12 +223,10 @@ function freq2wave(samples::Matrix, wave::String, J::Int; B::Float64=0.0)
 	# Evaluate the first column in change of basis matrix
 	# TODO: Parse strings such as "db4"
 	func = string("Four", wave, "Scaling")
-	#= samplesx = view(samples, :, 1) =#
-	#= samplesy = view(samples, :, 2) =#
-	#= column1 = eval(parse(func))( samplesx, J ) =#
-	#= column1y = eval(parse(func))( samplesy, J ) =#
-	column1 = eval(parse(func))( samples[:,1], J )
-	column1y = eval(parse(func))( samples[:,2], J )
+	samplesx = view(samples, :, 1)
+	samplesy = view(samples, :, 2)
+	column1 = eval(parse(func))( samplesx, J )
+	column1y = eval(parse(func))( samplesy, J )
 	had!(column1, column1y)
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
@@ -237,9 +235,7 @@ function freq2wave(samples::Matrix, wave::String, J::Int; B::Float64=0.0)
 	xi = scale(samples, 1/N)
 	frac!(xi)
 	p = NFFTPlan(xi', (N,N))
-	diag = column1 .* cis(-pi*(samples[:,1] + samples[:,2]))
-	#diag = column1 .* cis(-pi*(samplesx + samplesy))
-	#diag = column1 .* cis(-pi*sum(samples,2))
+	diag = column1 .* cis(-pi*(samplesx + samplesy))
 
 	if isuniform(samples)
 		W = false
@@ -280,16 +276,17 @@ function Base.size(T::Freq2wave2D, d::Int)
 	end
 end
 
-function mul!(T::Freq2wave2D, x::Matrix{Complex{Float64}}, y::Vector{Complex{Float64}})
+function mul!(T::Freq2wave2D, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
-	@assert size(T,2) == length(x)
+	@assert (N = size(T,2)) == length(x)
 
 	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
 	fill!(y, 0.0+0.0*im)
+	N = Int(sqrt(N))
+	X = reshape_view(x, (N,N))
 
-	NFFT.nfft!(T.FFT, x, y)
+	NFFT.nfft!(T.FFT, X, y)
 	had!(y, T.diag)
-	#y = NFFT.nfft(T.FFT, x)
 
 	return y
 end
@@ -305,7 +302,7 @@ function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Matrix{Complex{Fl
 	NFFT.nfft_adjoint!(T.FFT, D, z)
 end
 
-function Base.(:(*))(T::Freq2wave2D, x::Matrix)
+function Base.(:(*))(T::Freq2wave2D, x::Vector)
 	y = Array(Complex{Float64}, size(T,1))
 	mul!(T, complex(x), y)
 	return y

@@ -3,7 +3,7 @@ module GeneralizedSampling
 using NFFT
 import Distributions: Categorical, sampler, rand
 import Wavelets: wavelet
-import ArrayViews: view
+import ArrayViews: view, reshape_view
 
 # package code goes here
 include("types.jl")
