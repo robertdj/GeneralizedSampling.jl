@@ -98,9 +98,9 @@ function weights(xi::Matrix, bandwidth::Real)
 	# This is done using R and its deldir package
 	# TODO: Find a Julia way
 	reval("library(deldir)")
-	globalEnv[:x] = sexp( xi[:,1] )
-	globalEnv[:y] = sexp( xi[:,2] )
-	globalEnv[:K] = sexp( bandwidth )
+	globalEnv[:x] = RObject( xi[:,1] )
+	globalEnv[:y] = RObject( xi[:,2] )
+	globalEnv[:K] = RObject( bandwidth )
 	reval("V = deldir(x, y, rw=c(-K,K,-K,K))")
 
 	area = rcopy(reval("V\$summary\$dir.area"))
