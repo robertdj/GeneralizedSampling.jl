@@ -214,6 +214,16 @@ function wscale(T::Freq2wave)
 	T.J
 end
 
+@doc """
+	wside(T::Freq2wave2D)
+
+The number of wavelet coefficients in each dimension.
+"""->
+function wside(T::Freq2wave2D)
+	2^wscale(T)
+end
+
+
 function freq2wave(samples::AbstractMatrix, wave::String, J::Int; B::Float64=0.0)
 	M, D = size(samples)
 	@assert D == 2
@@ -259,7 +269,7 @@ function Base.show(io::IO, T::Freq2wave2D)
 	typeof(T.weights) == Bool ?  U = " " : U = " non-"
 
 	M, N = size(T)
-	N = Int(sqrt(N))
+	N = wside(T)
 	println(io, "From: ", M, U, "uniform frequency samples")
 	print(io, "To: ", N, "-by-", N, " ", T.wave, " wavelets")
 end
@@ -277,11 +287,11 @@ end
 
 function mul!(T::Freq2wave2D, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
-	@assert (N = size(T,2)) == length(x)
+	@assert size(T,2) == length(x)
 
 	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
 	fill!(y, 0.0+0.0*im)
-	N = Int(sqrt(N))
+	N = wside(T)
 	X = reshape_view(x, (N,N))
 
 	NFFT.nfft!(T.FFT, X, y)
@@ -297,13 +307,13 @@ end
 
 function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
-	@assert (N = size(T,2)) == length(z)
+	@assert size(T,2) == length(z)
 
 	D = conj(T.diag)
 	had!(D, v)
 	# TODO: As in mul!
 	fill!(z, 0.0+0.0*im)
-	N = Int(sqrt(N))
+	N = wside(T)
 	Z = reshape_view(z, (N,N))
 	NFFT.nfft_adjoint!(T.FFT, D, Z)
 
@@ -318,21 +328,28 @@ end
 
 
 function Base.collect(T::Freq2wave2D)
-	# TODO: Check if the matrix fits in memory
-
 	# Fourier matrix
-	M, NN = size(T)
-	F = Array(Complex{Float64}, M, NN)
-	N = Int(sqrt(NN))
-	for m = 1:M
-		samplex = T.samples[m,1]
-		sampley = T.samples[m,2]
-		x = cis(-2*pi*samplex*[0:N-1;]/N)
-		y = cis(-2*pi*sampley*[0:N-1;]/N)
+	M, N = size(T)
+	F = Array(Complex{Float64}, M, N)
+	K = wside(T)
 
-		F[m,:] = kron(x,y)
+	samplesx = view(T.samples, :, 1)
+	samplesy = view(T.samples, :, 2)
+
+	for n = 1:N
+		# Manual kron for each row
+		r = rem(n,K)
+		if r == 0
+			r = K
+		end
+		q = div(n-r,K)
+		r -= 1
+
+		for m = 1:M
+			F[m,n] = T.column1[m]*cis( -2*pi*(samplesx[m]*q + samplesy[m]*r)/K )
+		end
 	end
 
-	broadcast!(*, F, T.column1, F)
+	return F
 end
 
