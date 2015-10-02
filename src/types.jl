@@ -51,6 +51,14 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	func = string("Four", wave, "Scaling")
 	column1 = eval(parse(func))( samples, J )
 
+	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
+	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
+	N = 2^J
+	xi = scale(samples, 1/N)
+	frac!(xi)
+	p = NFFTPlan(xi, N)
+	diag = column1 .* cis(-pi*samples)
+
 	if isuniform(samples)
 		W = false
 	else
@@ -62,14 +70,6 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 		mu = complex( sqrt(W) )
 		had!(column1, mu)
 	end
-
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
-	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
-	N = 2^J
-	xi = scale(samples, 1/N)
-	frac!(xi)
-	p = NFFTPlan(xi, N)
-	diag = column1 .* cis(-pi*samples)
 
 	return Freq2wave1D(samples, W, wave, column1, J, diag, p)
 end
@@ -229,13 +229,14 @@ function freq2wave(samples::Matrix, wave::String, J::Int; B::Float64=0.0)
 	column1y = eval(parse(func))( samplesy, J )
 	had!(column1, column1y)
 
+	diag = column1 .* cis( -pi*(samplesx + samplesy) )
+
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
 	# TODO: This is for functions on the unit square. Should rectangles be allowed?
 	N = 2^J
 	xi = scale(samples, 1/N)
 	frac!(xi)
 	p = NFFTPlan(xi', (N,N))
-	diag = column1 .* cis(-pi*(samplesx + samplesy))
 
 	if isuniform(samples)
 		W = false
@@ -259,17 +260,16 @@ function Base.show(io::IO, T::Freq2wave2D)
 	typeof(T.weights) == Bool ?  U = " " : U = " non-"
 
 	M, N = size(T)
-	# TODO: sqrt(N)
+	N = Int(sqrt(N))
 	println(io, "From: ", M, U, "uniform frequency samples")
 	print(io, "To: ", N, "-by-", N, " ", T.wave, " wavelets")
 end
 
-# TODO: Should size(T,2) return total number or for one dimension
+# TODO: Should size(T,2) return total number or for one dimension?
 function Base.size(T::Freq2wave2D, d::Int)
 	if d == 1
 		size(T.samples, 1)
 	elseif d == 2
-		#2^(2*wscale(T))
 		4^wscale(T)
 	else
 		error("Dimension does not exist")
@@ -291,28 +291,30 @@ function mul!(T::Freq2wave2D, x::Vector{Complex{Float64}}, y::Vector{Complex{Flo
 	return y
 end
 
-function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Matrix{Complex{Float64}})
+function Base.(:(*))(T::Freq2wave2D, x::Vector)
+	y = Array(Complex{Float64}, size(T,1))
+	mul!(T, complex(x), y)
+end
+
+function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
-	@assert size(T,2) == length(z)
+	@assert (N = size(T,2)) == length(z)
 
 	D = conj(T.diag)
 	had!(D, v)
 	# TODO: As in mul!
 	fill!(z, 0.0+0.0*im)
-	NFFT.nfft_adjoint!(T.FFT, D, z)
+	N = Int(sqrt(N))
+	Z = reshape_view(z, (N,N))
+	NFFT.nfft_adjoint!(T.FFT, D, Z)
+
+	return vec(z)
 end
 
-function Base.(:(*))(T::Freq2wave2D, x::Vector)
-	y = Array(Complex{Float64}, size(T,1))
-	mul!(T, complex(x), y)
-	return y
-end
-
-function Base.Ac_mul_B(T::Freq2wave2D, x::Vector{Complex{Float64}})
-	N = 2^wscale(T)
-	y = Array(Complex{Float64}, N, N)
+function Base.Ac_mul_B(T::Freq2wave2D, x::Vector)
+	N = size(T,2)
+	y = Array(Complex{Float64}, N)
 	mulT!(T, complex(x), y)
-	return y
 end
 
 
