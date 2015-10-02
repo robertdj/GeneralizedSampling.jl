@@ -25,8 +25,6 @@ immutable Freq2wave1D
 	# Multiplication with FFT: T*x = diag*NFFT(x)
 	diag::Vector{Complex{Float64}}
 	FFT::NFFT.NFFTPlan{1,Float64}
-
-	#Freq2wave1D() = new()
 end
 
 @doc """
@@ -57,7 +55,6 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	xi = scale(samples, 1/N)
 	frac!(xi)
 	p = NFFTPlan(xi, N)
-	diag = column1 .* cis(-pi*samples)
 
 	if isuniform(samples)
 		W = false
@@ -70,6 +67,8 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 		mu = complex( sqrt(W) )
 		had!(column1, mu)
 	end
+
+	diag = column1 .* cis(-pi*samples)
 
 	return Freq2wave1D(samples, W, wave, column1, J, diag, p)
 end
@@ -215,7 +214,7 @@ function wscale(T::Freq2wave)
 	T.J
 end
 
-function freq2wave(samples::Matrix, wave::String, J::Int; B::Float64=0.0)
+function freq2wave(samples::AbstractMatrix, wave::String, J::Int; B::Float64=0.0)
 	M, D = size(samples)
 	@assert D == 2
 	# TODO: Warning if J is too big
@@ -228,8 +227,6 @@ function freq2wave(samples::Matrix, wave::String, J::Int; B::Float64=0.0)
 	column1 = eval(parse(func))( samplesx, J )
 	column1y = eval(parse(func))( samplesy, J )
 	had!(column1, column1y)
-
-	diag = column1 .* cis( -pi*(samplesx + samplesy) )
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
 	# TODO: This is for functions on the unit square. Should rectangles be allowed?
@@ -249,6 +246,8 @@ function freq2wave(samples::Matrix, wave::String, J::Int; B::Float64=0.0)
 		mu = complex( sqrt(W) )
 		had!(column1, mu)
 	end
+
+	diag = column1 .* cis( -pi*(samplesx + samplesy) )
 
 	return Freq2wave2D(samples, W, wave, column1, J, diag, p)
 end

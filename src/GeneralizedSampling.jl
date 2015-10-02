@@ -15,6 +15,7 @@ include("CGNR.jl")
 export
 	# Types
 	Freq2wave1D,
+	Freq2wave2D,
 	freq2wave,
 
 	# Fourier transforms

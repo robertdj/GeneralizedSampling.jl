@@ -1,4 +1,4 @@
-#= using GeneralizedSampling =#
+using GeneralizedSampling
 using Base.Test
 
 # 1D
@@ -35,7 +35,7 @@ for J = 3:10
 	y1 = A*x
 	y2 = T*x
 	#@show norm(y1-y2)
-	#@test_approx_eq_eps( y1, y2, 1e-5 )
+	@test_approx_eq_eps( y1, y2, 1e-5 )
 end
 
 
