@@ -9,9 +9,7 @@ function Base.size(T::CoB)
 end
 
 function Base.size(T::CoB, d::Int)
-	if d != 1 || d != 2
-		error("Dimension must be 1 or 2")
-	end
+	@assert d == 1 || d == 2
 
 	size(T, Val{d})
 end

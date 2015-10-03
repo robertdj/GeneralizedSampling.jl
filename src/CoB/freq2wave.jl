@@ -93,6 +93,18 @@ function mul!(T::Freq2wave1D, x::Vector{Complex{Float64}}, y::Vector{Complex{Flo
 end
 
 @doc """
+	*(T::Freq2wave, x::vector)
+
+Compute `T*x`.
+"""->
+function Base.(:(*))(T::Freq2wave1D, x::Vector)
+	y = Array(Complex{Float64}, size(T,1))
+	mul!(T, complex(x), y)
+	return y
+end
+
+
+@doc """
 	mulT!(T::Freq2wave, v::Vector, z::Vector)
 	
 Replace `z` with `T'*v`.
@@ -106,18 +118,6 @@ function mulT!(T::Freq2wave1D, v::Vector{Complex{Float64}}, z::Vector{Complex{Fl
 	# TODO: As in mul!
 	fill!(z, 0.0+0.0*im)
 	NFFT.nfft_adjoint!(T.FFT, D, z)
-end
-
-
-@doc """
-	*(T::Freq2wave, x::vector)
-
-Compute `T*x`.
-"""->
-function Base.(:(*))(T::Freq2wave1D, x::Vector)
-	y = Array(Complex{Float64}, size(T,1))
-	mul!(T, complex(x), y)
-	return y
 end
 
 @doc """
@@ -139,15 +139,15 @@ end
 Return the full change of basis matrix.
 """->
 function Base.collect(T::Freq2wave1D)
-	# TODO: Check if the matrix fits in memory
+	M, N = size(T)
+	F = Array(Complex{Float64}, M, N)
+	for n = 1:N
+		for m = 1:M
+			@inbounds F[m,n] = T.column1[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
+		end
+	end
 
-	# Fourier matrix
-	J = wscale(T)
-	xk = T.samples*[0:2^J-1;]'
-	scale!(xk, -2*pi*2.0^(-J))
-	F = cis(xk)
-
-	broadcast!(*, F, T.column1, F)
+	return F
 end
 
 
@@ -155,7 +155,7 @@ end
 # 2D change of basis matrix
 
 @doc """
-	wscale(T::Freq2wave)
+	wscale(Freq2wave)
 
 Return the scale of the wavelet coefficients.
 """->
@@ -216,7 +216,7 @@ end
 function Base.show(io::IO, T::Freq2wave2D)
 	println(io, "2D change of basis matrix")
 
-	isnull(T.weights) ?  U = " " : U = " non-"
+	isuniform(T) ?  U = " " : U = " non-"
 
 	M, N = size(T)
 	N = wside(T)
@@ -247,6 +247,7 @@ function Base.(:(*))(T::Freq2wave2D, x::Vector)
 	y = Array(Complex{Float64}, size(T,1))
 	mul!(T, complex(x), y)
 end
+
 
 function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
@@ -289,9 +290,10 @@ function Base.collect(T::Freq2wave2D)
 		r -= 1
 
 		for m = 1:M
-			F[m,n] = T.column1[m]*cis( -2*pi*(samplesx[m]*q + samplesy[m]*r)/K )
+			@inbounds F[m,n] = T.column1[m]*cis( -2*pi*(samplesx[m]*q + samplesy[m]*r)/K )
 		end
 	end
 
 	return F
 end
+

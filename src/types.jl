@@ -3,6 +3,10 @@
 """->
 abstract CoB
 
+
+# ------------------------------------------------------------
+# Frequency to wavelets
+
 @doc """
 `Freq2wave1D` is a change of basis type between 1D frequency samples and 1D wavelets. 
 """->
@@ -26,6 +30,7 @@ end
 `Freq2wave2D` is a change of basis type between 2D frequency samples and 2D wavelets. 
 """->
 immutable Freq2wave2D <: CoB
+	# TODO: If samples *are* uniform, this should be *two* matrices
 	# Sampling
 	samples::Matrix{Float64}
 	weights::Nullable{Vector{Float64}}
@@ -44,8 +49,11 @@ end
 @doc """
 `Freq2wave` is the union of `Freq2wave1D` and `Freq2wave2D`.
 """->
-Freq2wave = Union(Freq2wave1D, Freq2wave2D)
+Freq2wave = Union{Freq2wave1D, Freq2wave2D}
 
+
+# ------------------------------------------------------------
+# Load functions for types
 
 include("CoB/common.jl")
 include("CoB/freq2wave.jl")
