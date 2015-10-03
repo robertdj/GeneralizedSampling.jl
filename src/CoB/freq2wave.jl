@@ -31,7 +31,7 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	p = NFFTPlan(xi, N)
 
 	if isuniform(samples)
-		W = false
+		W = Nullable{Vector{Float64}}()
 	else
 		if B <= 0.0
 			error("Samples are not uniform; supply bandwidth")
@@ -40,6 +40,7 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 		W = weights(samples, B)
 		mu = complex( sqrt(W) )
 		had!(column1, mu)
+		W = Nullable(W)
 	end
 
 	diag = column1 .* cis(-pi*samples)
@@ -51,7 +52,7 @@ end
 function Base.show(io::IO, T::Freq2wave1D)
 	println(io, "1D change of basis matrix")
 
-	typeof(T.weights) == Bool ?  U = " " : U = " non-"
+	isnull(T.weights) ?  U = " " : U = " non-"
 
 	M, N = size(T)
 	println(io, "From: ", M, U, "uniform frequency samples")
@@ -202,7 +203,7 @@ function freq2wave(samples::AbstractMatrix, wave::String, J::Int; B::Float64=0.0
 	p = NFFTPlan(xi', (N,N))
 
 	if isuniform(samples)
-		W = false
+		W = Nullable{Vector{Float64}}()
 	else
 		if B <= 0.0
 			error("Samples are not uniform; supply bandwidth")
@@ -211,6 +212,7 @@ function freq2wave(samples::AbstractMatrix, wave::String, J::Int; B::Float64=0.0
 		W = weights(samples, B)
 		mu = complex( sqrt(W) )
 		had!(column1, mu)
+		W = Nullable(W)
 	end
 
 	diag = column1 .* cis( -pi*(samplesx + samplesy) )
@@ -222,7 +224,7 @@ end
 function Base.show(io::IO, T::Freq2wave2D)
 	println(io, "2D change of basis matrix")
 
-	typeof(T.weights) == Bool ?  U = " " : U = " non-"
+	isnull(T.weights) ?  U = " " : U = " non-"
 
 	M, N = size(T)
 	N = wside(T)

@@ -1,7 +1,7 @@
 immutable Freq2wave1D
 	# Sampling
 	samples::Vector{Float64}
-	weights::Union{Bool, Vector{Float64}}
+	weights::Nullable{Vector{Float64}}
 
 	# Reconstruction
 	wave::String
@@ -18,7 +18,7 @@ end
 immutable Freq2wave2D
 	# Sampling
 	samples::Matrix{Float64}
-	weights::Union{Bool, Vector{Float64}}
+	weights::Nullable{Vector{Float64}}
 
 	# Reconstruction
 	wave::String
@@ -34,6 +34,5 @@ end
 Freq2wave = Union(Freq2wave1D, Freq2wave2D)
 
 
-#include("CoB/common.jl")
 include("CoB/freq2wave.jl")
 
