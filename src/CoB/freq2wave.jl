@@ -11,9 +11,10 @@ Make change of basis for switching between frequency responses and wavelets.
 - `J` is the scale of the wavelet transform to reconstruct.
 - `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
 
-If the samples *are* uniform, `weights` in the output is `false`.
+`weights` in the output is a `Nullable` type and
 
-If the samples are *not* uniform, `weights` contains the weights as a vector and `basis` and `diag` are scaled with `sqrt(weights)`.
+- If the samples *are* uniform, `weights` is `Null`.
+- If the samples are *not* uniform, `weights` contains the weights as a `Nullable` vector and `basis` and `diag` are scaled with `sqrt(weights)`.
 """->
 function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	# TODO: Warning if J is too big
@@ -48,11 +49,14 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	return Freq2wave1D(samples, W, wave, column1, J, diag, p)
 end
 
+function isuniform(T::Freq2wave; prec::Float64=eps())
+	isnull(T.weights)
+end
 
 function Base.show(io::IO, T::Freq2wave1D)
 	println(io, "1D change of basis matrix")
 
-	isnull(T.weights) ?  U = " " : U = " non-"
+	isuniform(T) ?  U = " " : U = " non-"
 
 	M, N = size(T)
 	println(io, "From: ", M, U, "uniform frequency samples")
@@ -63,14 +67,12 @@ end
 # ------------------------------------------------------------
 # Basic operations for Freq2wave1D
 
-function Base.size(T::Freq2wave1D, d::Int)
-	if d == 1
-		length(T.samples)
-	elseif d == 2
-		2^wscale(T)
-	else
-		error("Dimension does not exist")
-	end
+function Base.size(T::Freq2wave, ::Type{Val{1}})
+	length(T.samples)
+end
+
+function Base.size(T::Freq2wave1D, ::Type{Val{2}})
+	T.FFT.N[1]
 end
 
 
@@ -153,16 +155,6 @@ end
 # 2D change of basis matrix
 
 @doc """
-	size(Freq2wave) -> (M,N)
-	size(Freq2wave, d) -> M or N
-
-`M` is the number of samples and `N` is the number of reconstruction functions.
-"""->
-function Base.size(T::Freq2wave)
-	(size(T,1), size(T,2))
-end
-
-@doc """
 	wscale(T::Freq2wave)
 
 Return the scale of the wavelet coefficients.
@@ -177,7 +169,7 @@ end
 The number of wavelet coefficients in each dimension.
 """->
 function wside(T::Freq2wave2D)
-	2^wscale(T)
+	T.FFT.N[1]
 end
 
 
@@ -232,15 +224,8 @@ function Base.show(io::IO, T::Freq2wave2D)
 	print(io, "To: ", N, "-by-", N, " ", T.wave, " wavelets")
 end
 
-# TODO: Should size(T,2) return total number or for one dimension?
-function Base.size(T::Freq2wave2D, d::Int)
-	if d == 1
-		size(T.samples, 1)
-	elseif d == 2
-		4^wscale(T)
-	else
-		error("Dimension does not exist")
-	end
+function Base.size(T::Freq2wave2D, ::Type{Val{2}})
+	prod( T.FFT.N )
 end
 
 function mul!(T::Freq2wave2D, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})

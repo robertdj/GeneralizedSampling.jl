@@ -1,4 +1,12 @@
-immutable Freq2wave1D
+@doc """
+`CoB` is an abstract *c*hange *o*f *b*asis super-type 
+"""->
+abstract CoB
+
+@doc """
+`Freq2wave1D` is a change of basis type between 1D frequency samples and 1D wavelets. 
+"""->
+immutable Freq2wave1D <: CoB
 	# Sampling
 	samples::Vector{Float64}
 	weights::Nullable{Vector{Float64}}
@@ -14,8 +22,10 @@ immutable Freq2wave1D
 	FFT::NFFT.NFFTPlan{1,Float64}
 end
 
-
-immutable Freq2wave2D
+@doc """
+`Freq2wave2D` is a change of basis type between 2D frequency samples and 2D wavelets. 
+"""->
+immutable Freq2wave2D <: CoB
 	# Sampling
 	samples::Matrix{Float64}
 	weights::Nullable{Vector{Float64}}
@@ -31,8 +41,12 @@ immutable Freq2wave2D
 	FFT::NFFT.NFFTPlan{2,Float64}
 end
 
+@doc """
+`Freq2wave` is the union of `Freq2wave1D` and `Freq2wave2D`.
+"""->
 Freq2wave = Union(Freq2wave1D, Freq2wave2D)
 
 
+include("CoB/common.jl")
 include("CoB/freq2wave.jl")
 
