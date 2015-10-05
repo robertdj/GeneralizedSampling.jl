@@ -3,7 +3,8 @@ module GeneralizedSampling
 using NFFT
 import Distributions: Categorical, sampler, rand
 import Wavelets: wavelet
-import ArrayViews: view
+import ArrayViews: view, reshape_view
+using RCall # Used for Voronoi computations
 
 # package code goes here
 include("types.jl")
@@ -15,6 +16,7 @@ include("CGNR.jl")
 export
 	# Types
 	Freq2wave1D,
+	Freq2wave2D,
 	freq2wave,
 
 	# Fourier transforms

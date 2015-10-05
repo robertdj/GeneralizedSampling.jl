@@ -21,7 +21,7 @@ end
 The Fourier transform of the Haar wavelet on scale `J` and translation `k` evaluated at `xi`.
 If not supplied, `J = 0` and `k = 0`.
 """->
-function FourHaarWavelet(xi::Number)
+function FourHaarWavelet{T<:Real}(xi::T)
 	if xi == 0
 		return zero(Complex{Float64})
 	else
@@ -36,7 +36,7 @@ for name in [:FourHaarScaling, :FourHaarWavelet]
 	@eval begin
 		@vectorize_1arg Real $name
 
-		function $name{T<:Real}(xi::Vector{T}, J::Int)
+		function $name{T<:Real}(xi::DenseArray{T}, J::Int)
 			M = length(xi)
 			C2 = 2.0^(-J)
 			C = 2.0^(-J/2)
@@ -47,7 +47,7 @@ for name in [:FourHaarScaling, :FourHaarWavelet]
 			return y
 		end
 
-		function $name{T<:Real}(xi::Vector{T}, J::Int, k::Int)
+		function $name{T<:Real}(xi::DenseArray{T}, J::Int, k::Int)
 			y = $name(xi, J)
 			D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
 			had!(y, D)
@@ -72,7 +72,7 @@ to control this there are optional arguments:
 - `prec`: Include factors that are numerically smaller than 1-prec.
 - `maxCount`: The maximum number of factors.
 """->
-function FourDaubScaling{T<:Real}( XI::AbstractArray{T}, N::Int; prec=eps(), maxCount=100)
+function FourDaubScaling{T<:Real}( XI::DenseArray{T}, N::Int; prec=eps(), maxCount=100)
 	Z = Array(Complex{Float64}, size(XI))
 
 	# Filter coefficients
@@ -127,7 +127,7 @@ The Fourier transform of the Daubechies `N` wavelet function evaluated at `xi`.
 
 The optional arguments are passed to `FourDaubScaling`.
 """->
-function FourDaubWavelet{T<:Real}( XI::AbstractArray{T}, N::Int; args... )
+function FourDaubWavelet{T<:Real}( XI::DenseArray{T}, N::Int; args... )
 	# Fixed factor in the complex exponential
 	Four_idx = 2*pi*im*[0:2*N-1;]
 
@@ -158,14 +158,14 @@ end
 # Identical for scaling and wavelet
 for name in [:FourDaubScaling, :FourDaubWavelet]
 	@eval begin
-		function $name{T<:Real}(xi::Vector{T}, N::Int, J::Int; args...)
+		function $name{T<:Real}(xi::DenseArray{T}, N::Int, J::Int; args...)
 			scale_xi = scale( 2.0^(-J), xi )
 			y = $name( scale_xi, N; args... )
 			scale!( 2.0^(-J/2), y )
 			return y
 		end
 
-		function $name{T<:Real}(xi::Vector{T}, N::Int, J::Int, k::Int; args...)
+		function $name{T<:Real}(xi::DenseArray{T}, N::Int, J::Int, k::Int; args...)
 			y = $name(xi, N, J; args... )
 			D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
 			had!(y, D)
