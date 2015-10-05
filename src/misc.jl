@@ -194,6 +194,7 @@ function density(xi::Matrix{Float64}, bandwidth::Number)
 	ind1 = rcopy("V\$dirsgs\$ind1")
 	ind = round(Int64, ind1)
 
+	# Compute the distance from each xi to the corners of its Voronoi cell
 	density = 0.0
 	Ncorner = length(ind)
 	for n = 1:Ncorner
