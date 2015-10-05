@@ -49,7 +49,12 @@ function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
 	return Freq2wave1D(samples, W, wave, column1, J, diag, p)
 end
 
-function isuniform(T::Freq2wave; prec::Float64=eps())
+@doc """
+	isuniform(Freq2wave)
+
+Are the samples used in change of basis matrix uniform.
+"""->
+function isuniform(T::Freq2wave)
 	isnull(T.weights)
 end
 
@@ -67,7 +72,7 @@ end
 # ------------------------------------------------------------
 # Basic operations for Freq2wave1D
 
-function Base.size(T::Freq2wave, ::Type{Val{1}})
+function Base.size(T::Freq2wave1D, ::Type{Val{1}})
 	length(T.samples)
 end
 
@@ -92,17 +97,6 @@ function mul!(T::Freq2wave1D, x::Vector{Complex{Float64}}, y::Vector{Complex{Flo
 	had!(y, T.diag)
 end
 
-@doc """
-	*(T::Freq2wave, x::vector)
-
-Compute `T*x`.
-"""->
-function Base.(:(*))(T::Freq2wave1D, x::Vector)
-	y = Array(Complex{Float64}, size(T,1))
-	mul!(T, complex(x), y)
-	return y
-end
-
 
 @doc """
 	mulT!(T::Freq2wave, v::Vector, z::Vector)
@@ -118,18 +112,6 @@ function mulT!(T::Freq2wave1D, v::Vector{Complex{Float64}}, z::Vector{Complex{Fl
 	# TODO: As in mul!
 	fill!(z, 0.0+0.0*im)
 	NFFT.nfft_adjoint!(T.FFT, D, z)
-end
-
-@doc """
-	Ac_mul_B(T::Freq2wave, x::vector)
-	'*(T::Freq2wave1D, x::vector)
-
-Compute `T'*x`.
-"""->
-function Base.Ac_mul_B(T::Freq2wave1D, x::Vector{Complex{Float64}})
-	y = Array(Complex{Float64}, size(T,2))
-	mulT!(T, complex(x), y)
-	return y
 end
 
 
@@ -187,12 +169,13 @@ function freq2wave(samples::AbstractMatrix, wave::String, J::Int; B::Float64=0.0
 	column1y = eval(parse(func))( samplesy, J )
 	had!(column1, column1y)
 
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
+	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
 	# TODO: This is for functions on the unit square. Should rectangles be allowed?
 	N = 2^J
-	xi = scale(samples, 1/N)
+	xi = samples'
+	scale!(xi, 1/N)
 	frac!(xi)
-	p = NFFTPlan(xi', (N,N))
+	p = NFFTPlan(xi, (N,N))
 
 	if isuniform(samples)
 		W = Nullable{Vector{Float64}}()
@@ -224,6 +207,10 @@ function Base.show(io::IO, T::Freq2wave2D)
 	print(io, "To: ", N, "-by-", N, " ", T.wave, " wavelets")
 end
 
+function Base.size(T::Freq2wave2D, ::Type{Val{1}})
+	size(T.samples, 1)
+end
+
 function Base.size(T::Freq2wave2D, ::Type{Val{2}})
 	prod( T.FFT.N )
 end
@@ -243,7 +230,12 @@ function mul!(T::Freq2wave2D, x::Vector{Complex{Float64}}, y::Vector{Complex{Flo
 	return y
 end
 
-function Base.(:(*))(T::Freq2wave2D, x::Vector)
+@doc """
+	*(T::Freq2wave, x::vector)
+
+Compute `T*x`.
+"""->
+function Base.(:(*))(T::Freq2wave, x::Vector)
 	y = Array(Complex{Float64}, size(T,1))
 	mul!(T, complex(x), y)
 end
@@ -264,6 +256,12 @@ function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Vector{Complex{Fl
 	return vec(z)
 end
 
+@doc """
+	Ac_mul_B(T::Freq2wave, x::vector)
+	'*(T::Freq2wave1D, x::vector)
+
+Compute `T'*x`.
+"""->
 function Base.Ac_mul_B(T::Freq2wave2D, x::Vector)
 	N = size(T,2)
 	y = Array(Complex{Float64}, N)
