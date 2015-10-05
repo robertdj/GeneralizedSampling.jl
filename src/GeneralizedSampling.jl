@@ -4,6 +4,7 @@ using NFFT
 import Distributions: Categorical, sampler, rand
 import Wavelets: wavelet
 import ArrayViews: view, reshape_view
+using RCall # Used for Voronoi computations
 
 # package code goes here
 include("types.jl")

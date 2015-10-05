@@ -64,7 +64,7 @@ function isuniform(points::Matrix; prec::Float64=eps())
 	uniquey = unique(y)
 	My = length(uniquey)
 
-	if !isuniform(uniquex; prec) || !isuniform(uniquey; prec) || Mx*My != M
+	if !isuniform(uniquex; prec=prec) || !isuniform(uniquey; prec=prec) || Mx*My != M
 		return false
 	end
 
@@ -91,11 +91,14 @@ function grid(Mx::Int, My::Int=Mx, scale::Float64=1.0)
 	points = [x y]
 end
 
+
 @doc """
 	weights(xi, bandwidth)
 
 Compute weights for sampling points `xi`.
-When `xi` is a vector it is assumed to be *sorted*.
+
+- For 1D points `xi` must be a *sorted* vector.
+- For 2D points `xi` must be a matrix with 2 columns.
 """->
 function weights(xi::Vector, bandwidth::Real)
 	# TODO: Remove this assumption?
@@ -121,8 +124,6 @@ function weights(xi::Vector, bandwidth::Real)
 	return mu
 end
 
-# TODO: Move package call to module
-using RCall
 function weights(xi::Matrix, bandwidth::Real)
 	@assert size(xi,2) == 2
 
@@ -135,7 +136,7 @@ function weights(xi::Matrix, bandwidth::Real)
 	globalEnv[:K] = RObject( bandwidth )
 	reval("V = deldir(x, y, rw=c(-K,K,-K,K))")
 
-	area = rcopy(reval("V\$summary\$dir.area"))
+	area = rcopy("V\$summary\$dir.area")
 end
 
 
@@ -184,12 +185,30 @@ function density(xi::Matrix{Float64}, bandwidth::Number)
 	reval("V = deldir(x, y, rw=c(-K,K,-K,K))")
 
 	# Corners of Voronoi cells
-	x1 = rcopy(reval("V\$dirsgs\$x1"))
-	y1 = rcopy(reval("V\$dirsgs\$y1"))
-	x2 = rcopy(reval("V\$dirsgs\$x2"))
-	y2 = rcopy(reval("V\$dirsgs\$y2"))
+	x1 = rcopy("V\$dirsgs\$x1")
+	y1 = rcopy("V\$dirsgs\$y1")
+	x2 = rcopy("V\$dirsgs\$x2")
+	y2 = rcopy("V\$dirsgs\$y2")
 
-	error("Not implemented yet")
+	# Edge-sampling point relation
+	ind1 = rcopy("V\$dirsgs\$ind1")
+	ind = round(Int64, ind1)
+
+	density = 0.0
+	Ncorner = length(ind)
+	for n = 1:Ncorner
+		idx = ind[n]
+		# Distance^2 from corners to one of the xi's that has this edge
+		diff1 = (x1[n] - xi[idx,1])^2 + (y1[n] - xi[idx,2])^2
+		diff2 = (x2[n] - xi[idx,1])^2 + (y2[n] - xi[idx,2])^2
+
+		diff = max(diff1, diff2)
+		if diff > density
+			density = diff
+		end
+	end
+
+	return sqrt(density)
 end
 
 @doc """
