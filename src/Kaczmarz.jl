@@ -29,14 +29,14 @@ function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=1e-6, ma
 	for iter = 1:maxiter
 		# Update z
 		col_index = rand(col_sampler)
-		col = view(A, :, col_index)
-		col_val = -BLAS.dotc(M,col,1,z,1)/col_norm[col_index]
+		col = slice(A, :, col_index)
+		col_val = -BLAS.dotc(col,z)/col_norm[col_index]
 		BLAS.axpy!(col_val, col, z) # z = z + col_val*col
 
 		# Update x
 		row_index = rand(row_sampler)
-		row = view(AH, :, row_index)
-		row_val = (b[row_index] - z[row_index] - BLAS.dotc(N,row,1,x,1))/row_norm[row_index] 
+		row = slice(AH, :, row_index)
+		row_val = (b[row_index] - z[row_index] - BLAS.dotc(row,x))/row_norm[row_index] 
 		BLAS.axpy!(row_val, row, x) # x = x + row_val*row
 
 		# Check for convergence
