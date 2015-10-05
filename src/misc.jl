@@ -23,33 +23,22 @@ end
 
 
 @doc """
-	upscale(x)
-
-When `x` is a vector, each element is repeated twice.
-""" ->
-function upscale(x::Vector)
-	N = length(x)
-	kron(x, ones(2))
-end
-
-
-@doc """
 	isuniform(x; prec)
 
 Test if the sampling points in `x` are on a uniform grid with precision `prec`.
+
+`x` is a vector for 1D points and an `M`-by-2 matrix for 2D points.
 """ ->
 function isuniform(x::Vector; prec::Float64=eps())
-	N = length(x)
+	M = length(x)
 
-	if N == 1
-		error("The vector must have at least two elements")
-	elseif N == 2
+	if M <= 2
 		return true
 	end
 
 	diff = abs(x[1] - x[2])
 
-	for n = 3:N
+	for n = 3:M
 		d = abs(x[n-1] - x[n])
 		if abs(d - diff) > prec
 			return false
@@ -59,10 +48,48 @@ function isuniform(x::Vector; prec::Float64=eps())
 	return true
 end
 
-function isuniform(x::Matrix; prec::Float64=eps())
+function isuniform(points::Matrix; prec::Float64=eps())
+	M, D = size(points)
+	@assert D == 2
+
+	if M <= 2
+		return true
+	end
+
+	x = sort( points[:,1] )
+	uniquex = unique(x)
+	Mx = length(uniquex)
+
+	y = sort( points[:,2] )
+	uniquey = unique(y)
+	My = length(uniquey)
+
+	if !isuniform(uniquex; prec) || !isuniform(uniquey; prec) || Mx*My != M
+		return false
+	end
+
 	return true
 end
 
+
+@doc """
+	grid(Mx, My, scale)
+
+2D points on an `Mx`-by-`My` grid centered around the origin.
+By default, `My` = `Mx`.
+
+The points are scaled by `scale` which by default is 1.
+"""->
+function grid(Mx::Int, My::Int=Mx, scale::Float64=1.0)
+	# The points are sorted by the x coordinate
+	x = kron([1:Mx;], ones(My))
+	x -= ceil(Int, Mx/2)
+
+	y = repmat([1:My;], Mx)
+	y -= ceil(Int, My/2)
+
+	points = [x y]
+end
 
 @doc """
 	weights(xi, bandwidth)
