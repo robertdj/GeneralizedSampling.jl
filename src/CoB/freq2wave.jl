@@ -95,6 +95,8 @@ function mul!(T::Freq2wave1D, x::Vector{Complex{Float64}}, y::Vector{Complex{Flo
 
 	NFFT.nfft!(T.FFT, x, y)
 	had!(y, T.diag)
+
+	return y
 end
 
 
@@ -156,8 +158,8 @@ end
 
 
 function freq2wave(samples::AbstractMatrix, wave::String, J::Int; B::Float64=0.0)
-	M, D = size(samples)
-	@assert D == 2
+	M = size(samples, 1)
+	@assert size(samples,2) == 2
 	# TODO: Warning if J is too big
 
 	# Evaluate the first column in change of basis matrix
@@ -170,7 +172,6 @@ function freq2wave(samples::AbstractMatrix, wave::String, J::Int; B::Float64=0.0
 	had!(column1, column1y)
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
-	# TODO: This is for functions on the unit square. Should rectangles be allowed?
 	N = 2^J
 	xi = samples'
 	scale!(xi, 1/N)
@@ -201,7 +202,7 @@ function Base.show(io::IO, T::Freq2wave2D)
 
 	isuniform(T) ?  U = " " : U = " non-"
 
-	M, N = size(T)
+	M = size(T,1)
 	N = wside(T)
 	println(io, "From: ", M, U, "uniform frequency samples")
 	print(io, "To: ", N, "-by-", N, " ", T.wave, " wavelets")
@@ -238,6 +239,7 @@ Compute `T*x`.
 function Base.(:(*))(T::Freq2wave, x::Vector)
 	y = Array(Complex{Float64}, size(T,1))
 	mul!(T, complex(x), y)
+	return y
 end
 
 
@@ -253,7 +255,7 @@ function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Vector{Complex{Fl
 	Z = reshape_view(z, (N,N))
 	NFFT.nfft_adjoint!(T.FFT, D, Z)
 
-	return vec(z)
+	return z
 end
 
 @doc """
@@ -262,36 +264,77 @@ end
 
 Compute `T'*x`.
 """->
-function Base.Ac_mul_B(T::Freq2wave2D, x::Vector)
-	N = size(T,2)
-	y = Array(Complex{Float64}, N)
+function Base.Ac_mul_B(T::Freq2wave, x::Vector)
+	y = Array(Complex{Float64}, size(T,2))
 	mulT!(T, complex(x), y)
+	return y
 end
 
 
-function Base.collect(T::Freq2wave2D)
-	# Fourier matrix
-	M, N = size(T)
-	F = Array(Complex{Float64}, M, N)
-	K = wside(T)
+@doc """
+	NDFT(xsample::Vector{Float64}, ysample::Vector{Float64}, N::Int)
+	
+Compute the non-uniform Fourier matrix `F` from an `N-by-N` grid centered
+around the origin (as in `grid`) to samples `(xsample,ysample)`.
+The grid is assumed sorted by the `y` coordinate, i.e., the order is
+(0,0),
+(1,0),
+(2,0),
+(0,1),
+(1,1),
+(2,1)
+etc
+"""->
+function NDFT(xsample::Vector{Float64}, ysample::Vector{Float64}, N::Int)
+	# TODO: Check if the matrix fits in memory
+	@assert (M = length(xsample)) == length(ysample)
+	F = Array(Complex{Float64}, M, N^2)
 
-	samplesx = view(T.samples, :, 1)
-	samplesy = view(T.samples, :, 2)
-
-	for n = 1:N
-		# Manual kron for each row
-		r = rem(n,K)
-		if r == 0
-			r = K
-		end
-		q = div(n-r,K)
-		r -= 1
-
-		for m = 1:M
-			@inbounds F[m,n] = T.column1[m]*cis( -2*pi*(samplesx[m]*q + samplesy[m]*r)/K )
-		end
+	transl = [0:N-1;] - N/2
+	for m = 1:M
+		x = cis(-2*pi*transl*xsample[m])
+		y = cis(-2*pi*transl*ysample[m])
+		F[m,:] = kron(y,x)
 	end
 
+	return F
+end
+
+function Base.collect(T::Freq2wave2D)
+	N = wside(T)
+	xsample = T.samples[:,1]/N
+	ysample = T.samples[:,2]/N
+
+	F = NDFT(xsample, ysample, N);
+	broadcast!(*, F, F, T.diag)
+end
+
+
+# With this change of basis matrix, data should be sorted by the y coordinate, i.e., the order is
+# (0,0)
+# (1,0)
+# (2,0)
+# (0,1)
+# (1,1)
+# (2,1)
+function collect2(T::Freq2wave2D)
+	# Fourier matrix
+	M, NN = size(T)
+	F = Array(Complex{Float64}, M, NN)
+	N = wside(T)
+
+	transl = [0:N-1;] - N/2
+	x = kron(ones(N), transl)
+	y = kron(transl, ones(N))
+	for m = 1:M
+		X = -2*pi*x*T.samples[m,1]
+		Y = -2*pi*y*T.samples[m,2]
+		Z = X + Y
+
+		F[m,:] = cis(Z)
+	end
+
+	#broadcast!(*, F, T.column1, F)
 	return F
 end
 
