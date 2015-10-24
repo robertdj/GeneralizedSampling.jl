@@ -216,17 +216,26 @@ function Base.size(T::Freq2wave2D, ::Type{Val{2}})
 	prod( T.FFT.N )
 end
 
+function mul!(T::Freq2wave2D, X::DenseArray{Complex{Float64},2}, y::Vector{Complex{Float64}})
+	@assert size(T,1) == length(y)
+	N = wside(T)
+	@assert (N,N) == size(X)
+
+	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
+	fill!(y, 0.0+0.0*im)
+	NFFT.nfft!(T.FFT, X, y)
+	had!(y, T.diag)
+
+	return y
+end
+
 function mul!(T::Freq2wave2D, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
-	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
-	fill!(y, 0.0+0.0*im)
 	N = wside(T)
 	X = reshape_view(x, (N,N))
-
-	NFFT.nfft!(T.FFT, X, y)
-	had!(y, T.diag)
+	mul!(T, X, y)
 
 	return y
 end
@@ -247,15 +256,26 @@ function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Vector{Complex{Fl
 	@assert size(T,1) == length(v)
 	@assert size(T,2) == length(z)
 
+	N = wside(T)
+	Z = reshape_view(z, (N,N))
+	mulT!(T, v, Z)
+
+	return z
+end
+
+function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},2})
+	@assert size(T,1) == length(v)
+	N = wside(T)
+	@assert (N,N) == size(Z)
+
+	# TODO: Save conj(T.diag) ?
 	D = conj(T.diag)
 	had!(D, v)
 	# TODO: As in mul!
-	fill!(z, 0.0+0.0*im)
-	N = wside(T)
-	Z = reshape_view(z, (N,N))
+	fill!(Z, 0.0+0.0*im)
 	NFFT.nfft_adjoint!(T.FFT, D, Z)
 
-	return z
+	return Z
 end
 
 @doc """
@@ -305,7 +325,7 @@ function Base.collect(T::Freq2wave2D)
 	xsample = T.samples[:,1]/N
 	ysample = T.samples[:,2]/N
 
-	F = NDFT(xsample, ysample, N);
+	F = NDFT(xsample, ysample, N)
 	broadcast!(*, F, F, T.diag)
 end
 
