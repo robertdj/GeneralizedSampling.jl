@@ -1,6 +1,4 @@
-using GeneralizedSampling
-using Base.Test
-
+# TODO: Use begin end around the different blocks? See e.g. NFFT
 J = 10
 M = 2^(J+2)
 N = 2^J
