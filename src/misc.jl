@@ -29,7 +29,7 @@ Test if the sampling points in `x` are on a uniform grid with precision `prec`.
 
 `x` is a vector for 1D points and an `M`-by-2 matrix for 2D points.
 """ ->
-function isuniform(x::Vector; prec::Float64=eps())
+function isuniform( x::Vector; prec::Float64=sqrt(eps()) )
 	M = length(x)
 
 	if M <= 2
@@ -48,7 +48,7 @@ function isuniform(x::Vector; prec::Float64=eps())
 	return true
 end
 
-function isuniform(points::Matrix; prec::Float64=eps())
+function isuniform( points::Matrix; prec::Float64=sqrt(eps()) )
 	M, D = size(points)
 	@assert D == 2
 

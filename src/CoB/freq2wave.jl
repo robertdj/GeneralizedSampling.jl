@@ -311,10 +311,16 @@ function NDFT(xsample::Vector{Float64}, ysample::Vector{Float64}, N::Int)
 	F = Array(Complex{Float64}, M, N^2)
 
 	transl = [0:N-1;] - N/2
-	for m = 1:M
-		x = cis(-2*pi*transl*xsample[m])
-		y = cis(-2*pi*transl*ysample[m])
-		F[m,:] = kron(y,x)
+	idx = 0
+	for ny = 1:N
+		transly = transl[ny]
+		for nx = 1:N
+			translx = transl[nx]
+			idx += 1
+			for m = 1:M
+				@inbounds F[m,idx] = cis( -2*pi*(translx*xsample[m] + transly*ysample[m]) )
+			end
+		end
 	end
 
 	return F
@@ -327,34 +333,5 @@ function Base.collect(T::Freq2wave2D)
 
 	F = NDFT(xsample, ysample, N)
 	broadcast!(*, F, F, T.diag)
-end
-
-
-# With this change of basis matrix, data should be sorted by the y coordinate, i.e., the order is
-# (0,0)
-# (1,0)
-# (2,0)
-# (0,1)
-# (1,1)
-# (2,1)
-function collect2(T::Freq2wave2D)
-	# Fourier matrix
-	M, NN = size(T)
-	F = Array(Complex{Float64}, M, NN)
-	N = wside(T)
-
-	transl = [0:N-1;] - N/2
-	x = kron(ones(N), transl)
-	y = kron(transl, ones(N))
-	for m = 1:M
-		X = -2*pi*x*T.samples[m,1]
-		Y = -2*pi*y*T.samples[m,2]
-		Z = X + Y
-
-		F[m,:] = cis(Z)
-	end
-
-	#broadcast!(*, F, T.column1, F)
-	return F
 end
 
