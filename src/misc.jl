@@ -23,33 +23,22 @@ end
 
 
 @doc """
-	upscale(x)
-
-When `x` is a vector, each element is repeated twice.
-""" ->
-function upscale(x::Vector)
-	N = length(x)
-	kron(x, ones(2))
-end
-
-
-@doc """
 	isuniform(x; prec)
 
 Test if the sampling points in `x` are on a uniform grid with precision `prec`.
-""" ->
-function isuniform(x::Vector; prec::Float64=eps())
-	N = length(x)
 
-	if N == 1
-		error("The vector must have at least two elements")
-	elseif N == 2
+`x` is a vector for 1D points and an `M`-by-2 matrix for 2D points.
+""" ->
+function isuniform( x::Vector; prec::Float64=sqrt(eps()) )
+	M = length(x)
+
+	if M <= 2
 		return true
 	end
 
 	diff = abs(x[1] - x[2])
 
-	for n = 3:N
+	for n = 3:M
 		d = abs(x[n-1] - x[n])
 		if abs(d - diff) > prec
 			return false
@@ -59,11 +48,60 @@ function isuniform(x::Vector; prec::Float64=eps())
 	return true
 end
 
+function isuniform( points::Matrix; prec::Float64=sqrt(eps()) )
+	M, D = size(points)
+	@assert D == 2
+
+	if M <= 2
+		return true
+	end
+
+	x = sort( points[:,1] )
+	uniquex = unique(x)
+	Mx = length(uniquex)
+
+	y = sort( points[:,2] )
+	uniquey = unique(y)
+	My = length(uniquey)
+
+	if !isuniform(uniquex; prec=prec) || !isuniform(uniquey; prec=prec) || Mx*My != M
+		return false
+	end
+
+	return true
+end
+
+
+@doc """
+	grid(Mx, My, scale)
+
+2D points on an `Mx`-by-`My` grid centered around the origin.
+With even `M`'s the grid has one extra point on the negative values.
+
+By default, `My` = `Mx`.
+The points are scaled by `scale` which by default is 1.
+"""->
+function grid(Mx::Int, My::Int=Mx, scale::Float64=1.0)
+	startx = -div(Mx,2)
+	endx = (isodd(Mx) ? -startx : -startx-1)
+	# The points are sorted by the x coordinate
+	x = kron([startx:endx;], ones(My))
+
+	starty = -div(My,2)
+	endy = (isodd(My) ? -starty : -starty-1)
+	y = repmat([starty:endy;], Mx)
+
+	points = scale*[x y]
+end
+
+
 @doc """
 	weights(xi, bandwidth)
 
 Compute weights for sampling points `xi`.
-When `xi` is a vector it is assumed to be *sorted*.
+
+- For 1D points `xi` must be a *sorted* vector.
+- For 2D points `xi` must be a matrix with 2 columns.
 """->
 function weights(xi::Vector, bandwidth::Real)
 	# TODO: Remove this assumption?
@@ -89,8 +127,6 @@ function weights(xi::Vector, bandwidth::Real)
 	return mu
 end
 
-# TODO: Move package call to module
-using RCall
 function weights(xi::Matrix, bandwidth::Real)
 	@assert size(xi,2) == 2
 
@@ -98,12 +134,12 @@ function weights(xi::Matrix, bandwidth::Real)
 	# This is done using R and its deldir package
 	# TODO: Find a Julia way
 	reval("library(deldir)")
-	globalEnv[:x] = sexp( xi[:,1] )
-	globalEnv[:y] = sexp( xi[:,2] )
-	globalEnv[:K] = sexp( bandwidth )
+	globalEnv[:x] = RObject( xi[:,1] )
+	globalEnv[:y] = RObject( xi[:,2] )
+	globalEnv[:K] = RObject( bandwidth )
 	reval("V = deldir(x, y, rw=c(-K,K,-K,K))")
 
-	area = rcopy(reval("V\$summary\$dir.area"))
+	area = rcopy("V\$summary\$dir.area")
 end
 
 
@@ -140,12 +176,43 @@ function density(xi::Vector, bandwidth::Number)
 	return density
 end
 
-function density(xi::Matrix, bandwidth::Number)
+function density(xi::Matrix{Float64}, bandwidth::Number)
 	M, dim = size(xi)
 	@assert dim == 2
 
+	# Compute Voronoi tesselation
+	reval("library(deldir)")
+	globalEnv[:x] = RObject( xi[:,1] )
+	globalEnv[:y] = RObject( xi[:,2] )
+	globalEnv[:K] = RObject( bandwidth )
+	reval("V = deldir(x, y, rw=c(-K,K,-K,K))")
 
-	error("Not implemented yet")
+	# Corners of Voronoi cells
+	x1 = rcopy("V\$dirsgs\$x1")
+	y1 = rcopy("V\$dirsgs\$y1")
+	x2 = rcopy("V\$dirsgs\$x2")
+	y2 = rcopy("V\$dirsgs\$y2")
+
+	# Edge-sampling point relation
+	ind1 = rcopy("V\$dirsgs\$ind1")
+	ind = round(Int64, ind1)
+
+	# Compute the distance from each xi to the corners of its Voronoi cell
+	density = 0.0
+	Ncorner = length(ind)
+	for n = 1:Ncorner
+		idx = ind[n]
+		# Distance^2 from corners to one of the xi's that has this edge
+		diff1 = (x1[n] - xi[idx,1])^2 + (y1[n] - xi[idx,2])^2
+		diff2 = (x2[n] - xi[idx,1])^2 + (y2[n] - xi[idx,2])^2
+
+		diff = max(diff1, diff2)
+		if diff > density
+			density = diff
+		end
+	end
+
+	return sqrt(density)
 end
 
 @doc """
@@ -155,7 +222,7 @@ end
 The fractional part of x as a number in [-0.5, 0.5).
 """->
 function frac(x::Array{Float64})
-	y = deepcopy(x)
+	y = copy(x)
 	frac!(y)
 
 	return y
