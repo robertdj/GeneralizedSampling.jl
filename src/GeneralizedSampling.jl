@@ -1,17 +1,11 @@
 module GeneralizedSampling
 
+using ArrayViews
 using NFFT
-import Distributions: Categorical, sampler, rand
-import Wavelets: wavelet
-import ArrayViews: view, reshape_view
 using RCall # Used for Voronoi computations
 
-# package code goes here
-include("types.jl")
-include("misc.jl")
-include("FourierTransforms.jl")
-include("Kaczmarz.jl")
-include("CGNR.jl")
+import Distributions: Categorical, sampler, rand
+import Wavelets: wavelet
 
 export
 	# Types
@@ -28,15 +22,27 @@ export
 	REK,
 	cgnr,
 
+	# Special multiplication
+	mul!,
+	mulT!,
+	collect,
+
 	# misc
 	had!,
 	isuniform,
 	weights,
 	wscale,
+	wside,
 	density,
 	frac,
 	frac!,
-	mul!,
-	mulT!
+	grid
+
+
+include("types.jl")
+include("misc.jl")
+include("FourierTransforms.jl")
+include("Kaczmarz.jl")
+include("CGNR.jl")
 
 end # module

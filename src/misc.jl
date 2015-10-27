@@ -29,7 +29,7 @@ Test if the sampling points in `x` are on a uniform grid with precision `prec`.
 
 `x` is a vector for 1D points and an `M`-by-2 matrix for 2D points.
 """ ->
-function isuniform(x::Vector; prec::Float64=eps())
+function isuniform( x::Vector; prec::Float64=sqrt(eps()) )
 	M = length(x)
 
 	if M <= 2
@@ -48,7 +48,7 @@ function isuniform(x::Vector; prec::Float64=eps())
 	return true
 end
 
-function isuniform(points::Matrix; prec::Float64=eps())
+function isuniform( points::Matrix; prec::Float64=sqrt(eps()) )
 	M, D = size(points)
 	@assert D == 2
 
@@ -76,19 +76,22 @@ end
 	grid(Mx, My, scale)
 
 2D points on an `Mx`-by-`My` grid centered around the origin.
-By default, `My` = `Mx`.
+With even `M`'s the grid has one extra point on the negative values.
 
+By default, `My` = `Mx`.
 The points are scaled by `scale` which by default is 1.
 """->
 function grid(Mx::Int, My::Int=Mx, scale::Float64=1.0)
+	startx = -div(Mx,2)
+	endx = (isodd(Mx) ? -startx : -startx-1)
 	# The points are sorted by the x coordinate
-	x = kron([1:Mx;], ones(My))
-	x -= ceil(Int, Mx/2)
+	x = kron([startx:endx;], ones(My))
 
-	y = repmat([1:My;], Mx)
-	y -= ceil(Int, My/2)
+	starty = -div(My,2)
+	endy = (isodd(My) ? -starty : -starty-1)
+	y = repmat([starty:endy;], Mx)
 
-	points = [x y]
+	points = scale*[x y]
 end
 
 
