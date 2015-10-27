@@ -1,3 +1,6 @@
+using GeneralizedSampling
+using Base.Test
+
 # 1D
 for J = 3:10
 	#println(J)

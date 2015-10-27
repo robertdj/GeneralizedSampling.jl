@@ -1,3 +1,6 @@
+using GeneralizedSampling
+using Base.Test
+
 J = 10
 M = 2^(J+1)
 N = 2^J

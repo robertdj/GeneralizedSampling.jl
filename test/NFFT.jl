@@ -1,3 +1,9 @@
+using GeneralizedSampling
+using Base.Test
+
+using NFFT
+import ArrayViews: reshape_view
+
 # M-by-M sampling points
 M = 16
 xi = grid(M, M, 0.2)
@@ -13,7 +19,7 @@ a1 = ndft(p, X)
 #= a2 = nfft(p, X) =#
 
 # NDFT matrix
-F = NDFT( xi[:,1], xi[:,2], N );
+F = GeneralizedSampling.NDFT( xi[:,1], xi[:,2], N );
 b1 = F*x
 
 #= @show norm(a1 - b1, Inf) =#

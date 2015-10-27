@@ -1,3 +1,6 @@
+using GeneralizedSampling
+using Base.Test
+
 begin
 	J = 10
 	M = 2^(J+2)
