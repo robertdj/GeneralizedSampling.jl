@@ -1,5 +1,6 @@
 module GeneralizedSampling
 
+using Debug
 using NFFT
 import Distributions: Categorical, sampler, rand
 import Wavelets: wavelet
@@ -28,15 +29,20 @@ export
 	REK,
 	cgnr,
 
+	# Special multiplication
+	mul!,
+	mulT!,
+	collect,
+
 	# misc
 	had!,
 	isuniform,
 	weights,
 	wscale,
+	wside,
 	density,
 	frac,
 	frac!,
-	mul!,
-	mulT!
+	grid
 
 end # module

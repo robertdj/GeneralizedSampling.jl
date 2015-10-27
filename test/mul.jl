@@ -48,10 +48,12 @@ A = collect(T)
 x = rand(size(T,2))
 y1 = A*x
 y2 = T*x
-@show norm(y1-y2)
+#@show norm(y1-y2)
+@test_approx_eq_eps( y1, y2, 1e-5 )
 
 v = rand(size(T,1))
 z1 = A'*v
 z2 = T'*v
-@show norm(z1-z2)
+#@show norm(z1-z2)
+@test_approx_eq_eps( z1, z2, 1e-5 )
 

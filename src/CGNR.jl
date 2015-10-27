@@ -41,8 +41,10 @@ function cgnr{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=sqrt(ep
 end
 
 
-function cgnr(T::Freq2wave1D, b::Vector{Complex{Float64}}, x0::Vector{Complex{Float64}}; prec=sqrt(eps()), maxiter=length(x0))
+function cgnr(T::Freq2wave, b::Vector{Complex{Float64}}, x0::AbstractArray{Complex{Float64}}; prec=sqrt(eps()), maxiter=length(x0))
 	@assert size(T,1) == length(b)
+	#= N = wside(T) =#
+	#= @assert (N,N) == size(x0) =#
 	@assert size(T,2) == length(x0)
 
 	# Initialize
@@ -56,19 +58,21 @@ function cgnr(T::Freq2wave1D, b::Vector{Complex{Float64}}, x0::Vector{Complex{Fl
 	mulT!(T, r, z) # z = T'*r
 	p = copy(z)
 
+	cone = one(Complex{Float64})
+
 	for iter = 1:maxiter
-		ztz = norm(z)^2
+		ztz = vecnorm(z)^2
 		mul!(T, p, y) # y = T*x
-		mu = ztz / norm(y)^2
+		mu = ztz / vecnorm(y)^2
 		BLAS.axpy!(mu, p, x) # x = x + mu*p
 		BLAS.axpy!(-mu, y, r) # r = r - mu*y
 		mulT!(T, r, z) # z = T'*r
-		tau = norm(z)^2 / ztz
+		tau = vecnorm(z)^2 / ztz
 		scale!(p, tau)
-		BLAS.axpy!(1.0, z, p)
+		BLAS.axpy!(cone, z, p)
 
 		# Check for convergence: |xnew - xold|
-		if mu*norm(p) < prec
+		if mu*vecnorm(p) < prec
 			println("Number of iterations: ", iter)
 			break
 		end
