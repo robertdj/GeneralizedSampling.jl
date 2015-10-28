@@ -16,7 +16,7 @@ immutable Freq2wave1D <: CoB
 	weights::Nullable{Vector{Float64}}
 
 	# Reconstruction
-	wave::String
+	wave::AbstractString
 	column1::Vector{Complex{Float64}}
 	# TODO: J is redundant; remove?
 	J::Int
@@ -36,7 +36,7 @@ immutable Freq2wave2D <: CoB
 	weights::Nullable{Vector{Float64}}
 
 	# Reconstruction
-	wave::String
+	wave::AbstractString
 	column1::Vector{Complex{Float64}}
 	# TODO: J is redundant; remove?
 	J::Int

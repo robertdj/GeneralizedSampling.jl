@@ -16,7 +16,7 @@ Make change of basis for switching between frequency responses and wavelets.
 - If the samples *are* uniform, `weights` is `Null`.
 - If the samples are *not* uniform, `weights` contains the weights as a `Nullable` vector and `basis` and `diag` are scaled with `sqrt(weights)`.
 """->
-function freq2wave(samples::Vector, wave::String, J::Int; B::Float64=0.0)
+function freq2wave(samples::Vector, wave::AbstractString, J::Int; B::Float64=0.0)
 	# TODO: Warning if J is too big
 
 	# Evaluate the first column in change of basis matrix
@@ -157,7 +157,7 @@ function wside(T::Freq2wave2D)
 end
 
 
-function freq2wave(samples::AbstractMatrix, wave::String, J::Int; B::Float64=0.0)
+function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Float64=0.0)
 	M = size(samples, 1)
 	@assert size(samples,2) == 2
 	# TODO: Warning if J is too big
