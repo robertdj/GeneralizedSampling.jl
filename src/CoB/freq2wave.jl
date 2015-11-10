@@ -82,42 +82,6 @@ end
 
 
 @doc """
-	mul!(T::Freq2wave, x::Vector, y::Vector)
-	
-Replace `y` with `T*x`.
-"""->
-function mul!(T::Freq2wave{1}, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
-	@assert size(T,1) == length(y)
-	@assert size(T,2) == length(x)
-
-	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
-	fill!(y, 0.0+0.0*im)
-
-	NFFT.nfft!(T.FFT, x, y)
-	had!(y, T.diag)
-
-	return y
-end
-
-
-@doc """
-	mulT!(T::Freq2wave, v::Vector, z::Vector)
-	
-Replace `z` with `T'*v`.
-"""->
-function mulT!(T::Freq2wave{1}, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
-	@assert size(T,1) == length(v)
-	@assert size(T,2) == length(z)
-
-	D = conj(T.diag)
-	had!(D, v)
-	# TODO: As in mul!
-	fill!(z, 0.0+0.0*im)
-	NFFT.nfft_adjoint!(T.FFT, D, z)
-end
-
-
-@doc """
 	collect(Freq2wave)
 
 Return the full change of basis matrix.
@@ -155,7 +119,7 @@ The size of the reconstructed wavelet coefficients.
 - When `D` == 1, the output is (Int,)
 - When `D` == 2, the output is (Int,Int)
 """->
-function wsize(T::Freq2wave{2})
+function wsize(T::Freq2wave)
 	T.FFT.N
 end
 
@@ -219,7 +183,12 @@ function Base.size(T::Freq2wave{2}, ::Type{Val{2}})
 	prod( T.FFT.N )
 end
 
-function mul!(T::Freq2wave{2}, X::DenseArray{Complex{Float64},2}, y::Vector{Complex{Float64}})
+@doc """
+	mul!(T::Freq2wave, x::Vector, y::Vector)
+	
+Replace `y` with `T*x`.
+"""->
+function mul!{D}(T::Freq2wave{D}, X::DenseArray{Complex{Float64},D}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert wsize(T) == size(X)
 
@@ -254,6 +223,25 @@ function Base.(:(*))(T::Freq2wave, x::Vector)
 end
 
 
+@doc """
+	mulT!(T::Freq2wave, v::Vector, z::Vector)
+	
+Replace `z` with `T'*v`.
+"""->
+function mulT!{D}(T::Freq2wave{D}, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},D})
+	@assert size(T,1) == length(v)
+	@assert wsize(T) == size(Z)
+
+	# TODO: Save conj(T.diag) ?
+	Diag = conj(T.diag)
+	had!(Diag, v)
+	# TODO: As in mul!
+	fill!(Z, 0.0+0.0*im)
+	NFFT.nfft_adjoint!(T.FFT, Diag, Z)
+
+	return Z
+end
+
 function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert size(T,2) == length(z)
@@ -263,20 +251,6 @@ function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{F
 	mulT!(T, v, Z)
 
 	return z
-end
-
-function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},2})
-	@assert size(T,1) == length(v)
-	@assert wsize(T) == size(Z)
-
-	# TODO: Save conj(T.diag) ?
-	D = conj(T.diag)
-	had!(D, v)
-	# TODO: As in mul!
-	fill!(Z, 0.0+0.0*im)
-	NFFT.nfft_adjoint!(T.FFT, D, Z)
-
-	return Z
 end
 
 @doc """
