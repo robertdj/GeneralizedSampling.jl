@@ -148,12 +148,15 @@ function wscale(T::Freq2wave)
 end
 
 @doc """
-	wside(T::Freq2wave{2})
+	wsize(T::Freq2wave{D})
 
-The number of wavelet coefficients in each dimension.
+The size of the reconstructed wavelet coefficients.
+
+- When `D` == 1, the output is (Int,)
+- When `D` == 2, the output is (Int,Int)
 """->
-function wside(T::Freq2wave{2})
-	T.FFT.N[1]
+function wsize(T::Freq2wave{2})
+	T.FFT.N
 end
 
 
@@ -203,9 +206,9 @@ function Base.show(io::IO, T::Freq2wave{2})
 	isuniform(T) ?  U = " " : U = " non-"
 
 	M = size(T,1)
-	N = wside(T)
+	N = wsize(T)
 	println(io, "From: ", M, U, "uniform frequency samples")
-	print(io, "To: ", N, "-by-", N, " ", T.wave, " wavelets")
+	print(io, "To: ", N[1], "-by-", N[2], " ", T.wave, " wavelets")
 end
 
 function Base.size(T::Freq2wave{2}, ::Type{Val{1}})
@@ -218,8 +221,7 @@ end
 
 function mul!(T::Freq2wave{2}, X::DenseArray{Complex{Float64},2}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
-	N = wside(T)
-	@assert (N,N) == size(X)
+	@assert wsize(T) == size(X)
 
 	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
 	fill!(y, 0.0+0.0*im)
@@ -233,8 +235,8 @@ function mul!(T::Freq2wave{2}, x::Vector{Complex{Float64}}, y::Vector{Complex{Fl
 	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
-	N = wside(T)
-	X = reshape_view(x, (N,N))
+	N = wsize(T)
+	X = reshape_view(x, N)
 	mul!(T, X, y)
 
 	return y
@@ -256,8 +258,8 @@ function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{F
 	@assert size(T,1) == length(v)
 	@assert size(T,2) == length(z)
 
-	N = wside(T)
-	Z = reshape_view(z, (N,N))
+	N = wsize(T)
+	Z = reshape_view(z, N)
 	mulT!(T, v, Z)
 
 	return z
@@ -265,8 +267,7 @@ end
 
 function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},2})
 	@assert size(T,1) == length(v)
-	N = wside(T)
-	@assert (N,N) == size(Z)
+	@assert wsize(T) == size(Z)
 
 	# TODO: Save conj(T.diag) ?
 	D = conj(T.diag)
@@ -327,11 +328,11 @@ function NDFT(xsample::Vector{Float64}, ysample::Vector{Float64}, N::Int)
 end
 
 function Base.collect(T::Freq2wave{2})
-	N = wside(T)
-	xsample = T.samples[:,1]/N
-	ysample = T.samples[:,2]/N
+	N = wsize(T)
+	xsample = T.samples[:,1]/N[1]
+	ysample = T.samples[:,2]/N[2]
 
-	F = NDFT(xsample, ysample, N)
+	F = NDFT(xsample, ysample, N[1])
 	broadcast!(*, F, F, T.diag)
 end
 
