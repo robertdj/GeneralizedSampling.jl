@@ -16,7 +16,7 @@ Make change of basis for switching between frequency responses and wavelets.
 - If the samples *are* uniform, `weights` is `Null`.
 - If the samples are *not* uniform, `weights` contains the weights as a `Nullable` vector and `basis` and `diag` are scaled with `sqrt(weights)`.
 """->
-function freq2wave(samples::Vector, wave::AbstractString, J::Int; B::Float64=0.0)
+function freq2wave(samples::Vector, wave::AbstractString, J::Int; B::Float64=NaN)
 	# TODO: Warning if J is too big
 
 	# Evaluate the first column in change of basis matrix
@@ -34,7 +34,7 @@ function freq2wave(samples::Vector, wave::AbstractString, J::Int; B::Float64=0.0
 	if isuniform(samples)
 		W = Nullable{Vector{Float64}}()
 	else
-		if B <= 0.0
+		if isnan(B)
 			error("Samples are not uniform; supply bandwidth")
 		end
 
@@ -58,26 +58,12 @@ function isuniform(T::Freq2wave)
 	isnull(T.weights)
 end
 
-function Base.show(io::IO, T::Freq2wave{1})
-	println(io, "1D change of basis matrix")
-
-	isuniform(T) ?  U = " " : U = " non-"
-
-	M, N = size(T)
-	println(io, "From: ", M, U, "uniform frequency samples")
-	print(io, "To: ", N, " ", T.wave, " wavelets")
-end
-
 
 # ------------------------------------------------------------
 # Basic operations for 1D Freq2wave
 
 function Base.size(T::Freq2wave{1}, ::Type{Val{1}})
 	length(T.samples)
-end
-
-function Base.size(T::Freq2wave{1}, ::Type{Val{2}})
-	T.FFT.N[1]
 end
 
 
@@ -124,7 +110,7 @@ function wsize(T::Freq2wave)
 end
 
 
-function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Float64=0.0)
+function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Float64=NaN)
 	M = size(samples, 1)
 	@assert size(samples,2) == 2
 	# TODO: Warning if J is too big
@@ -148,7 +134,7 @@ function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Flo
 	if isuniform(samples)
 		W = Nullable{Vector{Float64}}()
 	else
-		if B <= 0.0
+		if isnan(B)
 			error("Samples are not uniform; supply bandwidth")
 		end
 
@@ -164,22 +150,22 @@ function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Flo
 end
 
 
-function Base.show(io::IO, T::Freq2wave{2})
-	println(io, "2D change of basis matrix")
+function Base.show{D}(io::IO, T::Freq2wave{D})
+	println(io, D, "D change of basis matrix")
 
 	isuniform(T) ?  U = " " : U = " non-"
 
 	M = size(T,1)
-	N = wsize(T)
+	D == 1 ? N = size(T,2) : N = wsize(T)
 	println(io, "From: ", M, U, "uniform frequency samples")
-	print(io, "To: ", N[1], "-by-", N[2], " ", T.wave, " wavelets")
+	print(io, "To: ", N, " ", T.wave, " wavelets")
 end
 
 function Base.size(T::Freq2wave{2}, ::Type{Val{1}})
 	size(T.samples, 1)
 end
 
-function Base.size(T::Freq2wave{2}, ::Type{Val{2}})
+function Base.size(T::Freq2wave, ::Type{Val{2}})
 	prod( T.FFT.N )
 end
 
@@ -217,6 +203,7 @@ end
 Compute `T*x`.
 """->
 function Base.(:(*))(T::Freq2wave, x::Vector)
+	@assert size(T,2) == length(x)
 	y = Array(Complex{Float64}, size(T,1))
 	mul!(T, complex(x), y)
 	return y
@@ -233,11 +220,11 @@ function mulT!{D}(T::Freq2wave{D}, v::Vector{Complex{Float64}}, Z::DenseArray{Co
 	@assert wsize(T) == size(Z)
 
 	# TODO: Save conj(T.diag) ?
-	Diag = conj(T.diag)
-	had!(Diag, v)
+	Tdiag = conj(T.diag)
+	had!(Tdiag, v)
 	# TODO: As in mul!
 	fill!(Z, 0.0+0.0*im)
-	NFFT.nfft_adjoint!(T.FFT, Diag, Z)
+	NFFT.nfft_adjoint!(T.FFT, Tdiag, Z)
 
 	return Z
 end
@@ -260,6 +247,7 @@ end
 Compute `T'*x`.
 """->
 function Base.Ac_mul_B(T::Freq2wave, x::Vector)
+	@assert size(T,1) == length(x)
 	y = Array(Complex{Float64}, size(T,2))
 	mulT!(T, complex(x), y)
 	return y
