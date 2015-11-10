@@ -1,7 +1,7 @@
 @doc """
 	cgnr(A::Matrix, b::Vector, x0::Vector; prec, maxiter)
 
-Conjugate gradient normal equation residual method for solving the least squares problem `min norm( Ax - b )`.
+Conjugate gradient for normal equations residual method for solving the least squares problem `min norm( Ax - b )`.
 
 - `A` is the coefficient matrix (`M-by-N`)
 - `b` is the observation vector (`M`).
@@ -18,17 +18,18 @@ function cgnr{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=sqrt(ep
 	r = b - A*x
 	z = A'*r
 	p = copy(z)
+	tone = one(T)
 
 	for iter = 1:maxiter
 		ztz = norm(z)^2
 		mu = ztz / norm(A*p)^2
 		BLAS.axpy!(mu, p, x) # x = x + mu*p
-		BLAS.gemv!('N', convert(T,-mu), A, p, one(T), r) # r = r - mu*A*p
+		BLAS.gemv!('N', convert(T,-mu), A, p, tone, r) # r = r - mu*A*p
 		z = A'*r
 		tau = norm(z)^2 / ztz
 		# p = z + tau*p
 		scale!(p, tau)
-		BLAS.axpy!(1.0, z, p)
+		BLAS.axpy!(tone, z, p)
 
 		# Check for convergence: |xnew - xold|
 		if mu*norm(p) < prec
@@ -40,12 +41,15 @@ function cgnr{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=sqrt(ep
 	return x
 end
 
+@doc """
+	cgnr(T::Freq2wave, b, x0; ...)
 
-function cgnr(T::Freq2wave, b::Vector{Complex{Float64}}, x0::AbstractArray{Complex{Float64}}; prec=sqrt(eps()), maxiter=length(x0))
+Conjugate gradient for normal equations residual method for `Freq2wave`.
+The initial point `x0` must be of the same dimension as `T`.
+"""->
+function cgnr{D}(T::Freq2wave{D}, b::Vector{Complex{Float64}}, x0::DenseArray{Complex{Float64},D}; prec=sqrt(eps()), maxiter=length(x0))
 	@assert size(T,1) == length(b)
-	#= N = wside(T) =#
-	#= @assert (N,N) == size(x0) =#
-	@assert size(T,2) == length(x0)
+	@assert wsize(T) == size(x0)
 
 	# Initialize
 	x = copy(x0)
@@ -68,6 +72,7 @@ function cgnr(T::Freq2wave, b::Vector{Complex{Float64}}, x0::AbstractArray{Compl
 		BLAS.axpy!(-mu, y, r) # r = r - mu*y
 		mulT!(T, r, z) # z = T'*r
 		tau = vecnorm(z)^2 / ztz
+		# p = z + tau*p
 		scale!(p, tau)
 		BLAS.axpy!(cone, z, p)
 
