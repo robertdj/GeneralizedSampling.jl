@@ -57,7 +57,6 @@ function REK{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=1e-6, ma
 end
 
 
-#=
 @doc """
 	REK(T::Freq2wave1D, b, x0; prec, maxiter)
 
@@ -65,8 +64,7 @@ Random Extended Kaczmarz algorithm for solving the least squares problem `min no
 
 By default, `prec=1e-6` and `maxiter=length(x0)`.
 """ ->
-=#
-function REK(T::Freq2wave1D, b::Vector{Complex{Float64}}, x0::Vector{Complex{Float64}}; prec::Float64=1e-4, maxiter::Int=length(x0)^2)
+function REK(T::Freq2wave{1}, b::Vector{Complex{Float64}}, x0::Vector{Complex{Float64}}; prec::Float64=1e-4, maxiter::Int=length(x0)^2)
 	M, N = size(T)
 	# TODO: Scale b with weights??
 
@@ -111,7 +109,7 @@ function REK(T::Freq2wave1D, b::Vector{Complex{Float64}}, x0::Vector{Complex{Flo
 		BLAS.axpy!(row_val, row, x) # x = x + row_val*row
 
 		# Check for convergence
-		#= if mod(iter,8*N) == 0 =#
+		if mod(iter,8*N) == 0
 			xnorm = norm(x)
 			Ax = T*x
 			Atz = T'*z
@@ -122,7 +120,7 @@ function REK(T::Freq2wave1D, b::Vector{Complex{Float64}}, x0::Vector{Complex{Flo
 				println("Number of iterations: ", iter)
 				break
 			end
-		#= end =#
+		end
 	end
 
 	return x

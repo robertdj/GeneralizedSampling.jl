@@ -46,7 +46,7 @@ function freq2wave(samples::Vector, wave::AbstractString, J::Int; B::Float64=0.0
 
 	diag = column1 .* cis(-pi*samples)
 
-	return Freq2wave1D(samples, W, wave, column1, J, diag, p)
+	return Freq2wave(samples, W, wave, column1, J, diag, p)
 end
 
 @doc """
@@ -58,7 +58,7 @@ function isuniform(T::Freq2wave)
 	isnull(T.weights)
 end
 
-function Base.show(io::IO, T::Freq2wave1D)
+function Base.show(io::IO, T::Freq2wave{1})
 	println(io, "1D change of basis matrix")
 
 	isuniform(T) ?  U = " " : U = " non-"
@@ -70,13 +70,13 @@ end
 
 
 # ------------------------------------------------------------
-# Basic operations for Freq2wave1D
+# Basic operations for 1D Freq2wave
 
-function Base.size(T::Freq2wave1D, ::Type{Val{1}})
+function Base.size(T::Freq2wave{1}, ::Type{Val{1}})
 	length(T.samples)
 end
 
-function Base.size(T::Freq2wave1D, ::Type{Val{2}})
+function Base.size(T::Freq2wave{1}, ::Type{Val{2}})
 	T.FFT.N[1]
 end
 
@@ -86,7 +86,7 @@ end
 	
 Replace `y` with `T*x`.
 """->
-function mul!(T::Freq2wave1D, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
+function mul!(T::Freq2wave{1}, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
@@ -105,7 +105,7 @@ end
 	
 Replace `z` with `T'*v`.
 """->
-function mulT!(T::Freq2wave1D, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
+function mulT!(T::Freq2wave{1}, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert size(T,2) == length(z)
 
@@ -122,7 +122,7 @@ end
 
 Return the full change of basis matrix.
 """->
-function Base.collect(T::Freq2wave1D)
+function Base.collect(T::Freq2wave{1})
 	M, N = size(T)
 	F = Array(Complex{Float64}, M, N)
 	for n = 1:N
@@ -148,11 +148,11 @@ function wscale(T::Freq2wave)
 end
 
 @doc """
-	wside(T::Freq2wave2D)
+	wside(T::Freq2wave{2})
 
 The number of wavelet coefficients in each dimension.
 """->
-function wside(T::Freq2wave2D)
+function wside(T::Freq2wave{2})
 	T.FFT.N[1]
 end
 
@@ -193,11 +193,11 @@ function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Flo
 
 	diag = column1 .* cis( -pi*(samplesx + samplesy) )
 
-	return Freq2wave2D(samples, W, wave, column1, J, diag, p)
+	return Freq2wave(samples, W, wave, column1, J, diag, p)
 end
 
 
-function Base.show(io::IO, T::Freq2wave2D)
+function Base.show(io::IO, T::Freq2wave{2})
 	println(io, "2D change of basis matrix")
 
 	isuniform(T) ?  U = " " : U = " non-"
@@ -208,15 +208,15 @@ function Base.show(io::IO, T::Freq2wave2D)
 	print(io, "To: ", N, "-by-", N, " ", T.wave, " wavelets")
 end
 
-function Base.size(T::Freq2wave2D, ::Type{Val{1}})
+function Base.size(T::Freq2wave{2}, ::Type{Val{1}})
 	size(T.samples, 1)
 end
 
-function Base.size(T::Freq2wave2D, ::Type{Val{2}})
+function Base.size(T::Freq2wave{2}, ::Type{Val{2}})
 	prod( T.FFT.N )
 end
 
-function mul!(T::Freq2wave2D, X::DenseArray{Complex{Float64},2}, y::Vector{Complex{Float64}})
+function mul!(T::Freq2wave{2}, X::DenseArray{Complex{Float64},2}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	N = wside(T)
 	@assert (N,N) == size(X)
@@ -229,7 +229,7 @@ function mul!(T::Freq2wave2D, X::DenseArray{Complex{Float64},2}, y::Vector{Compl
 	return y
 end
 
-function mul!(T::Freq2wave2D, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
+function mul!(T::Freq2wave{2}, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
@@ -252,7 +252,7 @@ function Base.(:(*))(T::Freq2wave, x::Vector)
 end
 
 
-function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
+function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert size(T,2) == length(z)
 
@@ -263,7 +263,7 @@ function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, z::Vector{Complex{Fl
 	return z
 end
 
-function mulT!(T::Freq2wave2D, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},2})
+function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},2})
 	@assert size(T,1) == length(v)
 	N = wside(T)
 	@assert (N,N) == size(Z)
@@ -280,7 +280,7 @@ end
 
 @doc """
 	Ac_mul_B(T::Freq2wave, x::vector)
-	'*(T::Freq2wave1D, x::vector)
+	'*(T::Freq2wave{1}, x::vector)
 
 Compute `T'*x`.
 """->
@@ -326,7 +326,7 @@ function NDFT(xsample::Vector{Float64}, ysample::Vector{Float64}, N::Int)
 	return F
 end
 
-function Base.collect(T::Freq2wave2D)
+function Base.collect(T::Freq2wave{2})
 	N = wside(T)
 	xsample = T.samples[:,1]/N
 	ysample = T.samples[:,2]/N
