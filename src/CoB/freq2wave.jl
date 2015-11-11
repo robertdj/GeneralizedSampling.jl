@@ -89,6 +89,15 @@ end
 # 2D change of basis matrix
 
 @doc """
+	dim(Freq2wave{D})
+
+Return the dimension `D`.
+"""->
+function dim{D}(::Freq2wave{D})
+	D
+end
+
+@doc """
 	wscale(Freq2wave)
 
 Return the scale of the wavelet coefficients.
@@ -251,6 +260,22 @@ function Base.Ac_mul_B(T::Freq2wave, x::Vector)
 	y = Array(Complex{Float64}, size(T,2))
 	mulT!(T, complex(x), y)
 	return y
+end
+
+function Base.(:(\))(T::Freq2wave, y::Vector{Complex{Float64}})
+	# Non-uniform samples: Scale observations
+	if !isuniform(T)
+		y = scale(y, T.weights)
+	end
+
+	# TODO: Exact solution for 2D uniform samples?
+
+	print("Solution via conjugate gradients... ")
+	# TODO: Better initial guess?
+	x0 = zeros(Complex{Float64}, wsize(T))
+	x = cgnr(T, y, x0)
+
+	return x
 end
 
 
