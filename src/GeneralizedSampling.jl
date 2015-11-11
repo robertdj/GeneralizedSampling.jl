@@ -32,7 +32,7 @@ export
 	isuniform,
 	weights,
 	wscale,
-	wside,
+	wsize,
 	density,
 	frac,
 	frac!,
