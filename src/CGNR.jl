@@ -24,15 +24,18 @@ function cgnr{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=sqrt(ep
 		ztz = norm(z)^2
 		mu = ztz / norm(A*p)^2
 		BLAS.axpy!(mu, p, x) # x = x + mu*p
+		xdiff = mu*norm(p)
+
 		BLAS.gemv!('N', convert(T,-mu), A, p, tone, r) # r = r - mu*A*p
 		z = A'*r
 		tau = norm(z)^2 / ztz
+
 		# p = z + tau*p
 		scale!(p, tau)
 		BLAS.axpy!(tone, z, p)
 
 		# Check for convergence: |xnew - xold|
-		if mu*norm(p) < prec
+		if xdiff < prec
 			println("Number of iterations: ", iter)
 			break
 		end
@@ -69,15 +72,18 @@ function cgnr{D}(T::Freq2wave{D}, b::Vector{Complex{Float64}}, x0::DenseArray{Co
 		mul!(T, p, y) # y = T*x
 		mu = ztz / vecnorm(y)^2
 		BLAS.axpy!(mu, p, x) # x = x + mu*p
+		xdiff = mu*norm(p)
+
 		BLAS.axpy!(-mu, y, r) # r = r - mu*y
 		mulT!(T, r, z) # z = T'*r
 		tau = vecnorm(z)^2 / ztz
+
 		# p = z + tau*p
 		scale!(p, tau)
 		BLAS.axpy!(cone, z, p)
 
 		# Check for convergence: |xnew - xold|
-		if mu*vecnorm(p) < prec
+		if xdiff < prec
 			println("Number of iterations: ", iter)
 			break
 		end
