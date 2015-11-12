@@ -67,11 +67,6 @@ function Base.size(T::Freq2wave{1}, ::Type{Val{1}})
 end
 
 
-@doc """
-	collect(Freq2wave)
-
-Return the full change of basis matrix.
-"""->
 function Base.collect(T::Freq2wave{1})
 	M, N = size(T)
 	F = Array(Complex{Float64}, M, N)
@@ -280,46 +275,42 @@ end
 
 
 @doc """
-	NDFT(xsample::Vector{Float64}, ysample::Vector{Float64}, N::Int)
+	collect(Freq2wave)
 	
-Compute the non-uniform Fourier matrix `F` from an `N-by-N` grid centered
-around the origin (as in `grid`) to samples `(xsample,ysample)`.
-The grid is assumed sorted by the `y` coordinate, i.e., the order is
-(0,0),
-(1,0),
-(2,0),
-(0,1),
+Return the full change of basis matrix.
+
+In 2D, the reconstruction grid is sorted by the `y` coordinate, i.e., the order is
 (1,1),
-(2,1)
+(2,1),
+(3,1),
+(1,2),
+(2,2),
+(3,2)
 etc
 """->
-function NDFT(xsample::Vector{Float64}, ysample::Vector{Float64}, N::Int)
+function Base.collect(T::Freq2wave{2})
+	M = size(T,1)
+	N = wsize(T)
 	# TODO: Check if the matrix fits in memory
-	@assert (M = length(xsample)) == length(ysample)
-	F = Array(Complex{Float64}, M, N^2)
+	F = Array(Complex{Float64}, M, prod(N))
 
-	transl = [0:N-1;] - N/2
+	xsample = T.samples[:,1]/N[1]
+	ysample = T.samples[:,2]/N[2]
+
+	translx = [0:N[1]-1;] - N[1]/2
+	transly = [0:N[2]-1;] - N[2]/2
 	idx = 0
-	for ny = 1:N
-		transly = transl[ny]
-		for nx = 1:N
-			translx = transl[nx]
+	for ny = 1:N[2]
+		yidx = transly[ny]
+		for nx = 1:N[1]
+			xidx = translx[nx]
 			idx += 1
 			for m = 1:M
-				@inbounds F[m,idx] = cis( -2*pi*(translx*xsample[m] + transly*ysample[m]) )
+				@inbounds F[m,idx] = T.diag[m]*cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) )
 			end
 		end
 	end
 
 	return F
-end
-
-function Base.collect(T::Freq2wave{2})
-	N = wsize(T)
-	xsample = T.samples[:,1]/N[1]
-	ysample = T.samples[:,2]/N[2]
-
-	F = NDFT(xsample, ysample, N[1])
-	broadcast!(*, F, F, T.diag)
 end
 
