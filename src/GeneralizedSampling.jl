@@ -4,7 +4,6 @@ using ArrayViews
 using NFFT
 using RCall # Used for Voronoi computations
 
-import Distributions: Categorical, sampler, rand
 import Wavelets: wavelet
 
 export
@@ -19,7 +18,6 @@ export
 	FourDaubScaling,
 
 	# Linear equation solvers
-	REK,
 	cgnr,
 
 	# Special multiplication
@@ -32,7 +30,7 @@ export
 	isuniform,
 	weights,
 	wscale,
-	wside,
+	wsize,
 	density,
 	frac,
 	frac!,
@@ -42,7 +40,6 @@ export
 include("types.jl")
 include("misc.jl")
 include("FourierTransforms.jl")
-include("Kaczmarz.jl")
 include("CGNR.jl")
 
 end # module

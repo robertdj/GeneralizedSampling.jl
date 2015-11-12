@@ -241,7 +241,7 @@ end
 
 Return the characteristics of a wavelet needed for computations.
 """->
-function wavename(name::String)
+function wavename(name::AbstractString)
 	lname = lowercase(name)
 
 	if lname == "haar"
@@ -260,7 +260,7 @@ Return the low pass filter coefficients of the wavelet `name`.
 
 Uses the `Wavelets` package.
 """->
-function wavefilter(name::String)
+function wavefilter(name::AbstractString)
 	parsed_name = wavename(name)
 
 	if parsed_name == "Haar"

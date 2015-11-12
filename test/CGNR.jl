@@ -45,7 +45,7 @@ begin
 end
 
 # 2D
-#= begin =#
+begin
 	J = 4
 	M = 2^(J+1)
 
@@ -55,8 +55,8 @@ end
 	A = collect(T)
 
 	b = complex( rand(size(T,1)) )
-	N = wside(T)
-	x0 = complex(rand(N,N))
+	N = wsize(T)
+	x0 = complex(rand(N))
 
 	x = A \ b
 
@@ -67,5 +67,5 @@ end
 	#@show norm(x - vec(x2), Inf)
 	@test_approx_eq_eps( x, x1, 1e-5 )
 	@test_approx_eq_eps( x, x2, 1e-5 )
-#= end =#
+end
 
