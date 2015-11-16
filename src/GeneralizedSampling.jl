@@ -4,7 +4,7 @@ using ArrayViews
 using NFFT
 using RCall # Used for Voronoi computations
 
-import Wavelets: wavelet
+import Wavelets: wavelet, WT
 
 export
 	# Types
@@ -34,7 +34,8 @@ export
 	density,
 	frac,
 	frac!,
-	grid
+	grid,
+	wavefilter
 
 
 include("types.jl")
