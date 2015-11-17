@@ -64,7 +64,7 @@ to control this there are optional arguments:
 - `maxCount`: The maximum number of factors.
 """->
 function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCount=100)
-	@assert abs(sum(C) - 1.0) < eps()
+	@assert isapprox(sum(C), 1.0)
 
 	# When xi is (almost) an even integer y is (approx) 1.
 	# To ensure that the while loop below does not exit prematurely, 
@@ -72,6 +72,7 @@ function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCou
 	# iterations needed for abs(xi) < 1
 	minCount = ( abs(xi) > 1.0 ? ceil(Int, log2(abs(xi))) : 1 )
 
+	almost1 = 1.0 - prec
 	y_almost1 = false
 	Y = one(Complex{Float64})
 	count = 1
@@ -81,7 +82,7 @@ function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCou
 		Y *= y
 
 		if count > minCount
-			y_almost1 = 1.0 - abs(y) <= prec
+			y_almost1 = almost1 <= abs(y)
 		end
 		count += 1
 	end
@@ -112,35 +113,37 @@ The Fourier transform of the Daubechies `N` wavelet function evaluated at `xi`.
 
 The optional arguments are passed to `FourDaubScaling`.
 """->
-function FourDaubWavelet{T<:Real}( XI::DenseArray{T}, N::Int; args... )
-	# Fixed factor in the complex exponential
-	Four_idx = 2*pi*im*[0:2*N-1;]
+function FourDaubWavelet{T<:Real}( xi::T, C::Vector{Float64}; args... )
+	@assert isapprox(sum(C), 1.0)
 
-	# Filter coefficients
-	C = wavefilter( string("db", N) )
-	C = scale!(C, 1/sum(C))
+	xi /= 2
+	Y = FourDaubScaling(xi, C; args...)
 
-	# Fourier transform of low pass filter
-	XI /= 2
-	Z = FourDaubScaling(XI, N; args...)
+	# High pass filter
+	Y *= feval( -xi-0.5, C )
+	Y *= cis( 2*pi*xi )
 
-	M = length(XI)
-
-	# The infinite product for each xi
-	# TODO: Vectorize this?
-	for m = 1:M
-		xi = XI[m]
-		# High pass filter
-		H = conj(dot( C, exp((xi+0.5)*Four_idx) ))
-
-		Z[m] *= exp( 2*pi*im*xi )*H
-	end
-
-	return Z
+	return Y
 end
 
-# Vectorize and add dilation/scale and translation. 
-# Identical for scaling and wavelet
+function FourDaubWavelet{T<:Real}( xi::DenseArray{T}, N::Int; args... )
+	# Filter coefficients
+	C = wavefilter( string("db", N) )
+	scale!(C, 1/sum(C))
+
+	Y = Array(Complex{Float64}, size(xi))
+	M = length(xi)
+	for m = 1:M
+		@inbounds Y[m] = FourDaubWavelet( xi[m], C; args... )
+	end
+
+	return Y
+end
+
+
+# ------------------------------------------------------------
+# Dilation and translation. 
+
 for name in [:FourHaarScaling, :FourHaarWavelet]
 	@eval begin
 		@vectorize_1arg Real $name
@@ -165,10 +168,6 @@ for name in [:FourHaarScaling, :FourHaarWavelet]
 	end
 end
 
-
-
-# Vectorize and add dilation/scale and translation. 
-# Identical for scaling and wavelet
 for name in [:FourDaubScaling, :FourDaubWavelet]
 	@eval begin
 		function $name{T<:Real}(xi::DenseArray{T}, N::Int, J::Int; args...)
