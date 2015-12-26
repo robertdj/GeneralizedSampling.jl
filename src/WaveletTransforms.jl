@@ -39,7 +39,7 @@ function DaubScaling(C::Vector{Float64}, R::Int)
 
 		for phin = cur_idx
 			for Ck = 1:NC
-				pidx = parent_scale_index(phin, Ck-1, R)
+				pidx = dyadic_parent(phin, Ck-1, R)
 				if 1 <= pidx <= Nx
 					phi[phin] += sqrt2*C[Ck]*phi[pidx]
 				end
@@ -51,28 +51,41 @@ function DaubScaling(C::Vector{Float64}, R::Int)
 end
 
 @doc """
+	dyadic_dil_matrix(C::Vector)
+
+The "dyadic dilation matrix" of the filter `C` with `(i,j)`'th entry
+`C[2i-j]`.
+"""->
+function dyadic_dil_matrix(C::Vector{Float64})
+	NC = length(C)
+	dydil_mat = zeros(Float64, NC, NC)
+
+	sqrt2 = sqrt(2)
+	for nj = 1:NC, ni = 1:NC
+		Cidx = 2*ni - nj
+		# TODO: Avoid this check?
+		if 1 <= Cidx <= NC
+			dydil_mat[ni, nj] = sqrt2*C[Cidx]
+		end
+	end
+
+	return dydil_mat
+end
+
+@doc """
 	DaubScaling(C::Vector)
 
 Compute function values of the scaling function defined by the filter
 `C` at the integers in the support.
 """->
 function DaubScaling(C::Vector{Float64})
-	NC = length(C)
-	filter_matrix = zeros(Float64, NC, NC)
-
-	sqrt2 = sqrt(2)
-	for nj = 1:NC, ni = 1:NC
-		Cidx = 2*ni - nj
-		if 1 <= Cidx <= NC
-			filter_matrix[ni, nj] = sqrt2*C[Cidx]
-		end
-	end
+	L = dyadic_dil_matrix(C)
 
 	# Eigenvector of eigenvalue 1 (the largest)
+	# TODO: The first and last entry are both 0
 	# TODO: eigs is not consistent with sign
-	eigenvec = eigs(filter_matrix; nev=1)[2]
+	eigenvec = eigs(L; nev=1)[2]
 	return real(vec(eigenvec))
-	#= return filter_matrix =#
 end
 
 @doc """
@@ -102,12 +115,12 @@ function support(C::Vector{Float64})
 end
 
 @doc """
-	parent_scale_index(i::Int, k::Int, L::Int)
+	dyadic_parent(i::Int, k::Int, L::Int)
 
 In the vector `x` where the `i`'th entry is `x_i = (i-1)/2^L`,
-`parent_scale_index` returns the index of `2x_i - k`.
+`dyadic_parent` returns the index of `2x_i - k`.
 """->
-function parent_scale_index(i::Int, k::Int, L::Int)
+function dyadic_parent(i::Int, k::Int, L::Int)
 	2*i - 1 - k*2^L
 end
 
