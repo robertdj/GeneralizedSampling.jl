@@ -11,34 +11,42 @@ function HaarScaling{T<:Real}(xi::T)
 	0 <= xi < 1 ? 1 : 0
 end
 
-#= @doc """ =#
-#= 	DaubScaling(N, L[, J, k]) =#
+@doc """
+	DaubScaling(N, L[, J, k]) -> x,y
 
-#= A Daubechies `N` scaling function at scale `J` and translation `k` evaluated in `0:2^(-L):2N-1`. =#
-#= """-> =#
+A Daubechies `N` scaling function at scale `J` and translation `k` evaluated in `0:2^(-L):2N-1`.
+"""->
 function DaubScaling(N::Int, L::Int)
 	wt = wavelet( WT.Daubechies{N}() )
 	phi, x = DaubScaling( wt.qmf, L )
 end
 
 @doc """
-	DaubScaling(C::Vector)
+	DaubScaling(C::Vector) -> y
 
-Compute function values of the scaling function defined by the filter
-`C` at the integers in the support.
+Compute function values of the scaling function defined by the filter `C` at the integers in the support.
 """->
 function DaubScaling(C::Vector{Float64})
 	L = dyadic_dil_matrix(C)
 
 	# Eigenvector of eigenvalue 1 (the largest)
-	# TODO: The first and last entry are both 0
-	# TODO: eigs is not consistent with sign
 	eigenvec = eigs(L; nev=1)[2]
-	return real(vec(eigenvec))
+	E = vec(real(eigenvec))
+
+	# eigs is not consistent with the sign
+	if E[2] < 0
+		scale!(E, -1.0)
+	end
+
+	# The first and last entry are both 0
+	# TODO: Don't compute them
+	E[1] = E[end] = 0.0
+
+	return E
 end
 
 @doc """
-	DaubScaling(C::Vector, R::Int)
+	DaubScaling(C::Vector, R::Int) -> x, y
 
 Compute function values of the scaling function defined by the filter
 `C` at the dyadic rationals of resolution `R` in the support.
@@ -74,6 +82,77 @@ function DaubScaling(C::Vector{Float64}, R::Int)
 end
 
 @doc """
+	DaubScaling(N::Int, edge::Char)
+
+Compute function values of all the boundary scaling function with `N` vanishing moments at the integers in its support.
+
+`edge` can be either `L`(eft) og `R`(ight).
+
+The output is
+"""->
+function DaubScaling(N::Int, edge::Char)
+	# TODO: Check input
+end
+
+@doc """
+	DaubScaling(F::BoundaryFilter, boundary) -> Matrix 
+
+Compute function values of the boundary scaling function defined by the filters `F` at the integers in the support.
+
+`boundary` must be either `Val{'L'}` or `Val{'R'}`.
+
+The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary function evaluated at `i-1`.
+"""->
+function DaubScaling(F::BoundaryFilter, ::Type{Val{'L'}})
+	# The number of vanishing moments = the number of boundary functions
+	vm = van_moment(F)
+
+	# The number of integers to evaluate
+	Nint = vm + 2
+	Y = zeros(Float64, Nint, vm)
+
+	internal = DaubScaling(vm, 0)[2]
+
+	# Bounds of support
+	# TODO: support in function?
+	lower = 0
+	upper = 2*vm - 1
+
+	# Compute the function values from highest to lowest to use the recursion
+	# The order of the loops are intentional: All y values are needed
+	# for each x value
+	for xval = Nint:-1:1
+		for bfunc = 1:vm
+			# xval2 = index in Y of 2*xval
+			xval2 = 2*(xval - 1) + 1
+			cur_filter = lfilter(F,bfunc-1)
+
+			# Boundary contribution
+			if xval2 < upper
+				for l = 1:vm
+					Y[xval,bfunc] += cur_filter[l]*Y[xval2,bfunc]
+				end
+			end
+
+			# Internal contribution
+			for m = vm:length(cur_filter)
+				if m < xval2 < vm + m
+					@show xval2-m
+					Y[xval,bfunc] += cur_filter[m]*internal[xval2-m+1]
+				end
+			end
+		end
+	end
+
+	scale!(Y, sqrt(2))
+	return Y
+end
+
+function DaubScaling(C::Vector{Float64}, R::Int, ::Val{'L'})
+end
+
+
+@doc """
 	dyadic_rationals(upper, res)
 
 The dyadic rationals of resolution `R` in the integer interval `[0, upper]`.
@@ -91,13 +170,12 @@ return the indices of those at exactly `level`.
 function dyadic_rationals(upper::Int, res::Int, level::Int)
 	N = upper*2^res + 1
 
-	# TODO: Avoid collect?
 	if level == 0
 		step = 2^res
-		return collect( 1:step:N )
+		return 1:step:N
 	else
 		step = 2^(res-level)
-		return collect( 1+step:2*step:N )
+		return 1+step:2*step:N
 	end
 end
 
@@ -113,19 +191,18 @@ function dyadic_rationals(dy_rat::Vector{Float64}, level::Int)
 	@assert 0 <= level <= res "Resolution must be greater than level"
 
 	power2 = 2^level
-	# TODO: Pre-allocate
-	upper = dy_rat[end]
-	dyadic_level = Array(Int, 0)
+	max_supp = dy_rat[end]
+	Nlevel = Int(max_supp*power2+1)
+	dyadic_level = Array(Int, Nlevel)
 
 	# An entry in dy_rat (at level res) is also in dyadic_level if
 	# and only if it is an integer when multiplied with power2
-	#= count = 1 =#
+	count = 1
 	Nres = length(dy_rat)
 	for n = 1:Nres
 		if isinteger( power2*dy_rat[n] )
-			#= dyadic_level[count] = n =#
-			#= count += 1 =#
-			push!(dyadic_level, n)
+			dyadic_level[count] = n
+			count += 1
 		end
 	end
 
@@ -206,7 +283,6 @@ In the vector `x` where the `i`'th entry is `x_i = (i-1)/2^L`,
 `dyadic_parent` returns the index of `2x_i - k`.
 """->
 function dyadic_parent(i::Int, k::Int, L::Int)
-	# TODO: Try << instead of ^ for speed
 	2*i - 1 - k*2^L
 end
 
@@ -219,9 +295,8 @@ function HaarScaling{T<:Real}(xi::T, J::Int)
 end
 
 function HaarScaling{T<:Real}(xi::T, J::Int, k::Int)
-	# TODO: Is this error check slowing things down?
-	@assert 0 <= k < 2^J "Translation is too large"
-	2.0^(J/2)*HaarScaling(2^J*xi - k)
+	@assert 0 <= k < (dil_fact = 2^J) "Translation is too large"
+	2.0^(J/2)*HaarScaling(dil_fact*xi - k)
 end
 
 @doc """
@@ -234,11 +309,12 @@ function DaubScaling(phi::Vector{Float64}, J::Int, k::Int)
 	Nphi = length(phi)
 	upper, resolution = factor_support( Nphi )
 
-	#= min_scale = ceil(Int,log2(upper)) =#
-	#= @assert min_scale <= J <= resolution =# 
+	@assert 0 <= J <= resolution 
+	@assert 0 <= k < upper*2^J
 
 	# If x_{i,L} = (i-1)/2^L, the dilated & translated scaling function
 	# phi_{J,k}(x_{i,L}) = 2^(j/2)*phi( x_{i-k*2^{L-J}, L-J} )
+	# TODO: Pass this as an argument?
 	dy_ras = dyadic_rationals(upper, resolution)
 	xidx = dyadic_rationals(dy_ras, resolution-J)
 
@@ -272,18 +348,9 @@ end
 
 # ------------------------------------------------------------
 
-@doc """
-	weval(coef, wave, L::Int)
-
-Evaluate `coef` vector in the `wave` basis in the points `0:2^-L:1-2^-L`.
-"""->
-function weval(coef::AbstractArray{Float64}, J::Int, wave::AbstractString, L::Int)
-end
-
 # Reconstruction in Haar basis
-function weval(coef::AbstractArray{Float64}, L::Int)
-	inc = 2.0^(-L)
-	x = collect( 0:inc:1-inc )
+function weval(coef::AbstractArray{Float64}, res::Int)
+	x = dyadic_rationals(1, res)
 	Nx = length(x)
 	Ncoef = length(coef)
 	# Scale of wavelet transform.
@@ -293,8 +360,7 @@ function weval(coef::AbstractArray{Float64}, L::Int)
 	y = zeros(Float64, Nx)
 	for n = 1:Nx
 		for m = 1:Ncoef
-			# TODO: Only include the functions that have x[nx] in their
-			# support
+			# TODO: Only include the functions that have x[nx] in their support
 			@inbounds y[n] += coef[m]*HaarScaling( x[n], J, m-1 )
 		end
 	end
@@ -302,9 +368,29 @@ function weval(coef::AbstractArray{Float64}, L::Int)
 	return x, y
 end
 
-# Reconstruction in general Daubechies basis
-function weval(coef::AbstractArray{Float64}, J::Int, N::Int, L::Int)
-	# TODO: J must be so large that the support of the wavelet is
-	# contained in [0,1]
+@doc """
+	weval(coef::Vector, N::Int, J::Int, res::Int)
+
+Evaluate `coef` vector in the Daubechies `N` basis at scale `J` in the dyadic rationals of resolution `res`.
+
+`J` must be so large that the support of the wavelet is contained in `[0,1]`.
+"""->
+function weval(coef::AbstractArray{Float64}, N::Int, J::Int, res::Int)
+	# TODO: J must be sufficiently large 
+
+	x = dyadic_rationals(N, res)
+	Nx = length(x)
+	Ncoef = length(coef)
+	# TODO: Compute J from coef?
+
+	y = zeros(Float64, Nx)
+	for n = 1:Nx
+		for m = 1:Ncoef
+			# TODO: Only include the functions that have x[nx] in their support
+			@inbounds y[n] += coef[m]*HaarScaling( x[n], J, m-1 )
+		end
+	end
+
+	return x, y
 end
 
