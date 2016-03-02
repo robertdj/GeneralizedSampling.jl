@@ -95,6 +95,26 @@ function DaubScaling(N::Int, edge::Char)
 end
 
 @doc """
+	boundary_coef_mat(F::BoundaryFilter) -> Matrix
+
+The boundary coefficients collected in a matrix with the `i`'th row
+containing the coefficients of the `i`'th boundary scaling function.
+"""->
+function boundary_coef_mat(F::BoundaryFilter)
+	const vm = van_moment(F)
+	coef_mat = zeros(Float64, vm, vm)
+
+	const sqrt2 = sqrt(2)
+	for row = 1:vm
+		coef = bfilter(F, row-1)
+		coef_mat[row,:] = sqrt2*coef[1:vm]
+	end
+
+	return coef_mat
+end
+
+#=
+@doc """
 	DaubScaling(F::BoundaryFilter, boundary) -> Matrix 
 
 Compute function values of the boundary scaling function defined by the filters `F` at the integers in the support.
@@ -103,48 +123,63 @@ Compute function values of the boundary scaling function defined by the filters 
 
 The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary function evaluated at `i-1`.
 """->
-function DaubScaling(F::BoundaryFilter, ::Type{Val{'L'}})
+=#
+@debug function DaubScaling(F::BoundaryFilter, ::Type{Val{'L'}})
 	# The number of vanishing moments = the number of boundary functions
-	vm = van_moment(F)
+	const vm = van_moment(F)
+
+	# Bounds of support of boundary and internal scaling functions
+	const boundary_support = (0, 2*vm-1)
+	const internal_support = (-vm+1, vm)
+
+	# Convert between function values and indices for boundary and
+	# internal scaling functions
+	boundary_x2index(x::Int) = x + 1
+	boundary_index2x(idx::Int) = idx - 1
+	internal_x2index(x::Int) = x + vm
+
+	# Function values of the internal scaling function
+	C = wavelet( WT.Daubechies{vm}() ).qmf
+	internal = DaubScaling(C)
 
 	# The number of integers to evaluate
-	Nint = vm + 2
+	const Nint = internal_support[2] - internal_support[1] + 1
 	Y = zeros(Float64, Nint, vm)
 
-	internal = DaubScaling(vm, 0)[2]
+	# Boundary scaling functions at 0
+	# TODO: Move to separate function?
+	boundary_mat = boundary_coef_mat(F)
+	# TODO: Are we sure that the eigvector corresponding to 1 is always the first?
+	eigenvecs = eigvecs(boundary_mat)
+	Y[1,:] = eigenvecs[:,1]
 
-	# Bounds of support
-	# TODO: support in function?
-	lower = 0
-	upper = 2*vm - 1
+	# Remaining boundary scaling functions values from highest to lowest to use the recursion
+	# The order of the loops are intentional: All y values are needed for each x value
+	const sqrt2 = sqrt(2)
+	for i = (Nint-1):-1:2
+		xval = boundary_index2x(i)
+		xval2 = 2*xval
+		xval2index = boundary_x2index(xval2)
 
-	# Compute the function values from highest to lowest to use the recursion
-	# The order of the loops are intentional: All y values are needed
-	# for each x value
-	for xval = Nint:-1:1
-		for bfunc = 1:vm
-			# xval2 = index in Y of 2*xval
-			xval2 = 2*(xval - 1) + 1
-			cur_filter = lfilter(F,bfunc-1)
+		for j = 1:vm
+			cur_filter = bfilter(F, j-1)
 
 			# Boundary contribution
-			if xval2 < upper
-				for l = 1:vm
-					Y[xval,bfunc] += cur_filter[l]*Y[xval2,bfunc]
+			if boundary_support[1] <= xval2 < boundary_support[2]
+				for l = 0:vm-1
+					Y[i,j] += sqrt2*cur_filter[l+1]*Y[xval2index,l+1]
 				end
 			end
 
 			# Internal contribution
-			for m = vm:length(cur_filter)
-				if m < xval2 < vm + m
-					@show xval2-m
-					Y[xval,bfunc] += cur_filter[m]*internal[xval2-m+1]
+			for m = vm:(vm+2*(j-1))
+				if internal_support[1] < xval2-m < internal_support[2]
+					Y[i,j] += sqrt2*cur_filter[m+1]*internal[ internal_x2index(xval2-m) ]
 				end
 			end
 		end
 	end
 
-	scale!(Y, sqrt(2))
 	return Y
 end
 
