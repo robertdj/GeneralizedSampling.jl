@@ -52,20 +52,21 @@ Compute function values of the scaling function defined by the filter
 `C` at the dyadic rationals of resolution `R` in the support.
 """->
 function DaubScaling(C::Vector{Float64}, R::Int)
-	max_supp = support(C)
-	x = dyadic_rationals(max_supp, R)
+	supp = support(C)
+	x = dyadic_rationals(supp, R)
 	Nx = length(x)
 	phi = zeros(Float64, Nx)
 
 	# Base level
-	cur_idx = dyadic_rationals(max_supp, R, 0)
+	cur_idx = dyadic_rationals( supp, R, 0)
 	phi[cur_idx] = DaubScaling(C)
 
 	# Recursion: Fill remaining levels
 	NC = length(C)
-	sqrt2 = sqrt(2)
+	const sqrt2 = sqrt(2)
 	for L = 1:R
-		cur_idx = dyadic_rationals(max_supp, R, L)
+		# Indices of x values on scale L
+		cur_idx = dyadic_rationals(supp, R, L)
 
 		for phin = cur_idx
 			for Ck = 1:NC
@@ -113,56 +114,49 @@ function boundary_coef_mat(F::BoundaryFilter)
 	return coef_mat
 end
 
-#=
-@doc """
-	DaubScaling(F::BoundaryFilter, boundary) -> Matrix 
+# Convert between function values and indices for boundary and internal scaling functions
+boundary_x2index(x::Int) = x + 1
+boundary_index2x(idx::Int) = idx - 1
+# vm = the number of vanishing moments
+internal_x2index(x::Int, vm::Int) = x + vm
 
-Compute function values of the boundary scaling function defined by the filters `F` at the integers in the support.
+@doc """
+	DaubScaling(F::ScalingFilters, boundary) -> Matrix 
+
+For a boundary scaling function defined by the filters `F` with corresponding internal scaling function defined by the filter `, compute the function values at the integers in the support.
 
 `boundary` must be either `Val{'L'}` or `Val{'R'}`.
 
 The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary function evaluated at `i-1`.
 """->
-=#
-@debug function DaubScaling(F::BoundaryFilter, ::Type{Val{'L'}})
+function DaubScaling(F::ScalingFilters, ::Type{Val{'L'}})
 	# The number of vanishing moments = the number of boundary functions
 	const vm = van_moment(F)
 
 	# Bounds of support of boundary and internal scaling functions
-	const boundary_support = (0, 2*vm-1)
-	const internal_support = (-vm+1, vm)
-
-	# Convert between function values and indices for boundary and
-	# internal scaling functions
-	boundary_x2index(x::Int) = x + 1
-	boundary_index2x(idx::Int) = idx - 1
-	internal_x2index(x::Int) = x + vm
+	const internal_support, boundary_support = support(F)
 
 	# Function values of the internal scaling function
-	C = wavelet( WT.Daubechies{vm}() ).qmf
-	internal = DaubScaling(C)
+	const internal = DaubScaling(F.internal)
 
 	# The number of integers to evaluate
 	const Nint = internal_support[2] - internal_support[1] + 1
 	Y = zeros(Float64, Nint, vm)
 
 	# Boundary scaling functions at 0
-	# TODO: Move to separate function?
-	boundary_mat = boundary_coef_mat(F)
-	# TODO: Are we sure that the eigvector corresponding to 1 is always the first?
-	eigenvecs = eigvecs(boundary_mat)
-	Y[1,:] = eigenvecs[:,1]
+	Y[1,:] = DaubScaling(F.left)
 
-	# Remaining boundary scaling functions values from highest to lowest to use the recursion
-	# The order of the loops are intentional: All y values are needed for each x value
+	# Remaining boundary scaling functions values from highest to lowest 
+	# to use the recursion
+	# The order of the loops are intentional: All y values are needed for 
+	# each x value
 	const sqrt2 = sqrt(2)
 	for i = (Nint-1):-1:2
-		xval = boundary_index2x(i)
-		xval2 = 2*xval
+		xval2 = 2*boundary_index2x(i)
 		xval2index = boundary_x2index(xval2)
 
 		for j = 1:vm
-			cur_filter = bfilter(F, j-1)
+			cur_filter = bfilter(F.left, j-1)
 
 			# Boundary contribution
 			if boundary_support[1] <= xval2 < boundary_support[2]
@@ -174,7 +168,7 @@ The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary functio
 			# Internal contribution
 			for m = vm:(vm+2*(j-1))
 				if internal_support[1] < xval2-m < internal_support[2]
-					Y[i,j] += sqrt2*cur_filter[m+1]*internal[ internal_x2index(xval2-m) ]
+					Y[i,j] += sqrt2*cur_filter[m+1]*internal[ internal_x2index(xval2-m,vm) ]
 				end
 			end
 		end
@@ -183,27 +177,130 @@ The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary functio
 	return Y
 end
 
-function DaubScaling(C::Vector{Float64}, R::Int, ::Val{'L'})
+@doc """
+	DaubScaling(B::BoundaryFilter) -> Vector
+
+Compute the boundary scaling function values at 0.
+"""->
+function DaubScaling(B::BoundaryFilter)
+	boundary_mat = boundary_coef_mat(B)
+	# TODO: Are we sure that the eigvector corresponding to 1 is always the first?
+	eigenvecs = eigvecs(boundary_mat)
+	return eigenvecs[:,1]
 end
 
 
+# Convert between function values and indices for boundary and internal
+# scaling functions at resolution R
+boundary_x2index(x, R::Int) = Int(2^R*x) + 1
+boundary_index2x(idx::Int, R::Int) = (idx - 1)/2^R
+# I = support of the internal scaling function
+# TODO: Test if x \in I
+internal_x2index(x, I::Tuple, R::Int) = Int( (x-I[1])*2^R ) + 1
+
+@doc """
+	DaubScaling(F::BoundaryFilter, R::Int, boundary) -> Matrix 
+
+Compute function values of the boundary scaling function defined by the filters `F` at resolution `R` in the support.
+
+`boundary` must be either `Val{'L'}` or `Val{'R'}`.
+
+The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary function evaluated at `(i-1)/ 2^R`.
+"""->
+function DaubScaling(F::ScalingFilters, R::Int, ::Type{Val{'L'}})
+	const internal_support, boundary_support = support(F)
+
+	# Function values of the internal scaling function
+	# TODO: Only necessary at level R-1
+	#= const x, internal = DaubScaling(F.internal, R) =#
+	const internal = DaubScaling(F.internal, R)[2]
+	#= const Nx = length(x) =#
+
+	const x = dyadic_rationals(boundary_support, R)
+	const Nx = length(x)
+
+	# The number of vanishing moments = the number of boundary functions
+	const vm = van_moment(F)
+	phi = zeros(Float64, Nx, vm)
+
+	# Base level
+	cur_idx = dyadic_rationals(boundary_support, R, 0)
+	phi[cur_idx,:] = DaubScaling(F, Val{'L'})
+
+	# Recursion: Fill remaining levels
+	const sqrt2 = sqrt(2)
+	for L = 1:R
+		# Indices of x values on scale L
+		cur_idx = dyadic_rationals(boundary_support, R, L)
+
+		# x values
+		for i in cur_idx
+			# 2*x value
+			doublex = 2*x[i]
+			doublex_index = boundary_x2index(doublex, R)
+
+			# y values
+			for j = 1:vm
+				# TODO: Memoize?
+				cur_filter = bfilter(F.left, j-1)
+
+				# Boundary contribution
+				if boundary_support[1] <= doublex < boundary_support[2]
+					for l = 0:vm-1
+						phi[i,j] += sqrt2*cur_filter[l+1]*phi[doublex_index,l+1]
+					end
+				end
+
+				# Internal contribution
+				# TODO: The support depends on j
+				for m = vm:(vm+2*(j-1))
+					if internal_support[1] < doublex-m < internal_support[2]
+						index = internal_x2index(doublex-m, internal_support, R)
+						phi[i,j] += sqrt2*cur_filter[m+1]*internal[ index ]
+					end
+				end
+			end
+		end
+	end
+
+	return x, phi
+end
+
+
+@doc """
+	dyadic_rationals(I::Tuple, res::Int) -> Vector
+
+The dyadic rationals of resolution `R` in the integer interval `[ I[1], I[2] ]`.
+"""->
+function dyadic_rationals(I::Tuple, res::Int)
+	@assert I[1] < I[2]
+	@assert res >= 0
+	collect( I[1]:2.0^(-res):I[2] )
+end
+
+#=
 @doc """
 	dyadic_rationals(upper, res)
 
 The dyadic rationals of resolution `R` in the integer interval `[0, upper]`.
 """->
 function dyadic_rationals(upper::Int, res::Int)
-	collect( 0:2.0^(-res):upper )
+	dyadic_rationals( (0,upper), res )
+	#= collect( 0:2.0^(-res):upper ) =#
 end
+=#
 
 @doc """
-	dyadic_rationals(upper, res, level)
+	dyadic_rationals(I::Tuple, res, level) -> Vector
 
-In a vector of dyadic rationals up to resolution `res` in `[0,upper]`,
+In a vector of dyadic rationals up to resolution `res` in `[ I[1], I[2] ]`,
 return the indices of those at exactly `level`.
 """->
-function dyadic_rationals(upper::Int, res::Int, level::Int)
-	N = upper*2^res + 1
+function dyadic_rationals(I::Tuple, res::Int, level::Int)
+	@assert I[1] < I[2]
+	@assert 0 <= level <= res
+
+	N = I[2]*2^res + 1
 
 	if level == 0
 		step = 2^res
@@ -273,7 +370,7 @@ Return the length of the support of the scaling function defined by the
 filter vector `C`.
 """->
 function support(C::Vector{Float64})
-	length(C) - 1
+	return (0,length(C) - 1)
 end
 
 @doc """
