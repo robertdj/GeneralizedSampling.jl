@@ -22,7 +22,7 @@ function DaubScaling(N::Int, L::Int)
 end
 
 @doc """
-	DaubScaling(C::Vector) -> y
+	DaubScaling(C::Vector) -> Vector
 
 Compute function values of the scaling function defined by the filter `C` at the integers in the support.
 """->
@@ -33,12 +33,11 @@ function DaubScaling(C::Vector{Float64})
 	eigenvec = eigs(L; nev=1)[2]
 	E = vec(real(eigenvec))
 
-	# eigs is not consistent with the sign
-	if E[2] < 0
-		scale!(E, -1.0)
-	end
+	# The scaling function should be normalized in L2
+	scale!(E, 1/sum(E))
 
 	# The first and last entry are both 0
+	# TODO: Not for Haar
 	# TODO: Don't compute them
 	E[1] = E[end] = 0.0
 
@@ -46,15 +45,15 @@ function DaubScaling(C::Vector{Float64})
 end
 
 @doc """
-	DaubScaling(C::Vector, R::Int) -> x, y
+	DaubScaling(C::Vector, R::Int) -> Vector, Vector
 
 Compute function values of the scaling function defined by the filter
 `C` at the dyadic rationals of resolution `R` in the support.
 """->
 function DaubScaling(C::Vector{Float64}, R::Int)
-	supp = support(C)
-	x = dyadic_rationals(supp, R)
-	Nx = length(x)
+	const supp = support(C)
+	const x = dyadic_rationals(supp, R)
+	const Nx = length(x)
 	phi = zeros(Float64, Nx)
 
 	# Base level
@@ -62,7 +61,7 @@ function DaubScaling(C::Vector{Float64}, R::Int)
 	phi[cur_idx] = DaubScaling(C)
 
 	# Recursion: Fill remaining levels
-	NC = length(C)
+	const NC = length(C)
 	const sqrt2 = sqrt(2)
 	for L = 1:R
 		# Indices of x values on scale L
@@ -98,8 +97,8 @@ end
 @doc """
 	boundary_coef_mat(F::BoundaryFilter) -> Matrix
 
-The boundary coefficients collected in a matrix with the `i`'th row
-containing the coefficients of the `i`'th boundary scaling function.
+The boundary coefficients collected in a matrix where the `i`'th row
+contains the coefficients of the `i`'th boundary scaling function.
 """->
 function boundary_coef_mat(F::BoundaryFilter)
 	const vm = van_moment(F)
@@ -133,15 +132,14 @@ function DaubScaling(F::ScalingFilters, ::Type{Val{'L'}})
 	# The number of vanishing moments = the number of boundary functions
 	const vm = van_moment(F)
 
-	# Bounds of support of boundary and internal scaling functions
 	const internal_support, boundary_support = support(F)
 
 	# Function values of the internal scaling function
 	const internal = DaubScaling(F.internal)
 
-	# The number of integers to evaluate
-	const Nint = internal_support[2] - internal_support[1] + 1
-	Y = zeros(Float64, Nint, vm)
+	# The number of points to evaluate
+	const Nx = internal_support[2] - internal_support[1] + 1
+	Y = zeros(Float64, Nx, vm)
 
 	# Boundary scaling functions at 0
 	Y[1,:] = DaubScaling(F.left)
@@ -151,24 +149,25 @@ function DaubScaling(F::ScalingFilters, ::Type{Val{'L'}})
 	# The order of the loops are intentional: All y values are needed for 
 	# each x value
 	const sqrt2 = sqrt(2)
-	for i = (Nint-1):-1:2
-		xval2 = 2*boundary_index2x(i)
-		xval2index = boundary_x2index(xval2)
+	for i = (Nx-1):-1:2
+		doublex = 2*boundary_index2x(i)
+		doublex_index = boundary_x2index(doublex)
 
 		for j = 1:vm
+			# TODO: Memoize?
 			cur_filter = bfilter(F.left, j-1)
 
 			# Boundary contribution
-			if boundary_support[1] <= xval2 < boundary_support[2]
+			if boundary_support[1] < doublex < boundary_support[2]
 				for l = 0:vm-1
-					Y[i,j] += sqrt2*cur_filter[l+1]*Y[xval2index,l+1]
+					Y[i,j] += sqrt2*cur_filter[l+1]*Y[doublex_index,l+1]
 				end
 			end
 
 			# Internal contribution
 			for m = vm:(vm+2*(j-1))
-				if internal_support[1] < xval2-m < internal_support[2]
-					Y[i,j] += sqrt2*cur_filter[m+1]*internal[ internal_x2index(xval2-m,vm) ]
+				if internal_support[1] < doublex-m < internal_support[2]
+					Y[i,j] += sqrt2*cur_filter[m+1]*internal[ internal_x2index(doublex-m,vm) ]
 				end
 			end
 		end
@@ -185,6 +184,7 @@ Compute the boundary scaling function values at 0.
 function DaubScaling(B::BoundaryFilter)
 	boundary_mat = boundary_coef_mat(B)
 	# TODO: Are we sure that the eigvector corresponding to 1 is always the first?
+	# TODO: How should the eigenvector be scaled?
 	eigenvecs = eigvecs(boundary_mat)
 	return eigenvecs[:,1]
 end
@@ -235,7 +235,6 @@ function DaubScaling(F::ScalingFilters, R::Int, ::Type{Val{'L'}})
 
 		# x values
 		for i in cur_idx
-			# 2*x value
 			doublex = 2*x[i]
 			doublex_index = boundary_x2index(doublex, R)
 
@@ -277,18 +276,6 @@ function dyadic_rationals(I::Tuple, res::Int)
 	@assert res >= 0
 	collect( I[1]:2.0^(-res):I[2] )
 end
-
-#=
-@doc """
-	dyadic_rationals(upper, res)
-
-The dyadic rationals of resolution `R` in the integer interval `[0, upper]`.
-"""->
-function dyadic_rationals(upper::Int, res::Int)
-	dyadic_rationals( (0,upper), res )
-	#= collect( 0:2.0^(-res):upper ) =#
-end
-=#
 
 @doc """
 	dyadic_rationals(I::Tuple, res, level) -> Vector
@@ -342,16 +329,15 @@ function dyadic_rationals(dy_rat::Vector{Float64}, level::Int)
 end
 
 @doc """
-	dyadic_dil_matrix(C::Vector)
+	dyadic_dil_matrix(C::Vector) -> Matrix
 
-The "dyadic dilation matrix" of the filter `C` with `(i,j)`'th entry
-`C[2i-j]`.
+The "dyadic dilation matrix" `D` of the filter `C` with `D[i,j] = C[2i-j]`.
 """->
 function dyadic_dil_matrix(C::Vector{Float64})
-	NC = length(C)
+	const NC = length(C)
 	dydil_mat = zeros(Float64, NC, NC)
 
-	sqrt2 = sqrt(2)
+	const sqrt2 = sqrt(2)
 	for nj = 1:NC, ni = 1:NC
 		Cidx = 2*ni - nj
 		# TODO: Avoid this check?
