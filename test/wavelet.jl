@@ -1,5 +1,5 @@
 #= using GeneralizedSampling =#
-#= using Base.Test =#
+using Base.Test
 
 # Dyadic rationals
 #=
@@ -54,32 +54,31 @@ vm = 4
 F = scalingfilters(vm)
 IS, BS = support(F)
 
-phi = DaubScaling(F.internal)
+R = 2
 
-Y = DaubScaling(F, Val{'L'})
-#= x = 3 =#
-for x in BS[1]:BS[2]
+phi = DaubScaling(F.internal, R)[2]
+
+xval, Y = DaubScaling(F, R, Val{'L'})
+for x in xval
 	doublex = 2*x
 
-	#= k = 0 =#
 	for k = 0:vm-1
 		curF = bfilter(F.left,k)
 		curF_length = length(curF)
 
 		doubleY = zeros(Float64, curF_length)
 		if isinside(doublex, BS)
-			doubleY[1:vm] = Y[x2index(doublex,BS),:]
+			doubleY[1:vm] = Y[x2index(doublex,BS,R),:]
 		end
 
 		for m = vm:curF_length-1
 			if isinside(doublex-m, IS)
-				doubleY[m+1] = phi[x2index(doublex-m,IS)]
+				doubleY[m+1] = phi[x2index(doublex-m,IS,R)]
 			end
 		end
 
-		@test_approx_eq_eps sqrt(2)*dot(doubleY,curF) Y[x2index(x,BS),k+1] sqrt(eps())
-		println("x = ", x, ", ", sqrt(2)*dot( doubleY, curF ) - Y[x2index(x,BS),k+1], ", ", sqrt(2)*dot( doubleY, curF ), ", ",
-		Y[x2index(x,BS),k+1])
+		@test_approx_eq_eps sqrt(2)*dot(doubleY,curF) Y[x2index(x,BS,R),k+1] sqrt(eps())
+		#= println("x = ", x, ", ", sqrt(2)*dot( doubleY, curF ) - Y[x2index(x,BS,R),k+1], ", ", sqrt(2)*dot( doubleY, curF ), ", ", Y[x2index(x,BS,R),k+1]) =#
 	end
 end
 

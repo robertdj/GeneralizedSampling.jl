@@ -2,6 +2,8 @@ typealias DaubSupport Tuple{Int,Int}
 left(I::DaubSupport) = I[1]
 right(I::DaubSupport) = I[2]
 
+#= Base.length(I) = right(I) - left(I) =#
+
 isinside(x, I::DaubSupport) = left(I) <= x <= right(I)
 
 # ------------------------------------------------------------
@@ -151,6 +153,7 @@ index2x(x::Integer, I::DaubSupport) = x - 1 + left(I)
 	# Remaining boundary scaling functions values from highest to lowest x to use the recursion
 	# The order of the loops are intentional: All y values are needed for each x value
 	const sqrt2 = sqrt(2)
+	# TODO: Iterator for DaubSupport?
 	for x in (boundary_support[2]-1):-1:(boundary_support[1]+1)
 		x_index = x2index(x, boundary_support)
 		doublex = 2*x
@@ -268,9 +271,9 @@ end
 
 
 @doc """
-	dyadic_rationals(I::Tuple, res::Int) -> Vector
+	dyadic_rationals(I::DaubSupport, R::Int) -> Vector
 
-The dyadic rationals of resolution `R` in the integer interval `[ I[1], I[2] ]`.
+The dyadic rationals of resolution `R` in the interval `I`.
 """->
 function dyadic_rationals(I::DaubSupport, res::Int)
 	@assert left(I) < right(I)
@@ -279,9 +282,9 @@ function dyadic_rationals(I::DaubSupport, res::Int)
 end
 
 @doc """
-	dyadic_rationals(I::Tuple, res, level) -> Vector
+	dyadic_rationals(I::DaubSupport, res, level) -> Vector
 
-In a vector of dyadic rationals up to resolution `res` in `[ I[1], I[2] ]`,
+In a vector of dyadic rationals up to resolution `res` in `I`,
 return the indices of those at exactly `level`.
 """->
 function dyadic_rationals(I::DaubSupport, res::Int, level::Int)
