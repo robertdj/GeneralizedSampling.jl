@@ -1,3 +1,9 @@
+typealias DaubSupport Tuple{Int,Int}
+left(I::DaubSupport) = I[1]
+right(I::DaubSupport) = I[2]
+
+isinside(x, I::DaubSupport) = left(I) <= x <= right(I)
+
 # ------------------------------------------------------------
 # Scaling functions
 
@@ -113,67 +119,66 @@ function boundary_coef_mat(F::BoundaryFilter)
 	return coef_mat
 end
 
-# Convert between function values and indices for boundary and internal scaling functions
-boundary_x2index(x::Int) = x + 1
-boundary_index2x(idx::Int) = idx - 1
-# vm = the number of vanishing moments
-internal_x2index(x::Int, vm::Int) = x + vm
+# Convert between values and indices of a vector with the integers in
+# the interval I
+x2index(x::Integer, I::DaubSupport) = x + 1 - left(I)
+index2x(x::Integer, I::DaubSupport) = x - 1 + left(I)
 
-@doc """
-	DaubScaling(F::ScalingFilters, boundary) -> Matrix 
+#= @doc """ =#
+#= 	DaubScaling(F::ScalingFilters, boundary) -> Matrix =# 
 
-For a boundary scaling function defined by the filters `F` with corresponding internal scaling function defined by the filter `, compute the function values at the integers in the support.
+#= For a boundary scaling function defined by the filters `F` with corresponding internal scaling function defined by the filter `, compute the function values at the integers in the support. =#
 
-`boundary` must be either `Val{'L'}` or `Val{'R'}`.
+#= `boundary` must be either `Val{'L'}` or `Val{'R'}`. =#
 
-The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary function evaluated at `i-1`.
-"""->
-function DaubScaling(F::ScalingFilters, ::Type{Val{'L'}})
+#= The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary function evaluated at `i-1`. =#
+#= """-> =#
+@debug function DaubScaling(F::ScalingFilters, ::Type{Val{'L'}})
 	# The number of vanishing moments = the number of boundary functions
 	const vm = van_moment(F)
-
-	const internal_support, boundary_support = support(F)
 
 	# Function values of the internal scaling function
 	const internal = DaubScaling(F.internal)
 
 	# The number of points to evaluate
+	const internal_support, boundary_support = support(F)
 	const Nx = internal_support[2] - internal_support[1] + 1
 	Y = zeros(Float64, Nx, vm)
 
 	# Boundary scaling functions at 0
 	Y[1,:] = DaubScaling(F.left)
 
-	# Remaining boundary scaling functions values from highest to lowest 
-	# to use the recursion
-	# The order of the loops are intentional: All y values are needed for 
-	# each x value
+	# Remaining boundary scaling functions values from highest to lowest x to use the recursion
+	# The order of the loops are intentional: All y values are needed for each x value
 	const sqrt2 = sqrt(2)
-	for i = (Nx-1):-1:2
-		doublex = 2*boundary_index2x(i)
-		doublex_index = boundary_x2index(doublex)
+	for x in (boundary_support[2]-1):-1:(boundary_support[1]+1)
+		x_index = x2index(x, boundary_support)
+		doublex = 2*x
+		doublex_index = x2index(doublex, boundary_support)
 
-		for j = 1:vm
-			# TODO: Memoize?
-			cur_filter = bfilter(F.left, j-1)
+		for k = 1:vm
+			# TODO: Memoize
+			cur_filter = bfilter(F.left, k-1)
 
 			# Boundary contribution
-			if boundary_support[1] < doublex < boundary_support[2]
+			if isinside(doublex, boundary_support)
 				for l = 0:vm-1
-					Y[i,j] += sqrt2*cur_filter[l+1]*Y[doublex_index,l+1]
+					Y[x_index,k] += sqrt2*cur_filter[l+1]*Y[doublex_index,l+1]
 				end
 			end
 
 			# Internal contribution
-			for m = vm:(vm+2*(j-1))
-				if internal_support[1] < doublex-m < internal_support[2]
-					Y[i,j] += sqrt2*cur_filter[m+1]*internal[ internal_x2index(doublex-m,vm) ]
+			for m = vm:(vm+2*(k-1))
+				if isinside(doublex-m, internal_support)
+					index = x2index(doublex-m, internal_support)
+					Y[x_index,k] += sqrt2*cur_filter[m+1]*internal[ index ]
 				end
 			end
 		end
 	end
 
 	return Y
+	#= return [ 0:Nx-1 Y ] =#
 end
 
 @doc """
@@ -192,11 +197,8 @@ end
 
 # Convert between function values and indices for boundary and internal
 # scaling functions at resolution R
-boundary_x2index(x, R::Int) = Int(2^R*x) + 1
-boundary_index2x(idx::Int, R::Int) = (idx - 1)/2^R
-# I = support of the internal scaling function
-# TODO: Test if x \in I
-internal_x2index(x, I::Tuple, R::Int) = Int( (x-I[1])*2^R ) + 1
+x2index(x, I::DaubSupport, R::Integer) = Int( (x-left(I))*2^R ) + 1
+index2x(idx::Integer, I::DaubSupport, R::Integer) = (idx - 1)/2^R + left(I)
 
 @doc """
 	DaubScaling(F::BoundaryFilter, R::Int, boundary) -> Matrix 
@@ -208,14 +210,13 @@ Compute function values of the boundary scaling function defined by the filters 
 The output is a Matrix where the `(i,j)`'th entry is the `j`'th boundary function evaluated at `(i-1)/ 2^R`.
 """->
 function DaubScaling(F::ScalingFilters, R::Int, ::Type{Val{'L'}})
-	const internal_support, boundary_support = support(F)
-
 	# Function values of the internal scaling function
 	# TODO: Only necessary at level R-1
 	#= const x, internal = DaubScaling(F.internal, R) =#
 	const internal = DaubScaling(F.internal, R)[2]
 	#= const Nx = length(x) =#
 
+	const internal_support, boundary_support = support(F)
 	const x = dyadic_rationals(boundary_support, R)
 	const Nx = length(x)
 
@@ -236,25 +237,25 @@ function DaubScaling(F::ScalingFilters, R::Int, ::Type{Val{'L'}})
 		# x values
 		for i in cur_idx
 			doublex = 2*x[i]
-			doublex_index = boundary_x2index(doublex, R)
+			doublex_index = x2index(doublex, boundary_support, R)
 
 			# y values
 			for j = 1:vm
-				# TODO: Memoize?
+				# TODO: Memoize
 				cur_filter = bfilter(F.left, j-1)
 
 				# Boundary contribution
-				if boundary_support[1] <= doublex < boundary_support[2]
+				# TODO: The support depends on j
+				if isinside(doublex, boundary_support)
 					for l = 0:vm-1
 						phi[i,j] += sqrt2*cur_filter[l+1]*phi[doublex_index,l+1]
 					end
 				end
 
 				# Internal contribution
-				# TODO: The support depends on j
 				for m = vm:(vm+2*(j-1))
-					if internal_support[1] < doublex-m < internal_support[2]
-						index = internal_x2index(doublex-m, internal_support, R)
+					if isinside(doublex-m, internal_support)
+						index = x2index(doublex-m, internal_support, R)
 						phi[i,j] += sqrt2*cur_filter[m+1]*internal[ index ]
 					end
 				end
@@ -271,10 +272,10 @@ end
 
 The dyadic rationals of resolution `R` in the integer interval `[ I[1], I[2] ]`.
 """->
-function dyadic_rationals(I::Tuple, res::Int)
-	@assert I[1] < I[2]
+function dyadic_rationals(I::DaubSupport, res::Int)
+	@assert left(I) < right(I)
 	@assert res >= 0
-	collect( I[1]:2.0^(-res):I[2] )
+	collect( left(I):2.0^(-res):right(I) )
 end
 
 @doc """
@@ -283,11 +284,11 @@ end
 In a vector of dyadic rationals up to resolution `res` in `[ I[1], I[2] ]`,
 return the indices of those at exactly `level`.
 """->
-function dyadic_rationals(I::Tuple, res::Int, level::Int)
-	@assert I[1] < I[2]
+function dyadic_rationals(I::DaubSupport, res::Int, level::Int)
+	@assert left(I) < right(I)
 	@assert 0 <= level <= res
 
-	N = I[2]*2^res + 1
+	N = right(I)*2^res + 1
 
 	if level == 0
 		step = 2^res
