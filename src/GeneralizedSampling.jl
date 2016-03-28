@@ -2,15 +2,17 @@ module GeneralizedSampling
 
 using ArrayViews
 using NFFT
-using RCall # Used for Voronoi computations
 
+import Deldir: deldir, voronoiarea
 import Wavelets: wavelet, WT
 
 export
 	# Types
-	Freq2wave1D,
-	Freq2wave2D,
+	CoB,
+	Freq2wave,
 	freq2wave,
+	BoundaryFilter,
+	ScalingFilters,
 
 	# Fourier transforms
 	FourHaarScaling,
@@ -40,6 +42,7 @@ export
 
 include("types.jl")
 include("misc.jl")
+include("Filters.jl")
 include("FourierTransforms.jl")
 include("CGNR.jl")
 

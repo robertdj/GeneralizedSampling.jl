@@ -38,6 +38,7 @@ function isuniform( x::Vector; prec::Float64=sqrt(eps()) )
 
 	diff = abs(x[1] - x[2])
 
+	# TODO: Use isapprox?
 	for n = 3:M
 		d = abs(x[n-1] - x[n])
 		if abs(d - diff) > prec
@@ -129,17 +130,9 @@ end
 
 function weights(xi::Matrix, bandwidth::Real)
 	@assert size(xi,2) == 2
+	@assert maximum(abs(xi)) <= bandwidth
 
-	# Compute the area of the Voronoi cells corresponding to xi
-	# This is done using R and its deldir package
-	# TODO: Find a Julia way
-	reval("library(deldir)")
-	globalEnv[:x] = RObject( xi[:,1] )
-	globalEnv[:y] = RObject( xi[:,2] )
-	globalEnv[:K] = RObject( bandwidth )
-	reval("V = deldir(x, y, rw=c(-K,K,-K,K))")
-
-	area = rcopy("V\$summary\$dir.area")
+	voronoiarea(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
 end
 
 
@@ -176,33 +169,28 @@ function density(xi::Vector, bandwidth::Number)
 	return density
 end
 
-function density(xi::Matrix{Float64}, bandwidth::Number)
+function density(xi::Matrix{Float64}, bandwidth::Real)
 	M, dim = size(xi)
 	@assert dim == 2
 
 	# Compute Voronoi tesselation
-	reval("library(deldir)")
-	globalEnv[:x] = RObject( xi[:,1] )
-	globalEnv[:y] = RObject( xi[:,2] )
-	globalEnv[:K] = RObject( bandwidth )
-	reval("V = deldir(x, y, rw=c(-K,K,-K,K))")
+	D = deldir(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
 
 	# Corners of Voronoi cells
-	x1 = rcopy("V\$dirsgs\$x1")
-	y1 = rcopy("V\$dirsgs\$y1")
-	x2 = rcopy("V\$dirsgs\$x2")
-	y2 = rcopy("V\$dirsgs\$y2")
+	x1 = D.vorsgs[:x1]
+	y1 = D.vorsgs[:y1]
+	x2 = D.vorsgs[:x2]
+	y2 = D.vorsgs[:y2]
 
 	# Edge-sampling point relation
-	ind1 = rcopy("V\$dirsgs\$ind1")
-	ind = round(Int64, ind1)
+	ind = D.vorsgs[:ind1]
 
 	# Compute the distance from each xi to the corners of its Voronoi cell
 	density = 0.0
-	Ncorner = length(ind)
-	for n = 1:Ncorner
+	for n = 1:length(ind)
 		idx = ind[n]
-		# Distance^2 from corners to one of the xi's that has this edge
+		# Distance^2 from end points of Voronoi edge to one of the xi's 
+		# with this edge
 		diff1 = (x1[n] - xi[idx,1])^2 + (y1[n] - xi[idx,2])^2
 		diff2 = (x2[n] - xi[idx,1])^2 + (y2[n] - xi[idx,2])^2
 
