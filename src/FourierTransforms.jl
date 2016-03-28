@@ -36,8 +36,10 @@ end
 @doc """
 	feval(xi::Float64, C::Vector{Float64})
 
-*F*ilter *eval*uation at `xi` of the filter `C`, i.e., compute 
-the linear combination `sum( C[n]*exp(-*pi*n*xi) )`.
+*F*ilter *eval*uation at `xi` of the filter `C`, i.e., compute
+the linear combination 
+
+	sum( C[n]*exp(2*pi*n*xi) )
 """->
 function feval(xi::Float64, C::Vector{Float64})
 	y = zero(Complex{Float64})
@@ -66,25 +68,25 @@ to control this there are optional arguments:
 function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCount=100)
 	@assert isapprox(sum(C), 1.0)
 
-	# When xi is (almost) an even integer y is (approx) 1.
-	# To ensure that the while loop below does not exit prematurely, 
-	# a minimum number of iterations is set, which is the number of 
-	# iterations needed for abs(xi) < 1
-	minCount = ( abs(xi) > 1.0 ? ceil(Int, log2(abs(xi))) : 1 )
-
-	almost1 = 1.0 - prec
-	y_almost1 = false
+	const almost1 = 1.0 - prec
 	Y = one(Complex{Float64})
 	count = 1
-	while !y_almost1 && count <= maxCount
+	while count <= maxCount
 		xi /= 2.0
 		y = feval(xi, C)
 		Y *= y
 
-		if count > minCount
-			y_almost1 = almost1 <= abs(y)
+		# Convergence check: |y(xi) - 1| is small for small xi. But y is
+		# exactly 1 in all even integers; prevent premature exit
+		if abs(xi) > 1.0
+			continue
+		else
+			count += 1
 		end
-		count += 1
+
+		if abs(y) >= almost1
+			break
+		end
 	end
 
 	return Y
@@ -96,8 +98,7 @@ function FourDaubScaling{T<:Real}( xi::DenseArray{T}, N::Int; args... )
 	scale!(C, 1/sum(C))
 
 	Y = Array(Complex{Float64}, size(xi))
-	M = length(xi)
-	for m = 1:M
+	for m = 1:length(xi)
 		@inbounds Y[m] = FourDaubScaling( xi[m], C; args... )
 	end
 
@@ -132,14 +133,77 @@ function FourDaubWavelet{T<:Real}( xi::DenseArray{T}, N::Int; args... )
 	scale!(C, 1/sum(C))
 
 	Y = Array(Complex{Float64}, size(xi))
-	M = length(xi)
-	for m = 1:M
+	for m = 1:length(xi)
 		@inbounds Y[m] = FourDaubWavelet( xi[m], C; args... )
 	end
 
 	return Y
 end
 
+
+# ------------------------------------------------------------
+# Fourier transform of Daubechies boundary wavelets
+
+@doc """
+	UVmat(F::BoundaryFilter) -> Matrix, Matrix
+
+Return the matrices `U` and `V` used in `FourDaubScaling`.
+This notation is copied directly from the article of Poon & Gataric (see references in docs).
+
+Only intended for internal use!
+"""->
+function UVmat(F::BoundaryFilter)
+	const vm = van_moment(F)
+
+	UV = zeros(Float64, vm, 3*vm-1)
+
+	for i = 1:vm
+		UV[i,1:vm+2*i-1] = bfilter(F, i-1) / sqrt(2)
+	end
+
+	return UV[:,1:vm], UV[:,vm+1:end]
+end
+
+@doc """
+	FourDaubScaling( xi, F:::ScalingFilters; ... ) -> Matrix
+
+The Fourier transform of the Daubechies `N` boundary wavelet transform
+defined by the filters `F` evaluated at `xi`.
+"""->
+function FourDaubScaling( xi, F::ScalingFilters; prec=sqrt(eps()), maxcount=50 )
+	const U, V = UVmat(F.left)
+	const vm = van_moment(F)
+
+	# The notation is copied directly from the article of Poon & Gataric (see references in docs).
+	# v1(xi) is the vector of desired Fourier transforms and v10 = v1(0)
+	Vcol = size(V,2)
+	v20 = ones(Float64, Vcol)
+	const v10 = (eye(vm) - U) \ V*v20
+
+	const C = F.internal / sum(F.internal)
+	const v2index = vm + [0:(Vcol-1);]
+	v2(xi) = FourDaubScaling(xi, C)*cis(-2*pi*v2index*xi)
+
+	# For large j,
+	# v1(xi) \approx U^j*v10 + sum_{l=0}^{j-1} U^l*V*v2(xi/2^{l+1}) 
+	v1 = U^maxcount*v10
+	for l = 0:maxcount-1
+		v1 += U^l*V*v2(xi/2^(l+1))
+	end
+
+	return v1
+end
+
+function FourDaubScaling( xi::AbstractVector, F::ScalingFilters; args... )
+	Y = Array(Complex{Float64}, length(xi), van_moment(F))
+
+	ny = 0
+	for x in xi
+		@inbounds Y[ny+=1,:] = FourDaubScaling(x, F; args...)
+	end
+
+	return Y
+end
 
 # ------------------------------------------------------------
 # Dilation and translation. 
@@ -153,6 +217,7 @@ for name in [:FourHaarScaling, :FourHaarWavelet]
 			C2 = 2.0^(-J)
 			C = 2.0^(-J/2)
 			y = Array(Complex{Float64}, M)
+
 			for m = 1:M
 				@inbounds y[m] = C*$name( C2*xi[m] )
 			end
