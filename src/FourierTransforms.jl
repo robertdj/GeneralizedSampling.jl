@@ -8,7 +8,7 @@ The Fourier transform of the Haar scaling function on scale `J` and translation 
 If not supplied, `J = 0` and `k = 0`.
 """->
 function FourHaarScaling{T<:Real}(xi::T)
-	if xi == 0
+	if xi == zero(xi)
 		return one(Complex{Float64})
 	else
 		return (1.0 - exp(-2.0*pi*im*xi)) / (2.0*pi*im*xi)
@@ -22,7 +22,7 @@ The Fourier transform of the Haar wavelet on scale `J` and translation `k` evalu
 If not supplied, `J = 0` and `k = 0`.
 """->
 function FourHaarWavelet{T<:Real}(xi::T)
-	if xi == 0
+	if xi == zero(xi)
 		return zero(Complex{Float64})
 	else
 		return (1.0 - exp(-pi*im*xi))^2 / (2.0*pi*im*xi)
@@ -92,17 +92,21 @@ function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCou
 	return Y
 end
 
-function FourDaubScaling{T<:Real}( xi::DenseArray{T}, N::Int; args... )
-	# Filter coefficients
-	C = wavefilter( string("db", N) )
-	scale!(C, 1/sum(C))
-
+function FourDaubScaling{T<:Real}( xi::DenseArray{T}, C::Vector{Float64}; args... )
 	Y = Array(Complex{Float64}, size(xi))
 	for m = 1:length(xi)
 		@inbounds Y[m] = FourDaubScaling( xi[m], C; args... )
 	end
 
 	return Y
+end
+
+function FourDaubScaling{T<:Real}( xi::DenseArray{T}, N::Int; args... )
+	# Filter coefficients
+	C = ifilter(N)
+	scale!(C, 1/sum(C))
+
+	return FourDaubScaling( xi, C; args... )
 end
 
 
@@ -127,7 +131,7 @@ function FourDaubWavelet{T<:Real}( xi::T, C::Vector{Float64}; args... )
 	return Y
 end
 
-function FourDaubWavelet{T<:Real}( xi::DenseArray{T}, N::Int; args... )
+function FourDaubWavelet{T<:Real}( xi::DenseArray{T}, N::Integer; args... )
 	# Filter coefficients
 	C = wavefilter( string("db", N) )
 	scale!(C, 1/sum(C))
@@ -138,6 +142,27 @@ function FourDaubWavelet{T<:Real}( xi::DenseArray{T}, N::Int; args... )
 	end
 
 	return Y
+end
+
+@doc """
+	FourScalingFunc( xi, wavename::String, J=0, k=0; ... )
+
+Compute the Fourier transform at `xi` of the scaling function `wavename` with
+scale `J` and translation `k`.
+"""->
+function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer=0; args... )
+	@assert J >= 0 "Scale must be a non-negative integer"
+
+	lowername = lowercase(wavename)
+	if lowername == "haar" || lowername == "db1"
+		return FourHaarScaling(xi, J, k)
+	elseif isdaubechies(lowername)
+		vm = WaveletPlot.van_moment(lowername)
+		return FourDaubScaling(xi, vm, J, k)
+	else
+		error("Fourier transform for this wavelet is not implemented")
+	end
+
 end
 
 
@@ -178,7 +203,7 @@ function FourDaubScaling( xi, F::ScalingFilters; prec=sqrt(eps()), maxcount=50 )
 	# v1(xi) is the vector of desired Fourier transforms and v10 = v1(0)
 	Vcol = size(V,2)
 	v20 = ones(Float64, Vcol)
-	const v10 = (eye(vm) - U) \ V*v20
+	const v10 = (eye(U) - U) \ V*v20
 
 	const C = F.internal / sum(F.internal)
 	const v2index = vm + [0:(Vcol-1);]
@@ -195,14 +220,14 @@ function FourDaubScaling( xi, F::ScalingFilters; prec=sqrt(eps()), maxcount=50 )
 end
 
 function FourDaubScaling( xi::AbstractVector, F::ScalingFilters; args... )
-	Y = Array(Complex{Float64}, length(xi), van_moment(F))
+	Nxi = length(xi)
+	Y = Array(Complex{Float64}, van_moment(F), Nxi)
 
-	ny = 0
-	for x in xi
-		@inbounds Y[ny+=1,:] = FourDaubScaling(x, F; args...)
+	for nxi = 1:Nxi
+		@inbounds Y[:,nxi] = FourDaubScaling(xi[nxi], F; args...)
 	end
 
-	return Y
+	return Y'
 end
 
 # ------------------------------------------------------------
@@ -235,14 +260,14 @@ end
 
 for name in [:FourDaubScaling, :FourDaubWavelet]
 	@eval begin
-		function $name{T<:Real}(xi::DenseArray{T}, N::Int, J::Int; args...)
+		function $name{T<:Real}(xi::DenseArray{T}, N::Integer, J::Integer; args...)
 			scale_xi = scale( 2.0^(-J), xi )
 			y = $name( scale_xi, N; args... )
 			scale!( 2.0^(-J/2), y )
 			return y
 		end
 
-		function $name{T<:Real}(xi::DenseArray{T}, N::Int, J::Int, k::Int; args...)
+		function $name{T<:Real}(xi::DenseArray{T}, N::Integer, J::Int, k::Integer; args...)
 			y = $name(xi, N, J; args... )
 			D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
 			had!(y, D)

@@ -129,6 +129,7 @@ function weights(xi::Vector, bandwidth::Real)
 end
 
 function weights(xi::Matrix, bandwidth::Real)
+	# TODO: Which dim is 2?
 	@assert size(xi,2) == 2
 	@assert maximum(abs(xi)) <= bandwidth
 
@@ -207,7 +208,7 @@ end
 	frac(x)
 	frac!(x)
 
-The fractional part of x as a number in [-0.5, 0.5).
+The fractional part of `x` as a number in [-0.5, 0.5).
 """->
 function frac(x::Array{Float64})
 	y = copy(x)
@@ -217,48 +218,22 @@ function frac(x::Array{Float64})
 end
 
 function frac!(x::Array{Float64})
-	N = length(x)
-	for n = 1:N
+	for n = 1:length(x)
 		@inbounds x[n] -= round(x[n])
 	end
 end
 
 
 @doc """
-	wavename(name)
+	isdaubechies(wavename::AbstractString) -> Bool
 
-Return the characteristics of a wavelet needed for computations.
+Return `true` if `wavename` is of the form `dbN`, where `N` is an integer.
 """->
-function wavename(name::AbstractString)
-	lname = lowercase(name)
+function isdaubechies(wavename::AbstractString)
+	lowername = lowercase(wavename)
 
-	if lname == "haar"
-		return "Haar"
-	elseif lname[1:2] == "db" && typeof(parse(lname[3:end])) <: Integer
-		return ("Daubechies", parse(lname[3:end]))
-	else
-		error("Uknown wavelet name")
-	end
-end
-
-@doc """
-	wavefilter(name)
-
-Return the low pass filter coefficients of the wavelet `name`.
-
-Uses the `Wavelets` package.
-"""->
-function wavefilter(name::AbstractString)
-	parsed_name = wavename(name)
-
-	if parsed_name == "Haar"
-		C = wavelet( WT.Haar() )
-	elseif parsed_name[1] == "Daubechies"
-		C = wavelet( WT.Daubechies{parsed_name[2]}() )
-	else
-		error("Uknown wavelet name")
-	end
-
-	return C.qmf
+	prefix = lowername[1:2]
+	N = parse(lowername[3:end])
+	prefix == "db" && isa( N, Integer )
 end
 
