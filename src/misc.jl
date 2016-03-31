@@ -232,8 +232,12 @@ Return `true` if `wavename` is of the form `dbN`, where `N` is an integer.
 function isdaubechies(wavename::AbstractString)
 	lowername = lowercase(wavename)
 
+	if lowername == "haar"
+		return true
+	end
+
 	prefix = lowername[1:2]
 	N = parse(lowername[3:end])
-	prefix == "db" && isa( N, Integer )
+	return prefix == "db" && isa( N, Integer )
 end
 
