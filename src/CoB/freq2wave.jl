@@ -14,7 +14,7 @@ Make change of basis for switching between frequency responses and wavelets.
 function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64=NaN)
 	# TODO: Warning if J is too big
 
-	# Fourier transform of the scaling function
+	# Fourier transform of the internal scaling function
 	FT = FourScalingFunc( samples, wavename, J )
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
@@ -32,9 +32,9 @@ function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64
 			error("Samples are not uniform; supply bandwidth")
 		end
 
-		W = Nullable(weights(samples, B))
-		mu = complex( sqrt(get(W)) )
-		had!(FT, mu)
+		W = sqrt(weights(samples, B))
+		had!( FT, complex(W) )
+		W = Nullable(W)
 	end
 
 	# Diagonal matrix for multiplication with internal scaling function
@@ -42,10 +42,12 @@ function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave(samples, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
 		F = waveparse( wavename, true )
-		return Freq2BoundaryWave(samples, W, J, wavename, diag, p, left, right)
+		left = complex(samples)
+		right = complex(samples)
+		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
 end
 
@@ -87,21 +89,21 @@ function hasboundary(wavename::AbstractString)
 end
 
 
-#=
 # ------------------------------------------------------------
 # Basic operations for 1D Freq2Wave
 
-function Base.size(T::Freq2wave{1}, ::Type{Val{1}})
+function Base.size(T::Freq2Wave{1}, ::Type{Val{1}})
+	# TODO: Use size(samples,1)?
 	length(T.samples)
 end
 
 
-function Base.collect(T::Freq2wave{1})
+function Base.collect(T::Freq2Wave{1})
 	M, N = size(T)
 	F = Array(Complex{Float64}, M, N)
 	for n = 1:N
 		for m = 1:M
-			@inbounds F[m,n] = T.column1[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
+			@inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
 		end
 	end
 
@@ -117,45 +119,44 @@ end
 
 Return the dimension `D`.
 """->
-function dim{D}(::Freq2wave{D})
+function dim{D}(::Freq2Wave{D})
 	D
 end
 
 @doc """
-	wscale(Freq2wave)
+	wscale(Freq2Wave)
 
 Return the scale of the wavelet coefficients.
 """->
-function wscale(T::Freq2wave)
+function wscale(T::Freq2Wave)
 	T.J
 end
 
 @doc """
-	wsize(T::Freq2wave{D})
+	wsize(T::Freq2Wave{D})
 
 The size of the reconstructed wavelet coefficients.
 
 - When `D` == 1, the output is (Int,)
 - When `D` == 2, the output is (Int,Int)
 """->
-function wsize(T::Freq2wave)
-	T.FFT.N
+function wsize(T::Freq2Wave)
+	T.NFFT.N
 end
 
 
-function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Float64=NaN)
+function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B::Float64=NaN)
 	M = size(samples, 1)
 	@assert size(samples,2) == 2
 	# TODO: Warning if J is too big
 
-	# Evaluate the first column in change of basis matrix
-	# TODO: Parse strings such as "db4"
-	func = string("Four", wave, "Scaling")
+	# Fourier transform of the internal scaling function
 	samplesx = view(samples, :, 1)
 	samplesy = view(samples, :, 2)
-	column1 = eval(parse(func))( samplesx, J )
-	column1y = eval(parse(func))( samplesy, J )
-	had!(column1, column1y)
+
+	FT = FourScalingFunc( samplesx, wavename, J )
+	FTy = FourScalingFunc( samplesy, wavename, J )
+	had!(FT, FTy)
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
 	N = 2^J
@@ -164,6 +165,7 @@ function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Flo
 	frac!(xi)
 	p = NFFTPlan(xi, (N,N))
 
+	# Weights for non-uniform samples
 	if isuniform(samples)
 		W = Nullable{Vector{Float64}}()
 	else
@@ -171,87 +173,79 @@ function freq2wave(samples::AbstractMatrix, wave::AbstractString, J::Int; B::Flo
 			error("Samples are not uniform; supply bandwidth")
 		end
 
-		W = weights(samples, B)
-		mu = complex( sqrt(W) )
-		had!(column1, mu)
+		W = sqrt(weights(samples, B))
+		had!( FT, complex(W) )
 		W = Nullable(W)
 	end
 
-	diag = column1 .* cis( -pi*(samplesx + samplesy) )
+	# Diagonal matrix for multiplication with internal scaling function
+	diag = FT .* cis( -pi*(samplesx + samplesy) )
 
-	return Freq2wave(samples, W, wave, column1, J, diag, p)
+	# Wavelets w/o boundary
+	if !hasboundary(wavename)
+		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
+	else
+		F = waveparse( wavename, true )
+		left = complex(samples)
+		right = complex(samples)
+		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
+	end
 end
 
 
-function Base.show{D}(io::IO, T::Freq2Wave{D})
-	println(io, D, "D change of basis matrix")
-
-	# TODO: Move "U =" outside
-	isuniform(T) ?  U = " " : U = " non-"
-
-	M = size(T,1)
-	# TODO: Move "N =" outside
-	D == 1 ? N = size(T,2) : N = wsize(T)
-	println(io, "From: ", M, U, "uniform frequency samples")
-	print(io, "To: ", N, " ", T.wave, " wavelets")
-end
-
-function Base.size(T::Freq2wave{2}, ::Type{Val{1}})
+function Base.size(T::Freq2Wave{2}, ::Type{Val{1}})
 	size(T.samples, 1)
 end
 
-function Base.size(T::Freq2wave, ::Type{Val{2}})
-	prod( T.FFT.N )
-end
-
 @doc """
-	mul!(T::Freq2wave, x::Vector, y::Vector)
+	mul!(T::Freq2Wave, x::Vector, y::Vector)
 	
 Replace `y` with `T*x`.
 """->
-function mul!{D}(T::Freq2wave{D}, X::DenseArray{Complex{Float64},D}, y::Vector{Complex{Float64}})
+function mul!{D}(T::Freq2NoBoundaryWave{D}, X::DenseArray{Complex{Float64},D}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert wsize(T) == size(X)
 
+	# TODO: X <: Real and then complex(X) if necessary
+
 	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
 	fill!(y, 0.0+0.0*im)
-	NFFT.nfft!(T.FFT, X, y)
+	NFFT.nfft!(T.NFFT, X, y)
 	had!(y, T.diag)
 
 	return y
 end
 
-function mul!(T::Freq2wave{2}, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
+function mul!(T::Freq2NoBoundaryWave{2}, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
-	N = wsize(T)
-	# TODO: Use slice instead?
-	X = reshape_view(x, N)
+	X = reshape_view(x, wsize(T))
 	mul!(T, X, y)
 
 	return y
 end
 
 @doc """
-	*(T::Freq2wave, x::vector)
+	*(T::Freq2Wave, x::vector)
 
 Compute `T*x`.
 """->
-function Base.(:(*))(T::Freq2wave, x::Vector)
+function Base.(:(*))(T::Freq2Wave, x::Vector)
 	@assert size(T,2) == length(x)
 	y = Array(Complex{Float64}, size(T,1))
 	mul!(T, complex(x), y)
 	return y
 end
 
+#=
 
 @doc """
-	mulT!(T::Freq2wave, v::Vector, z::Vector)
+	mulT!(T::Freq2Wave, v::Vector, z::Vector)
 	
 Replace `z` with `T'*v`.
 """->
-function mulT!{D}(T::Freq2wave{D}, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},D})
+function mulT!{D}(T::Freq2Wave{D}, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},D})
 	@assert size(T,1) == length(v)
 	@assert wsize(T) == size(Z)
 
@@ -265,7 +259,7 @@ function mulT!{D}(T::Freq2wave{D}, v::Vector{Complex{Float64}}, Z::DenseArray{Co
 	return Z
 end
 
-function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
+function mulT!(T::Freq2Wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert size(T,2) == length(z)
 
@@ -277,19 +271,19 @@ function mulT!(T::Freq2wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{F
 end
 
 @doc """
-	Ac_mul_B(T::Freq2wave, x::vector)
-	'*(T::Freq2wave{1}, x::vector)
+	Ac_mul_B(T::Freq2Wave, x::vector)
+	'*(T::Freq2Wave{1}, x::vector)
 
 Compute `T'*x`.
 """->
-function Base.Ac_mul_B(T::Freq2wave, x::Vector)
+function Base.Ac_mul_B(T::Freq2Wave, x::Vector)
 	@assert size(T,1) == length(x)
 	y = Array(Complex{Float64}, size(T,2))
 	mulT!(T, complex(x), y)
 	return y
 end
 
-function Base.(:(\))(T::Freq2wave, y::Vector{Complex{Float64}})
+function Base.(:(\))(T::Freq2Wave, y::Vector{Complex{Float64}})
 	# Non-uniform samples: Scale observations
 	if !isuniform(T)
 		y = scale(y, T.weights)
@@ -307,7 +301,7 @@ end
 
 
 @doc """
-	collect(Freq2wave)
+	collect(Freq2Wave)
 	
 Return the full change of basis matrix.
 
@@ -320,7 +314,7 @@ In 2D, the reconstruction grid is sorted by the `y` coordinate, i.e., the order 
 (3,2)
 etc
 """->
-function Base.collect(T::Freq2wave{2})
+function Base.collect(T::Freq2Wave{2})
 	M = size(T,1)
 	N = wsize(T)
 	# TODO: Check if the matrix fits in memory
@@ -346,4 +340,23 @@ function Base.collect(T::Freq2wave{2})
 	return F
 end
 =#
+
+
+# ------------------------------------------------------------
+# Common
+
+function Base.size(T::Freq2Wave, ::Type{Val{2}})
+	prod( T.NFFT.N )
+end
+
+function Base.show{D}(io::IO, T::Freq2Wave{D})
+	println(io, D, "D change of basis matrix")
+
+	isuniform(T) ?  U = " " : U = " non-"
+	M = size(T,1)
+	println(io, "From: ", M, U, "uniform frequency samples")
+
+	D == 1 ? N = size(T,2) : N = wsize(T)
+	print(io, "To: ", N, " ", T.wavename, " wavelets")
+end
 

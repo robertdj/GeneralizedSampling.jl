@@ -15,7 +15,7 @@ There are sub types for wavelets with and without boundary correction.
 The `weights` entry is a `Nullable` type and
 
 - If the samples *are* uniform, `weights` is `Null`.
-- If the samples are *not* uniform, `weights` contains the weights as a `Nullable` vector and `diag` are scaled with `sqrt(weights)`.
+- If the samples are *not* uniform, `weights` contains the weights as a `Nullable` vector and `diag` are scaled with `weights`.
 """->
 abstract Freq2Wave{D} <: CoB
 
@@ -24,6 +24,7 @@ macro common_freq2wave()
 		# Sampling
 		# TODO: Are the parts of samples saved in NFFT sufficient for collect?
 		samples::Array{Float64, D}
+		FT::Vector{Complex{Float64}}
 		weights::Nullable{Vector{Float64}}
 
 		# Reconstruction
