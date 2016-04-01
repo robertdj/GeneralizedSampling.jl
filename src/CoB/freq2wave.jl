@@ -20,6 +20,13 @@ function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
 	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
 	N = 2^J
+	if hasboundary(wavename)
+		F = waveparse( wavename, true )
+		N -= 2*van_moment(F)
+		if N < 0
+			error("Too few wavelets: Boundary functions overlap")
+		end
+	end
 	xi = scale(samples, 1/N)
 	frac!(xi)
 	p = NFFTPlan(xi, N)
@@ -44,9 +51,8 @@ function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
-		F = waveparse( wavename, true )
-		left = complex(samples)
-		right = complex(samples)
+		left = FourDaubScaling(samples, F)
+		right = FourDaubScaling(samples, F)
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
 end
@@ -92,20 +98,35 @@ end
 # ------------------------------------------------------------
 # Basic operations for 1D Freq2Wave
 
-function Base.size(T::Freq2Wave{1}, ::Type{Val{1}})
-	# TODO: Use size(samples,1)?
-	length(T.samples)
-end
-
-
-function Base.collect(T::Freq2Wave{1})
+function Base.collect(T::Freq2NoBoundaryWave{1})
 	M, N = size(T)
 	F = Array(Complex{Float64}, M, N)
 	for n = 1:N
 		for m = 1:M
 			@inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
+			#= @inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
 		end
 	end
+
+	return F
+end
+
+function Base.collect(T::Freq2BoundaryWave{1})
+	M, N = size(T)
+	vm = van_moment(T.wavename)
+	F = Array(Complex{Float64}, M, N)
+
+	F[:,1:vm] = T.left
+
+	# Internal function
+	for n = (vm+1):(N-vm)
+		for m = 1:M
+			@inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
+			#= @inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
+		end
+	end
+
+	F[:,(N-vm+1):N] = T.right
 
 	return F
 end
@@ -192,10 +213,6 @@ function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B:
 	end
 end
 
-
-function Base.size(T::Freq2Wave{2}, ::Type{Val{1}})
-	size(T.samples, 1)
-end
 
 @doc """
 	mul!(T::Freq2Wave, x::Vector, y::Vector)
@@ -345,9 +362,14 @@ end
 # ------------------------------------------------------------
 # Common
 
-function Base.size(T::Freq2Wave, ::Type{Val{2}})
-	prod( T.NFFT.N )
+function Base.size(T::Freq2Wave, ::Type{Val{1}})
+	size(T.samples, 1)
 end
+
+function Base.size{D}(T::Freq2Wave{D}, ::Type{Val{2}})
+	2^(D*wscale(T))
+end
+
 
 function Base.show{D}(io::IO, T::Freq2Wave{D})
 	println(io, D, "D change of basis matrix")

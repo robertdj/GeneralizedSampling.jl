@@ -157,7 +157,7 @@ function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer
 	if lowername == "haar" || lowername == "db1"
 		return FourHaarScaling(xi, J, k)
 	elseif isdaubechies(lowername)
-		vm = WaveletPlot.van_moment(lowername)
+		vm = van_moment(lowername)
 		return FourDaubScaling(xi, vm, J, k)
 	else
 		error("Fourier transform for this wavelet is not implemented")
@@ -183,7 +183,7 @@ function UVmat(F::BoundaryFilter)
 	UV = zeros(Float64, vm, 3*vm-1)
 
 	for i = 1:vm
-		UV[i,1:vm+2*i-1] = bfilter(F, i-1) / sqrt(2)
+		UV[i,1:vm+2*i-1] = bfilter(F, i-1) / sqrt2
 	end
 
 	return UV[:,1:vm], UV[:,vm+1:end]
@@ -201,8 +201,8 @@ function FourDaubScaling( xi, F::ScalingFilters; prec=sqrt(eps()), maxcount=50 )
 
 	# The notation is copied directly from the article of Poon & Gataric (see references in docs).
 	# v1(xi) is the vector of desired Fourier transforms and v10 = v1(0)
-	Vcol = size(V,2)
-	v20 = ones(Float64, Vcol)
+	const Vcol = size(V,2)
+	const v20 = ones(Float64, Vcol)
 	const v10 = (eye(U) - U) \ V*v20
 
 	const C = F.internal / sum(F.internal)
