@@ -113,7 +113,7 @@ end
 
 function Base.collect(T::Freq2BoundaryWave{1})
 	M, N = size(T)
-	vm = van_moment(T.wavename)
+	vm = van_moment(T)
 	F = Array(Complex{Float64}, M, N)
 
 	F[:,1:vm] = T.left
@@ -219,11 +219,9 @@ end
 	
 Replace `y` with `T*x`.
 """->
-function mul!{D}(T::Freq2NoBoundaryWave{D}, X::DenseArray{Complex{Float64},D}, y::Vector{Complex{Float64}})
+function mul!{D}(T::Freq2NoBoundaryWave{D}, X::AbstractArray{Complex{Float64},D}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert wsize(T) == size(X)
-
-	# TODO: X <: Real and then complex(X) if necessary
 
 	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
 	fill!(y, 0.0+0.0*im)
@@ -233,7 +231,37 @@ function mul!{D}(T::Freq2NoBoundaryWave{D}, X::DenseArray{Complex{Float64},D}, y
 	return y
 end
 
-function mul!(T::Freq2NoBoundaryWave{2}, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
+
+function mul!(T::Freq2BoundaryWave{1}, x::AbstractVector{Complex{Float64}}, y::Vector{Complex{Float64}})
+	@assert size(T,1) == length(y)
+	@assert (Nx = size(T,2)) == length(x)
+
+	vm = van_moment(T)
+
+	# Internal scaling function
+	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
+	fill!(y, 0.0+0.0*im)
+	NFFT.nfft!(T.NFFT, x[vm+1:Nx-vm], y)
+	had!(y, T.diag)
+
+	# Left boundary functions
+	Cone = one(Complex{Float64})
+	BLAS.gemv!('N', Cone, T.left, x[1:vm], Cone, y)
+
+	# Right boundary functions
+	BLAS.gemv!('N', Cone, T.right, x[Nx-vm+1:Nx], Cone, y)
+
+	return y
+end
+
+function mul!(T::Freq2BoundaryWave{2}, X::AbstractMatrix{Complex{Float64}}, y::Vector{Complex{Float64}})
+	@assert size(T,1) == length(y)
+	@assert wsize(T) == size(X)
+	
+	error("not implemented")
+end
+
+function mul!(T::Freq2Wave{2}, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
@@ -248,7 +276,7 @@ end
 
 Compute `T*x`.
 """->
-function Base.(:(*))(T::Freq2Wave, x::Vector)
+function Base.(:(*))(T::Freq2Wave, x::AbstractVector)
 	@assert size(T,2) == length(x)
 	y = Array(Complex{Float64}, size(T,1))
 	mul!(T, complex(x), y)
@@ -370,6 +398,9 @@ function Base.size{D}(T::Freq2Wave{D}, ::Type{Val{2}})
 	2^(D*wscale(T))
 end
 
+function van_moment(T::Freq2Wave)
+	van_moment(T.wavename)
+end
 
 function Base.show{D}(io::IO, T::Freq2Wave{D})
 	println(io, D, "D change of basis matrix")
