@@ -164,7 +164,7 @@ The size of the reconstructed wavelet coefficients.
 """->
 function wsize(T::Freq2Wave)
 	if hasboundary(T)
-		return (2^wscale(T), 2^wscale(T))
+		return dim(T) == 1 ? (2^wscale(T),) : (2^wscale(T), 2^wscale(T))
 	else
 		return T.NFFT.N
 	end
@@ -245,13 +245,16 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::
 	vm = van_moment(T)
 
 	# Internal scaling function
-	NFFT.nfft!(T.NFFT, x[vm+1:Nx-vm], y)
+	xint = slice(x, vm+1:Nx-vm)
+	NFFT.nfft!(T.NFFT, xint, y)
 	had!(y, T.diag)
 
-	# Update y with boundary contribution
+	# Update y with boundary contributions
 	Cone = one(Complex{Float64})
-	BLAS.gemv!('N', Cone, T.left, x[1:vm], Cone, y)
-	BLAS.gemv!('N', Cone, T.right, x[Nx-vm+1:Nx], Cone, y)
+	xleft = slice(x, 1:vm)
+	BLAS.gemv!('N', Cone, T.left, xleft, Cone, y)
+	xright = slice(x, Nx-vm+1:Nx)
+	BLAS.gemv!('N', Cone, T.right, xright, Cone, y)
 
 	if !isuniform(T)
 		had!(y, get(T.weights))
@@ -267,7 +270,7 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::
 	error("not implemented")
 end
 
-function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2Wave{2}, x::Vector{Complex{Float64}})
+function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2Wave{2}, x::AbstractVector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
@@ -287,45 +290,75 @@ function Base.(:(*))(T::Freq2Wave, x::AbstractVector)
 end
 
 
-function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundaryWave{D}, v::Vector{Complex{Float64}})
+function Base.Ac_mul_B!{D}(Z::AbstractArray{Complex{Float64},D}, T::Freq2NoBoundaryWave{D}, v::AbstractVector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert wsize(T) == size(Z)
 
-	# TODO: Save conj(T.diag) ?
 	Tdiag = conj(T.diag)
+	if isuniform(T)
+		had!(Tdiag, get(T.weights))
+	end
 	had!(Tdiag, v)
+
 	NFFT.nfft_adjoint!(T.NFFT, Tdiag, Z)
 
 	return Z
 end
 
-#=
-
-function mulT!(T::Freq2Wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
+function Base.Ac_mul_B!(z::AbstractVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, v::AbstractVector{Complex{Float64}})
 	@assert size(T,1) == length(v)
-	@assert size(T,2) == length(z)
+	@assert (Nz = size(T,2)) == length(z)
 
-	N = wsize(T)
-	Z = reshape_view(z, N)
-	mulT!(T, v, Z)
+	vm = van_moment(T)
+
+	if !isuniform(T)
+		v .*= get(T.weights)
+	end
+
+	# Internal scaling function
+	Tdiag = conj(T.diag)
+	zint = slice(z, vm+1:Nz-vm)
+	had!(Tdiag, v)
+	NFFT.nfft_adjoint!(T.NFFT, Tdiag, zint)
+
+	# Update z with boundary contributions
+	z[1:vm] = T.left'*v
+	z[Nz-vm+1:Nz] = T.right'*v
+	#= zleft = slice(z, 1:vm) =#
+	#= Ac_mul_B!( zleft, T.left, v ) =#
+	#= zright = slice(z, Nz-vm+1:Nz) =#
+	#= Ac_mul_B!( zright, T.left, v ) =#
 
 	return z
 end
 
-@doc """
-	Ac_mul_B(T::Freq2Wave, x::vector)
-	'*(T::Freq2Wave{1}, x::vector)
-
-Compute `T'*x`.
-"""->
-function Base.Ac_mul_B(T::Freq2Wave, x::Vector)
-	@assert size(T,1) == length(x)
-	y = Array(Complex{Float64}, size(T,2))
-	mulT!(T, complex(x), y)
-	return y
+function Base.Ac_mul_B!(Z::AbstractMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2}, v::AbstractVector{Complex{Float64}})
+	@assert size(T,1) == length(v)
+	@assert wsize(T) == length(Z)
+	
+	error("not implemented")
 end
 
-function Base.(:(\))(T::Freq2Wave, y::Vector{Complex{Float64}})
+function Base.Ac_mul_B!(z::AbstractVector{Complex{Float64}}, T::Freq2Wave{2}, v::AbstractVector{Complex{Float64}})
+	@assert size(T,2) == length(z)
+
+	Z = reshape_view(z, wsize(T))
+	Ac_mul_B!(Z, T, v)
+
+	return z
+end
+
+function Base.Ac_mul_B(T::Freq2Wave, v::Vector)
+	@assert size(T,1) == length(v)
+
+	z = Array(Complex{Float64}, size(T,2))
+	Ac_mul_B!(z, T, complex(v))
+
+	return z
+end
+
+#=
+function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 	# Non-uniform samples: Scale observations
 	if !isuniform(T)
 		y = scale(y, T.weights)
@@ -336,9 +369,7 @@ function Base.(:(\))(T::Freq2Wave, y::Vector{Complex{Float64}})
 	print("Solution via conjugate gradients... ")
 	# TODO: Better initial guess?
 	x0 = zeros(Complex{Float64}, wsize(T))
-	x = cgnr(T, y, x0)
-
-	return x
+	x = cgnr(T, complex(y), x0)
 end
 
 
