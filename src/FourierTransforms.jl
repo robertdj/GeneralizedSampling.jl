@@ -67,6 +67,8 @@ to control this there are optional arguments:
 """->
 function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCount=100)
 	@assert isapprox(sum(C), 1.0)
+	@assert prec >= eps()
+	@assert maxCount >= 1
 
 	const almost1 = 1.0 - prec
 	Y = one(Complex{Float64})
@@ -77,12 +79,8 @@ function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCou
 		Y *= y
 
 		# Convergence check: |y(xi) - 1| is small for small xi. But y is
-		# exactly 1 in all even integers; prevent premature exit
-		if abs(xi) > 1.0
-			continue
-		else
-			count += 1
-		end
+		# exactly 1 in all even integers, so prevent premature exit
+		abs(xi) >= one(xi) ? continue : count += 1
 
 		if abs(y) >= almost1
 			break
@@ -93,6 +91,7 @@ function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCou
 end
 
 function FourDaubScaling{T<:Real}( xi::DenseArray{T}, C::Vector{Float64}; args... )
+	# TODO: eachindex
 	Y = Array(Complex{Float64}, size(xi))
 	for m = 1:length(xi)
 		@inbounds Y[m] = FourDaubScaling( xi[m], C; args... )
@@ -133,7 +132,7 @@ end
 
 function FourDaubWavelet{T<:Real}( xi::DenseArray{T}, N::Integer; args... )
 	# Filter coefficients
-	C = wavefilter( string("db", N) )
+	C = ifilter(N)
 	scale!(C, 1/sum(C))
 
 	Y = Array(Complex{Float64}, size(xi))
@@ -183,7 +182,7 @@ function UVmat(F::BoundaryFilter)
 	UV = zeros(Float64, vm, 3*vm-1)
 
 	for i = 1:vm
-		UV[i,1:vm+2*i-1] = bfilter(F, i-1) / sqrt2
+		@inbounds UV[i, 1:vm+2*i-1] = bfilter(F, i-1) / sqrt2
 	end
 
 	return UV[:,1:vm], UV[:,vm+1:end]
@@ -195,7 +194,11 @@ end
 The Fourier transform of the Daubechies `N` boundary wavelet transform
 defined by the filters `F` evaluated at `xi`.
 """->
-function FourDaubScaling( xi, F::ScalingFilters; prec=sqrt(eps()), maxcount=50 )
+function FourDaubScaling( xi::Number, F::ScalingFilters; prec=sqrt(eps()), maxcount=50 )
+	# TODO: Assertions in macro?
+	@assert prec >= eps()
+	@assert maxcount >= 1
+
 	const U, V = UVmat(F.left)
 	const vm = van_moment(F)
 

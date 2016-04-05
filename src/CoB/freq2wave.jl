@@ -172,15 +172,20 @@ function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B:
 	# TODO: Warning if J is too big
 
 	# Fourier transform of the internal scaling function
-	samplesx = view(samples, :, 1)
-	samplesy = view(samples, :, 2)
-
-	FT = FourScalingFunc( samplesx, wavename, J )
-	FTy = FourScalingFunc( samplesy, wavename, J )
-	had!(FT, FTy)
+	FT = FourScalingFunc( samples, wavename, J )
+	#= FTy = FourScalingFunc( samplesy, wavename, J ) =#
+	#= had!(FT, FTy) =#
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
 	N = 2^J
+	if hasboundary(wavename)
+		F = waveparse( wavename, true )
+		# TODO: How much to subtract?
+		N -= 2*van_moment(F)
+		if N < 0
+			error("Too few wavelets: Boundary functions overlap")
+		end
+	end
 	xi = samples'
 	scale!(xi, 1/N)
 	frac!(xi)
@@ -194,21 +199,24 @@ function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B:
 			error("Samples are not uniform; supply bandwidth")
 		end
 
-		W = sqrt(weights(samples, B))
-		had!( FT, complex(W) )
-		W = Nullable(W)
+		W = Nullable( sqrt(weights(samples, B)) )
+		#= W = sqrt(weights(samples, B)) =#
+		#= had!( FT, complex(W) ) =#
+		#= W = Nullable(W) =#
 	end
 
 	# Diagonal matrix for multiplication with internal scaling function
-	diag = FT .* cis( -pi*(samplesx + samplesy) )
+	samplesx = slice(samples, :, 1)
+	samplesy = slice(samples, :, 2)
+	diag = vec(prod(FT,2)) .* cis( -pi*(samplesx + samplesy) )
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
 		F = waveparse( wavename, true )
-		left = complex(samples)
-		right = complex(samples)
+		left = [ FourDaubScaling(samplesx, F) FourDaubScaling(samplesy, F) ]
+		right = [ FourDaubScaling(samplesx, F) FourDaubScaling(samplesy, F) ]
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
 end
@@ -223,8 +231,6 @@ function mul!{D}(T::Freq2NoBoundaryWave{D}, X::AbstractArray{Complex{Float64},D}
 	@assert size(T,1) == length(y)
 	@assert wsize(T) == size(X)
 
-	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
-	fill!(y, 0.0+0.0*im)
 	NFFT.nfft!(T.NFFT, X, y)
 	had!(y, T.diag)
 
@@ -239,8 +245,6 @@ function mul!(T::Freq2BoundaryWave{1}, x::AbstractVector{Complex{Float64}}, y::V
 	vm = van_moment(T)
 
 	# Internal scaling function
-	# TODO: nfft! requires that y contains only zeros. Change in NFFT package?
-	fill!(y, 0.0+0.0*im)
 	NFFT.nfft!(T.NFFT, x[vm+1:Nx-vm], y)
 	had!(y, T.diag)
 
@@ -359,7 +363,7 @@ In 2D, the reconstruction grid is sorted by the `y` coordinate, i.e., the order 
 (3,2)
 etc
 """->
-function Base.collect(T::Freq2Wave{2})
+function Base.collect(T::Freq2NoBoundaryWave{2})
 	M = size(T,1)
 	N = wsize(T)
 	# TODO: Check if the matrix fits in memory
