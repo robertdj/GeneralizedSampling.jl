@@ -357,21 +357,21 @@ function Base.Ac_mul_B(T::Freq2Wave, v::Vector)
 	return z
 end
 
-#=
 function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 	# Non-uniform samples: Scale observations
 	if !isuniform(T)
-		y = scale(y, T.weights)
+		y .*= get(T.weights)
 	end
 
 	# TODO: Exact solution for 2D uniform samples?
 
-	print("Solution via conjugate gradients... ")
+	println("Solution via conjugate gradients... ")
 	# TODO: Better initial guess?
 	x0 = zeros(Complex{Float64}, wsize(T))
 	x = cgnr(T, complex(y), x0)
 end
 
+#=
 
 @doc """
 	collect(Freq2Wave) -> Matrix
