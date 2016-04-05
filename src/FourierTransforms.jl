@@ -91,10 +91,9 @@ function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCou
 end
 
 function FourDaubScaling{T<:Real}( xi::DenseArray{T}, C::Vector{Float64}; args... )
-	# TODO: eachindex
 	Y = Array(Complex{Float64}, size(xi))
-	for m = 1:length(xi)
-		@inbounds Y[m] = FourDaubScaling( xi[m], C; args... )
+	for idx in eachindex(xi)
+		@inbounds Y[idx] = FourDaubScaling( xi[idx], C; args... )
 	end
 
 	return Y
@@ -241,13 +240,12 @@ for name in [:FourHaarScaling, :FourHaarWavelet]
 		@vectorize_1arg Real $name
 
 		function $name{T<:Real}(xi::DenseArray{T}, J::Int)
-			M = length(xi)
 			C2 = 2.0^(-J)
 			C = 2.0^(-J/2)
-			y = Array(Complex{Float64}, M)
+			y = Array(Complex{Float64}, size(xi))
 
-			for m = 1:M
-				@inbounds y[m] = C*$name( C2*xi[m] )
+			for idx in eachindex(xi)
+				@inbounds y[idx] = C*$name( C2*xi[idx] )
 			end
 			return y
 		end
@@ -255,7 +253,8 @@ for name in [:FourHaarScaling, :FourHaarWavelet]
 		function $name{T<:Real}(xi::DenseArray{T}, J::Int, k::Int)
 			y = $name(xi, J)
 			D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
-			had!(y, D)
+			#= had!(y, D) =#
+			broadcast!(*, y, y, D)
 			return y
 		end
 	end
