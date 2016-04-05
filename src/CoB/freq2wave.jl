@@ -23,7 +23,7 @@ function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64
 	if hasboundary(wavename)
 		F = waveparse( wavename, true )
 		N -= 2*van_moment(F)
-		if N < 0
+		if N <= 0
 			error("Too few wavelets: Boundary functions overlap")
 		end
 	end
@@ -33,15 +33,16 @@ function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
-		W = Nullable{Vector{Float64}}()
+		W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		if isnan(B)
 			error("Samples are not uniform; supply bandwidth")
 		end
 
-		W = sqrt(weights(samples, B))
-		had!( FT, complex(W) )
-		W = Nullable(W)
+		W = Nullable(complex( sqrt(weights(samples, B)) ))
+		#= W = sqrt(weights(samples, B)) =#
+		#= had!( FT, complex(W) ) =#
+		#= W = Nullable(W) =#
 	end
 
 	# Diagonal matrix for multiplication with internal scaling function
@@ -173,8 +174,6 @@ function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B:
 
 	# Fourier transform of the internal scaling function
 	FT = FourScalingFunc( samples, wavename, J )
-	#= FTy = FourScalingFunc( samplesy, wavename, J ) =#
-	#= had!(FT, FTy) =#
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
 	N = 2^J
@@ -193,16 +192,14 @@ function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B:
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
-		W = Nullable{Vector{Float64}}()
+		W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		if isnan(B)
 			error("Samples are not uniform; supply bandwidth")
 		end
 
-		W = Nullable( sqrt(weights(samples, B)) )
-		#= W = sqrt(weights(samples, B)) =#
-		#= had!( FT, complex(W) ) =#
-		#= W = Nullable(W) =#
+		W = sqrt(weights(samples, B))
+		W = Nullable(complex( W ))
 	end
 
 	# Diagonal matrix for multiplication with internal scaling function
@@ -222,23 +219,22 @@ function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B:
 end
 
 
-@doc """
-	mul!(T::Freq2Wave, x::Vector, y::Vector)
-	
-Replace `y` with `T*x`.
-"""->
-function mul!{D}(T::Freq2NoBoundaryWave{D}, X::AbstractArray{Complex{Float64},D}, y::Vector{Complex{Float64}})
+function Base.A_mul_B!{D}(y::Vector{Complex{Float64}}, T::Freq2NoBoundaryWave{D}, X::AbstractArray{Complex{Float64},D})
 	@assert size(T,1) == length(y)
 	@assert wsize(T) == size(X)
 
 	NFFT.nfft!(T.NFFT, X, y)
 	had!(y, T.diag)
 
+	if !isuniform(T)
+		had!(y, get(T.weights))
+	end
+
 	return y
 end
 
 
-function mul!(T::Freq2BoundaryWave{1}, x::AbstractVector{Complex{Float64}}, y::Vector{Complex{Float64}})
+function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::AbstractVector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert (Nx = size(T,2)) == length(x)
 
@@ -254,6 +250,10 @@ function mul!(T::Freq2BoundaryWave{1}, x::AbstractVector{Complex{Float64}}, y::V
 
 	# Right boundary functions
 	BLAS.gemv!('N', Cone, T.right, x[Nx-vm+1:Nx], Cone, y)
+
+	if !isuniform(T)
+		had!(y, get(T.weights))
+	end
 
 	return y
 end
