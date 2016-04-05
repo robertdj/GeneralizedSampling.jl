@@ -163,7 +163,11 @@ The size of the reconstructed wavelet coefficients.
 - When `D` == 2, the output is (Int,Int)
 """->
 function wsize(T::Freq2Wave)
-	T.NFFT.N
+	if hasboundary(T)
+		return (2^wscale(T), 2^wscale(T))
+	else
+		return T.NFFT.N
+	end
 end
 
 
@@ -244,11 +248,9 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::
 	NFFT.nfft!(T.NFFT, x[vm+1:Nx-vm], y)
 	had!(y, T.diag)
 
-	# Left boundary functions
+	# Update y with boundary contribution
 	Cone = one(Complex{Float64})
 	BLAS.gemv!('N', Cone, T.left, x[1:vm], Cone, y)
-
-	# Right boundary functions
 	BLAS.gemv!('N', Cone, T.right, x[Nx-vm+1:Nx], Cone, y)
 
 	if !isuniform(T)
@@ -258,55 +260,46 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::
 	return y
 end
 
-function mul!(T::Freq2BoundaryWave{2}, X::AbstractMatrix{Complex{Float64}}, y::Vector{Complex{Float64}})
+function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::AbstractMatrix{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert wsize(T) == size(X)
 	
 	error("not implemented")
 end
 
-function mul!(T::Freq2Wave{2}, x::Vector{Complex{Float64}}, y::Vector{Complex{Float64}})
+function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2Wave{2}, x::Vector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
 	X = reshape_view(x, wsize(T))
-	mul!(T, X, y)
+	A_mul_B!(y, T, X)
 
 	return y
 end
 
-@doc """
-	*(T::Freq2Wave, x::vector)
-
-Compute `T*x`.
-"""->
 function Base.(:(*))(T::Freq2Wave, x::AbstractVector)
 	@assert size(T,2) == length(x)
+
 	y = Array(Complex{Float64}, size(T,1))
-	mul!(T, complex(x), y)
+	A_mul_B!(y, T, complex(x))
+
 	return y
 end
 
-#=
 
-@doc """
-	mulT!(T::Freq2Wave, v::Vector, z::Vector)
-	
-Replace `z` with `T'*v`.
-"""->
-function mulT!{D}(T::Freq2Wave{D}, v::Vector{Complex{Float64}}, Z::DenseArray{Complex{Float64},D})
+function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundaryWave{D}, v::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert wsize(T) == size(Z)
 
 	# TODO: Save conj(T.diag) ?
 	Tdiag = conj(T.diag)
 	had!(Tdiag, v)
-	# TODO: As in mul!
-	fill!(Z, 0.0+0.0*im)
-	NFFT.nfft_adjoint!(T.FFT, Tdiag, Z)
+	NFFT.nfft_adjoint!(T.NFFT, Tdiag, Z)
 
 	return Z
 end
+
+#=
 
 function mulT!(T::Freq2Wave{2}, v::Vector{Complex{Float64}}, z::Vector{Complex{Float64}})
 	@assert size(T,1) == length(v)
@@ -350,7 +343,7 @@ end
 
 
 @doc """
-	collect(Freq2Wave)
+	collect(Freq2Wave) -> Matrix
 	
 Return the full change of basis matrix.
 
@@ -385,6 +378,11 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 			end
 		end
 	end
+
+	if !isuniform(T)
+		broadcast!(*, F, F, get(T.weights))
+	end
+		
 
 	return F
 end
