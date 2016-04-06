@@ -45,8 +45,10 @@ end
 # Uniform samples, boundary correction
 immutable Freq2BoundaryWave{D} <: Freq2Wave{D}
 	@common_freq2wave()
-	left::Matrix{Complex{Float64}}
-	right::Matrix{Complex{Float64}}
+	#= left::Matrix{Complex{Float64}} =#
+	#= right::Matrix{Complex{Float64}} =#
+	left::Array{Complex{Float64}}
+	right::Array{Complex{Float64}}
 end
 
 

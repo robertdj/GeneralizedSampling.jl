@@ -27,7 +27,7 @@ function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64
 			error("Too few wavelets: Boundary functions overlap")
 		end
 	end
-	xi = scale(samples, 1/N)
+	xi = samples/N
 	frac!(xi)
 	p = NFFTPlan(xi, N)
 
@@ -101,6 +101,7 @@ end
 
 function Base.collect(T::Freq2NoBoundaryWave{1})
 	M, N = size(T)
+
 	F = Array(Complex{Float64}, M, N)
 	for n = 1:N
 		for m = 1:M
@@ -109,25 +110,36 @@ function Base.collect(T::Freq2NoBoundaryWave{1})
 		end
 	end
 
+	if !isuniform(T)
+		broadcast!(*, F, F, get(T.weights))
+	end
+
 	return F
 end
 
 function Base.collect(T::Freq2BoundaryWave{1})
 	M, N = size(T)
-	vm = van_moment(T)
 	F = Array(Complex{Float64}, M, N)
 
+	vm = van_moment(T)
+
+	# Left boundary
 	F[:,1:vm] = T.left
 
 	# Internal function
 	for n = (vm+1):(N-vm)
 		for m = 1:M
 			@inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
-			#= @inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
+			#= @inbounds F[m,n] = W[m]*T.FT[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
 		end
 	end
 
-	F[:,(N-vm+1):N] = T.right
+	# Right boundary
+	F[:,N-vm+1:N] = T.right
+
+	if !isuniform(T)
+		broadcast!(*, F, F, get(T.weights))
+	end
 
 	return F
 end
@@ -216,8 +228,8 @@ function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B:
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
 		F = waveparse( wavename, true )
-		left = [ FourDaubScaling(samplesx, F) FourDaubScaling(samplesy, F) ]
-		right = [ FourDaubScaling(samplesx, F) FourDaubScaling(samplesy, F) ]
+		left = cat(3, FourDaubScaling(samplesx, F), FourDaubScaling(samplesy, F) )
+		right = cat(3, FourDaubScaling(samplesx, F), FourDaubScaling(samplesy, F) )
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
 end
@@ -371,7 +383,6 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 	x = cgnr(T, complex(y), x0)
 end
 
-#=
 
 @doc """
 	collect(Freq2Wave) -> Matrix
@@ -389,35 +400,88 @@ etc
 """->
 function Base.collect(T::Freq2NoBoundaryWave{2})
 	M = size(T,1)
-	N = wsize(T)
+	Nx, Ny = wsize(T)
 	# TODO: Check if the matrix fits in memory
-	F = Array(Complex{Float64}, M, prod(N))
+	F = Array(Complex{Float64}, M, size(T,2))
 
-	xsample = T.samples[:,1]/N[1]
-	ysample = T.samples[:,2]/N[2]
+	xsample = T.samples[:,1]/Nx
+	ysample = T.samples[:,2]/Ny
 
-	translx = [0:N[1]-1;] - N[1]/2
-	transly = [0:N[2]-1;] - N[2]/2
+	# DFT matrix
+	translx = [0:Nx-1;] - Nx/2
+	transly = [0:Ny-1;] - Ny/2
 	idx = 0
-	for ny = 1:N[2]
+	for ny = 1:Ny
 		yidx = transly[ny]
-		for nx = 1:N[1]
+		for nx = 1:Nx
 			xidx = translx[nx]
 			idx += 1
 			for m = 1:M
-				@inbounds F[m,idx] = T.diag[m]*cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) )
+				@inbounds F[m,idx] = cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) )
+				#= @inbounds F[m,idx] = T.diag[m]*cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) ) =#
+			end
+		end
+	end
+
+	D = vec(prod(T.FT,2))
+	if !isuniform(T)
+		had!( D, get(T.weights) )
+	end
+	broadcast!( *, F, F, D )
+
+	return F
+end
+
+function Base.collect(T::Freq2BoundaryWave{2})
+	const M = size(T,1)
+	const Nx, Ny = wsize(T)
+	# TODO: Check if the matrix fits in memory
+	F = Array(Complex{Float64}, M, size(T,2))
+
+	idx = 0
+	for nx = 1:Nx
+		for ny = 1:Ny
+			idx += 1
+			# TODO: Don't loop over m; insert entire column
+			for m = 1:M
+				@inbounds F[m,idx] = FourScaling(T, m, (nx,ny))
 			end
 		end
 	end
 
 	if !isuniform(T)
-		broadcast!(*, F, F, get(T.weights))
+		broadcast!( *, F, F, get(T.weights) )
 	end
-		
 
 	return F
 end
-=#
+
+@doc """
+	FourScaling(T::Freq2Wave{2}, d::Integer, m::Integer, n::Integer) -> Number
+
+Fourier transform of the `n`'th basis function at the `d`'th coordinate of the `m`'th frequency.
+"""->
+function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer)
+	const M = size(T,1)
+	@assert 1 <= m <= M
+	const N = wsize(T)[d]
+	@assert 1 <= n <= N
+	const vm = van_moment(T)
+
+	if vm < n <= N-vm
+		y = T.FT[m,d]*cis( -2*pi*T.samples[m]*(n-1-N/2)/N )
+	elseif 1 <= n <= vm
+		y = T.left[m, n, d]
+	elseif N-vm < n <= N
+		y = T.right[m, n-N+vm, d]
+	end
+
+	return y
+end
+
+function FourScaling(T::Freq2Wave{2}, m::Integer, n::Tuple{Integer,Integer})
+	FourScaling(T,m,n[1],1) * FourScaling(T,m,n[2],2)
+end
 
 
 # ------------------------------------------------------------
@@ -432,7 +496,11 @@ function Base.size{D}(T::Freq2Wave{D}, ::Type{Val{2}})
 end
 
 function van_moment(T::Freq2Wave)
-	van_moment(T.wavename)
+	if hasboundary(T)
+		return size(T.left,2)
+	else
+		return van_moment(T.wavename)
+	end
 end
 
 function Base.show{D}(io::IO, T::Freq2Wave{D})
