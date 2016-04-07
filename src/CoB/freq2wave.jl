@@ -176,7 +176,8 @@ The size of the reconstructed wavelet coefficients.
 """->
 function wsize(T::Freq2Wave)
 	if hasboundary(T)
-		return dim(T) == 1 ? (2^wscale(T),) : (2^wscale(T), 2^wscale(T))
+		N = 2^wscale(T)
+		return dim(T) == 1 ? (N,) : (N, N)
 	else
 		return T.NFFT.N
 	end
@@ -262,7 +263,7 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::
 	had!(y, T.diag)
 
 	# Update y with boundary contributions
-	Cone = one(Complex{Float64})
+	const Cone = one(Complex{Float64})
 	xleft = slice(x, 1:vm)
 	BLAS.gemv!('N', Cone, T.left, xleft, Cone, y)
 	xright = slice(x, Nx-vm+1:Nx)
@@ -275,15 +276,44 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::
 	return y
 end
 
-function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::AbstractMatrix{Complex{Float64}})
+@debug function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::AbstractMatrix{Complex{Float64}})
 	@assert size(T,1) == length(y)
-	@assert wsize(T) == size(X)
+	@assert ((Nx,Ny) = wsize(T)) == size(X)
 	
-	error("not implemented")
+	const vm = van_moment(T)
+	const S = split(X, vm)
+
+	# Internal scaling function
+	NFFT.nfft!(T.NFFT, S.II, y)
+	had!(y, T.diag)
+
+	# Update y with border contributions
+	for k in 1:vm
+		y += T.left[:,k,1] .* ( T.left[:,:,2]*S.LL[:,k] ) # LL
+		y += T.left[:,k,1] .* ( T.right[:,:,2]*S.LR[:,k] ) # LR
+		y += T.right[:,k,1] .* ( T.left[:,:,2]*S.RL[:,k] ) # RL
+		y += T.right[:,k,1] .* ( T.right[:,:,2]*S.RR[:,k] ) # RR
+	end
+
+	# Update y with side contributions
+	# Fourier transform of the internal functions using 1D NFFT
+	px = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
+	py = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
+	for k in 1:vm
+		y += T.left[:,k,1] .* nfft(py, S.LI[:,k]) # LI
+		y += T.right[:,k,1] .* nfft(py, S.LI[:,k]) # RI
+		y += T.left[:,k,1] .* nfft(px, vec(S.IL[k,:])) # IL
+		y += T.right[:,k,1] .* nfft(px, vec(S.IR[k,:])) # IR
+	end
+
+	if !isuniform(T)
+		had!(y, get(T.weights))
+	end
+
+	return y
 end
 
 function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2Wave{2}, x::AbstractVector{Complex{Float64}})
-	@assert size(T,1) == length(y)
 	@assert size(T,2) == length(x)
 
 	X = reshape_view(x, wsize(T))
@@ -293,10 +323,8 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2Wave{2}, x::Abstract
 end
 
 function Base.(:(*))(T::Freq2Wave, x::AbstractVector)
-	@assert size(T,2) == length(x)
-
 	y = Array(Complex{Float64}, size(T,1))
-	A_mul_B!(y, T, complex(x))
+	A_mul_B!( y, T, complex(float(x)) )
 
 	return y
 end
@@ -391,11 +419,11 @@ Return the full change of basis matrix.
 
 In 2D, the reconstruction grid is sorted by the `y` coordinate, i.e., the order is
 (1,1),
-(2,1),
-(3,1),
 (1,2),
+(1,3),
+(2,1),
 (2,2),
-(3,2)
+(2,3)
 etc
 """->
 function Base.collect(T::Freq2NoBoundaryWave{2})
@@ -411,10 +439,10 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 	translx = [0:Nx-1;] - Nx/2
 	transly = [0:Ny-1;] - Ny/2
 	idx = 0
-	for ny = 1:Ny
-		yidx = transly[ny]
-		for nx = 1:Nx
-			xidx = translx[nx]
+	for nx = 1:Nx
+		xidx = translx[nx]
+		for ny = 1:Ny
+			yidx = transly[ny]
 			idx += 1
 			for m = 1:M
 				@inbounds F[m,idx] = cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) )
@@ -462,6 +490,7 @@ end
 Fourier transform of the `n`'th basis function at the `d`'th coordinate of the `m`'th frequency.
 """->
 function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer)
+	# TODO: The majority of the time is spent in the following 4 lines
 	const M = size(T,1)
 	@assert 1 <= m <= M
 	const N = wsize(T)[d]

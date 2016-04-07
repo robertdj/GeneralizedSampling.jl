@@ -241,3 +241,60 @@ function isdaubechies(wavename::AbstractString)
 	return prefix == "db" && isa( N, Integer )
 end
 
+
+type SplitMatrix
+	LL::AbstractMatrix
+	LI::AbstractMatrix
+	LR::AbstractMatrix
+	IL::AbstractMatrix
+	II::AbstractMatrix
+	IR::AbstractMatrix
+	RL::AbstractMatrix
+	RI::AbstractMatrix
+	RR::AbstractMatrix
+end
+
+@doc """
+	split(A::Matrix, border) -> SplitMatrix
+
+Split `A` into 9 parts:
+4 corners, 4 sides and the internal part. `border` is the width of the
+boundary.
+
+With both the horizontal and the vertical part divided in `L`eft,
+`I`nternal and `R`ight, the parts are
+
+	 ________________ 
+	| LL |  IL  | RL |
+	|____|______|____|
+	|    |      |    |
+	| LI |  II  | RI |
+	|____|______|____|
+	| LR |  IR  | RR |
+	|____|______|____|
+"""->
+function split(A::Matrix, border::Int)
+	@assert border >= 1
+
+	Nx, Ny = size(A)
+	@assert min(Nx,Ny) > 2*border
+
+	Lidx = 1:border
+	Iidx = border+1:Nx-border
+	Ridx = Nx-border+1:Nx
+
+	LL = slice(A, Lidx, Lidx)
+	LI = slice(A, Iidx, Lidx)
+	LR = slice(A, Ridx, Lidx)
+
+	IL = slice(A, Lidx, Iidx)
+	II = slice(A, Iidx, Iidx)
+	IR = slice(A, Ridx, Iidx)
+
+	RL = slice(A, Lidx, Ridx)
+	RI = slice(A, Iidx, Ridx)
+	RR = slice(A, Ridx, Ridx)
+
+	SplitMatrix( LL, LI, LR, IL, II, IR, RL, RI, RR )
+end
+
