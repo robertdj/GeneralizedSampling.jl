@@ -11,14 +11,13 @@ Make change of basis for switching between frequency responses and wavelets.
 - `J` is the scale of the wavelet transform to reconstruct.
 - `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
 """->
-function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64=NaN)
+function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Float64=NaN)
 	# TODO: Warning if J is too big
 
 	# Fourier transform of the internal scaling function
 	FT = FourScalingFunc( samples, wavename, J )
 
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
-	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
+	# The number of internal wavelets in reconstruction
 	N = 2^J
 	if hasboundary(wavename)
 		F = waveparse( wavename, true )
@@ -27,8 +26,11 @@ function freq2wave(samples::Vector, wavename::AbstractString, J::Int; B::Float64
 			error("Too few wavelets: Boundary functions overlap")
 		end
 	end
+
+	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
 	xi = samples/N
 	frac!(xi)
+	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
 	p = NFFTPlan(xi, N)
 
 	# Weights for non-uniform samples
@@ -84,12 +86,10 @@ Does the `wavename` scaling function have boundary correction.
 function hasboundary(wavename::AbstractString)
 	lowername = lowercase(wavename)
 
+	ishaar(lowername) && return false
+
 	if isdaubechies(lowername)
-		if lowername == "haar" || lowername == "db1"
-			return false
-		else
-			return true
-		end
+		return true
 	else
 		error("Only Daubechies scaling functions are valid")
 	end
@@ -185,6 +185,7 @@ end
 
 
 function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B::Float64=NaN)
+	# TODO: Samples as 2-by-M? Faster access to each point
 	M = size(samples, 1)
 	@assert size(samples,2) == 2
 	# TODO: Warning if J is too big
@@ -297,8 +298,8 @@ end
 
 	# Update y with side contributions
 	# Fourier transform of the internal functions using 1D NFFT
-	px = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
-	py = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
+	const px = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
+	const py = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
 		y += T.left[:,k,1] .* nfft(py, S.LI[:,k]) # LI
 		y += T.right[:,k,1] .* nfft(py, S.LI[:,k]) # RI
@@ -451,6 +452,7 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 		end
 	end
 
+	# Wavelet Fourier transforms and weights
 	D = vec(prod(T.FT,2))
 	if !isuniform(T)
 		had!( D, get(T.weights) )

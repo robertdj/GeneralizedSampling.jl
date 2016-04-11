@@ -82,7 +82,8 @@ With even `M`'s the grid has one extra point on the negative values.
 By default, `My` = `Mx`.
 The points are scaled by `scale` which by default is 1.
 """->
-function grid(Mx::Int, My::Int=Mx, scale::Float64=1.0)
+function grid(Mx::Int, My::Int=Mx, grid_dist=1.0)
+	# TODO: Input as (Mx,My) instead?
 	startx = -div(Mx,2)
 	endx = (isodd(Mx) ? -startx : -startx-1)
 	# The points are sorted by the x coordinate
@@ -92,7 +93,7 @@ function grid(Mx::Int, My::Int=Mx, scale::Float64=1.0)
 	endy = (isodd(My) ? -starty : -starty-1)
 	y = repmat([starty:endy;], Mx)
 
-	points = scale*[x y]
+	points = grid_dist*[x y]
 end
 
 
@@ -210,16 +211,16 @@ end
 
 The fractional part of `x` as a number in [-0.5, 0.5).
 """->
-function frac(x::Array{Float64})
+function frac(x::DenseArray{Float64})
 	y = copy(x)
 	frac!(y)
 
 	return y
 end
 
-function frac!(x::Array{Float64})
-	for n = 1:length(x)
-		@inbounds x[n] -= round(x[n])
+function frac!(x::DenseArray{Float64})
+	for idx in eachindex(x)
+		@inbounds x[idx] -= round( x[idx] )
 	end
 end
 
@@ -232,13 +233,28 @@ Return `true` if `wavename` is of the form `dbN`, where `N` is an integer.
 function isdaubechies(wavename::AbstractString)
 	lowername = lowercase(wavename)
 
-	if lowername == "haar"
+	if ishaar(lowername)
 		return true
 	end
 
 	prefix = lowername[1:2]
 	N = parse(lowername[3:end])
 	return prefix == "db" && isa( N, Integer )
+end
+
+@doc """
+	ishaar(wavename::AbstractString) -> Bool
+
+Return `true` if `wavename` is "haar" or "db1".
+"""->
+function ishaar(wavename::AbstractString)
+	lowername = lowercase(wavename)
+
+	if lowername == "haar" || lowername == "db1"
+		return true
+	else
+		return false
+	end
 end
 
 

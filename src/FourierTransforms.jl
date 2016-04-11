@@ -90,7 +90,7 @@ function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCou
 	return Y
 end
 
-function FourDaubScaling{T<:Real}( xi::DenseArray{T}, C::Vector{Float64}; args... )
+function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}; args... )
 	Y = Array(Complex{Float64}, size(xi))
 	for idx in eachindex(xi)
 		@inbounds Y[idx] = FourDaubScaling( xi[idx], C; args... )
@@ -99,7 +99,7 @@ function FourDaubScaling{T<:Real}( xi::DenseArray{T}, C::Vector{Float64}; args..
 	return Y
 end
 
-function FourDaubScaling{T<:Real}( xi::DenseArray{T}, N::Int; args... )
+function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, N::Int; args... )
 	# Filter coefficients
 	C = ifilter(N)
 	scale!(C, 1/sum(C))
@@ -129,14 +129,14 @@ function FourDaubWavelet{T<:Real}( xi::T, C::Vector{Float64}; args... )
 	return Y
 end
 
-function FourDaubWavelet{T<:Real}( xi::DenseArray{T}, N::Integer; args... )
+function FourDaubWavelet{T<:Real}( xi::AbstractArray{T}, N::Integer; args... )
 	# Filter coefficients
 	C = ifilter(N)
 	scale!(C, 1/sum(C))
 
 	Y = Array(Complex{Float64}, size(xi))
-	for m = 1:length(xi)
-		@inbounds Y[m] = FourDaubWavelet( xi[m], C; args... )
+	for idx in eachindex(xi)
+		@inbounds Y[idx] = FourDaubWavelet( xi[idx], C; args... )
 	end
 
 	return Y
@@ -155,7 +155,7 @@ function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer
 	if lowername == "haar" || lowername == "db1"
 		return FourHaarScaling(xi, J, k)
 	elseif isdaubechies(lowername)
-		vm = van_moment(lowername)
+		const vm = van_moment(lowername)
 		return FourDaubScaling(xi, vm, J, k)
 	else
 		error("Fourier transform for this wavelet is not implemented")
@@ -239,7 +239,7 @@ for name in [:FourHaarScaling, :FourHaarWavelet]
 	@eval begin
 		@vectorize_1arg Real $name
 
-		function $name{T<:Real}(xi::DenseArray{T}, J::Int)
+		function $name{T<:Real}(xi::AbstractArray{T}, J::Int)
 			C2 = 2.0^(-J)
 			C = 2.0^(-J/2)
 			y = Array(Complex{Float64}, size(xi))
@@ -250,7 +250,7 @@ for name in [:FourHaarScaling, :FourHaarWavelet]
 			return y
 		end
 
-		function $name{T<:Real}(xi::DenseArray{T}, J::Int, k::Int)
+		function $name{T<:Real}(xi::AbstractArray{T}, J::Int, k::Int)
 			y = $name(xi, J)
 			D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
 			#= had!(y, D) =#
@@ -262,14 +262,14 @@ end
 
 for name in [:FourDaubScaling, :FourDaubWavelet]
 	@eval begin
-		function $name{T<:Real}(xi::DenseArray{T}, N::Integer, J::Integer; args...)
+		function $name{T<:Real}(xi::AbstractArray{T}, N::Integer, J::Integer; args...)
 			scale_xi = scale( 2.0^(-J), xi )
 			y = $name( scale_xi, N; args... )
 			scale!( 2.0^(-J/2), y )
 			return y
 		end
 
-		function $name{T<:Real}(xi::DenseArray{T}, N::Integer, J::Int, k::Integer; args...)
+		function $name{T<:Real}(xi::AbstractArray{T}, N::Integer, J::Int, k::Integer; args...)
 			y = $name(xi, N, J; args... )
 			D = exp( -2.0*pi*im*2.0^(-J)*k*xi )
 			had!(y, D)
