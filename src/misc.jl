@@ -3,53 +3,14 @@
 
 In-place Hadamard product/element-wise matrix multiplication; the first argument is modified.
 """->
-function had!{T<:Number}(A::Matrix{T}, B::Matrix{T})
-	m,n = size(A)
-	@assert (m,n) == size(B)
-	for j in 1:n
-		for i in 1:m
-			@inbounds A[i,j] *= B[i,j]
-		end
-	end
-end
-
-function had!{T<:Number}(A::Vector{T}, B::Vector{T})
-	m = length(A)
-	@assert m == length(B)
-	for i in 1:m
-		@inbounds A[i] *= B[i]
+function had!{T<:Number}(A::Array{T}, B::Array{T})
+	@assert size(A) == size(B)
+	for idx in eachindex(A)
+		@inbounds A[idx] *= B[idx]
 	end
 end
 
 
-#=
-@doc """
-	isuniform(x; prec) -> Bool
-
-Test if the sampling points in `x` are on a uniform grid with precision `prec`.
-
-`x` is a vector for 1D points and an `M`-by-2 matrix for 2D points.
-""" ->
-function isuniform( x::Vector; prec::Float64=sqrt(eps()) )
-	M = length(x)
-
-	M <= 2 && return true
-
-	diff = abs(x[1] - x[2])
-
-	# TODO: Use isapprox?
-	for n = 3:M
-		d = abs(x[n-1] - x[n])
-		if abs(d - diff) > prec
-			return false
-		end
-	end
-
-	return true
-end
-=#
-
-#= function isuniform( points::Matrix; prec::Float64=sqrt(eps()) ) =#
 function isuniform( points::Matrix )
 	M, D = size(points)
 	@assert D == 2
@@ -64,12 +25,11 @@ function isuniform( points::Matrix )
 	uniquey = unique(y)
 	My = length(uniquey)
 
-	#= if !isuniform(uniquex; prec=prec) || !isuniform(uniquey; prec=prec) || Mx*My != M =#
-	if !isuniform(uniquex) || !isuniform(uniquey) || Mx*My != M
+	if isuniform(uniquex) && isuniform(uniquey) && Mx*My == M
+		return true
+	else
 		return false
 	end
-
-	return true
 end
 
 

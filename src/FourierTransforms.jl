@@ -65,7 +65,8 @@ to control this there are optional arguments:
 - `prec`: Include factors that are numerically smaller than 1-prec.
 - `maxCount`: The maximum number of factors.
 """->
-function FourDaubScaling{T<:Real}( xi::T, C::Vector{Float64}; prec=eps(), maxCount=100)
+function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=eps(), maxCount=100)
+	# TODO: prec limit as global constant?
 	@assert isapprox(sum(C), 1.0)
 	@assert prec >= eps()
 	@assert maxCount >= 1
@@ -151,11 +152,10 @@ scale `J` and translation `k`.
 function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer=0; args... )
 	@assert J >= 0 "Scale must be a non-negative integer"
 
-	lowername = lowercase(wavename)
-	if lowername == "haar" || lowername == "db1"
+	if ishaar(wavename)
 		return FourHaarScaling(xi, J, k)
-	elseif isdaubechies(lowername)
-		const vm = van_moment(lowername)
+	elseif isdaubechies(wavename)
+		const vm = van_moment(wavename)
 		return FourDaubScaling(xi, vm, J, k)
 	else
 		error("Fourier transform for this wavelet is not implemented")
@@ -193,7 +193,7 @@ end
 The Fourier transform of the Daubechies `N` boundary wavelet transform
 defined by the filters `F` evaluated at `xi`.
 """->
-function FourDaubScaling( xi::Number, F::ScalingFilters; prec=sqrt(eps()), maxcount=50 )
+function FourDaubScaling( xi::Real, F::ScalingFilters; prec=sqrt(eps()), maxcount=50 )
 	# TODO: Assertions in macro?
 	@assert prec >= eps()
 	@assert maxcount >= 1

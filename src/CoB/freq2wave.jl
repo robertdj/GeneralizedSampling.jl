@@ -13,6 +13,7 @@ Make change of basis for switching between frequency responses and wavelets.
 """->
 function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Float64=NaN)
 	# TODO: Warning if J is too big
+	# TODO: IS it better with B as a non-optional argument?
 
 	# Fourier transform of the internal scaling function
 	FT = FourScalingFunc( samples, wavename, J )
@@ -336,7 +337,7 @@ function Base.Ac_mul_B!{D}(Z::AbstractArray{Complex{Float64},D}, T::Freq2NoBound
 	@assert wsize(T) == size(Z)
 
 	Tdiag = conj(T.diag)
-	if isuniform(T)
+	if !isuniform(T)
 		had!(Tdiag, get(T.weights))
 	end
 	had!(Tdiag, v)
