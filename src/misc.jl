@@ -22,8 +22,9 @@ function had!{T<:Number}(A::Vector{T}, B::Vector{T})
 end
 
 
+#=
 @doc """
-	isuniform(x; prec)
+	isuniform(x; prec) -> Bool
 
 Test if the sampling points in `x` are on a uniform grid with precision `prec`.
 
@@ -32,9 +33,7 @@ Test if the sampling points in `x` are on a uniform grid with precision `prec`.
 function isuniform( x::Vector; prec::Float64=sqrt(eps()) )
 	M = length(x)
 
-	if M <= 2
-		return true
-	end
+	M <= 2 && return true
 
 	diff = abs(x[1] - x[2])
 
@@ -48,14 +47,14 @@ function isuniform( x::Vector; prec::Float64=sqrt(eps()) )
 
 	return true
 end
+=#
 
-function isuniform( points::Matrix; prec::Float64=sqrt(eps()) )
+#= function isuniform( points::Matrix; prec::Float64=sqrt(eps()) ) =#
+function isuniform( points::Matrix )
 	M, D = size(points)
 	@assert D == 2
 
-	if M <= 2
-		return true
-	end
+	M <= 2 && return true
 
 	x = sort( points[:,1] )
 	uniquex = unique(x)
@@ -65,7 +64,8 @@ function isuniform( points::Matrix; prec::Float64=sqrt(eps()) )
 	uniquey = unique(y)
 	My = length(uniquey)
 
-	if !isuniform(uniquex; prec=prec) || !isuniform(uniquey; prec=prec) || Mx*My != M
+	#= if !isuniform(uniquex; prec=prec) || !isuniform(uniquey; prec=prec) || Mx*My != M =#
+	if !isuniform(uniquex) || !isuniform(uniquey) || Mx*My != M
 		return false
 	end
 
@@ -74,26 +74,42 @@ end
 
 
 @doc """
-	grid(Mx, My, scale)
+	grid(M, scale) -> Vector
 
-2D points on an `Mx`-by-`My` grid centered around the origin.
-With even `M`'s the grid has one extra point on the negative values.
+Equidistant 1D points centered around the origin.
+With even `M` the grid has one extra point on the negative values.
 
-By default, `My` = `Mx`.
 The points are scaled by `scale` which by default is 1.
 """->
-function grid(Mx::Int, My::Int=Mx, grid_dist=1.0)
-	# TODO: Input as (Mx,My) instead?
-	startx = -div(Mx,2)
-	endx = (isodd(Mx) ? -startx : -startx-1)
+function grid(M::Int, grid_dist=1)
+	startx = -div(M,2)
+	endx = (isodd(M) ? -startx : -startx-1)
+
+	x = collect( float(startx):float(endx) )
+
+	if grid_dist != one(grid_dist)
+		scale!(grid_dist, x)
+	end
+
+	return x
+end
+
+@doc """
+	grid( (Mx,My), scale) -> Matrix
+
+2D points on an `Mx`-by-`My` grid centered around the origin.
+
+The points are scaled by `scale` which by default is 1.
+"""->
+function grid( M::Tuple{Integer,Integer}, grid_dist=1)
 	# The points are sorted by the x coordinate
-	x = kron([startx:endx;], ones(My))
+	gridx = grid(M[1], grid_dist)
+	x = kron(gridx, ones(M[2]))
 
-	starty = -div(My,2)
-	endy = (isodd(My) ? -starty : -starty-1)
-	y = repmat([starty:endy;], Mx)
+	gridy = grid(M[2], grid_dist)
+	y = repmat(gridy, M[1])
 
-	points = grid_dist*[x y]
+	return hcat(x, y)
 end
 
 
