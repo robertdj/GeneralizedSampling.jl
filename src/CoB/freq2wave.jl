@@ -16,47 +16,42 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Fl
 	# TODO: IS it better with B as a non-optional argument?
 
 	# Fourier transform of the internal scaling function
-	FT = FourScalingFunc( samples, wavename, J )
+	const FT = FourScalingFunc( samples, wavename, J )
 
-	# The number of internal wavelets in reconstruction
-	N = 2^J
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
-	xi = samples/N
-	frac!(xi)
-	if hasboundary(wavename)
-		F = waveparse( wavename, true )
-		vm = van_moment(F)
-		N -= 2*vm
-		if N <= 0
-			error("Too few wavelets: Boundary functions overlap")
-		end
-	end
-
-	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
-	p = NFFTPlan(xi, N)
+	# Diagonal matrix used in 'multiplication' with NFFT
+	const diag = FT .* cis(-pi*samples)
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
-		W = Nullable{ Vector{Complex{Float64}} }()
+		const W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		if isnan(B)
 			error("Samples are not uniform; supply bandwidth")
 		end
-
-		W = Nullable(complex( sqrt(weights(samples, B)) ))
-		#= W = sqrt(weights(samples, B)) =#
-		#= had!( FT, complex(W) ) =#
-		#= W = Nullable(W) =#
+		const W = Nullable(complex( sqrt(weights(samples, B)) ))
 	end
 
-	diag = FT .* cis(-pi*samples)
+	# The number of internal wavelets in reconstruction
+	Ninternal = 2^J
+	if hasboundary(wavename)
+		Ninternal -= 2*van_moment(wavename)
+		Ninternal <= 0 && error("Too few wavelets: Boundary functions overlap")
+	end
+
+	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
+	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
+	xi = samples/2^J
+	frac!(xi)
+	const p = NFFTPlan(xi, Ninternal)
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
-		left = FourDaubScaling(samples, F)
-		right = FourDaubScaling(samples, F)
+		F = waveparse( wavename, true )
+		const left = FourDaubScaling(samples, F)
+		const right = FourDaubScaling(samples, F)
+
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
 end
@@ -257,18 +252,15 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 	@assert size(T,1) == length(y)
 	@assert (Nx = size(T,2)) == length(x)
 
-	vm = van_moment(T)
+	const xleft, xint, xright = split(x, van_moment(T))
 
 	# Internal scaling function
-	xint = slice(x, vm+1:Nx-vm)
 	NFFT.nfft!(T.NFFT, xint, y)
 	had!(y, T.diag)
 
 	# Update y with boundary contributions
 	const Cone = one(Complex{Float64})
-	xleft = slice(x, 1:vm)
 	BLAS.gemv!('N', Cone, T.left, xleft, Cone, y)
-	xright = slice(x, Nx-vm+1:Nx)
 	BLAS.gemv!('N', Cone, T.right, xright, Cone, y)
 
 	if !isuniform(T)
@@ -278,7 +270,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 	return y
 end
 
-@debug function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}})
+function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert ((Nx,Ny) = wsize(T)) == size(X)
 	
@@ -510,7 +502,8 @@ function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer
 	const vm = van_moment(T)
 
 	if vm < n <= N-vm
-		y = T.FT[m,d]*cis( -2*pi*T.samples[m]*(n-1-N/2)/N )
+		#= y = T.FT[m,d]*cis( -2*pi*T.samples[m]*(n-1-N/2)/N ) =#
+		y = T.FT[m,d]*cis( -2*pi*T.samples[m]*(n-1)/N )
 	elseif 1 <= n <= vm
 		y = T.left[m, n, d]
 	elseif N-vm < n <= N
@@ -544,7 +537,7 @@ function van_moment(T::Freq2Wave)
 	end
 end
 
-function Base.eltype(T::Freq2Wave)
+function Base.eltype(::Freq2Wave)
 	return Complex{Float64}
 end
 

@@ -234,6 +234,22 @@ function ishaar(wavename::AbstractString)
 end
 
 
+@doc """
+	split(x::Vector, border::Int) -> SubVector, SubVector, SubVector
+
+Split `x` into 3 parts:
+Left, internal and right, where left and right are `border` outmost entries.
+"""->
+function split(x::DenseVector, border::Int)
+	N = length(x)
+
+	L = slice(x, 1:border)
+	I = slice(x, border+1:N-border)
+	R = slice(x, N-border+1:N)
+
+	return L, I, R
+end
+
 type SplitMatrix
 	LL::AbstractMatrix
 	LI::AbstractMatrix
@@ -265,27 +281,29 @@ With both the horizontal and the vertical part divided in `L`eft,
 	| LR |  IR  | RR |
 	|____|______|____|
 """->
-function split(A::Matrix, border::Int)
+function split(A::DenseMatrix, border::Int)
 	@assert border >= 1
 
-	Nx, Ny = size(A)
-	@assert min(Nx,Ny) > 2*border
+	N = size(A)
+	@assert minimum(N) > 2*border
 
 	Lidx = 1:border
-	Iidx = border+1:Nx-border
-	Ridx = Nx-border+1:Nx
+	I1idx = border+1:N[1]-border
+	R1idx = N[1]-border+1:N[1]
+	I2idx = border+1:N[2]-border
+	R2idx = N[2]-border+1:N[2]
 
 	LL = slice(A, Lidx, Lidx)
-	LI = slice(A, Iidx, Lidx)
-	LR = slice(A, Ridx, Lidx)
+	LI = slice(A, I1idx, Lidx)
+	LR = slice(A, R1idx, Lidx)
 
-	IL = slice(A, Lidx, Iidx)
-	II = slice(A, Iidx, Iidx)
-	IR = slice(A, Ridx, Iidx)
+	IL = slice(A, Lidx, I2idx)
+	II = slice(A, I1idx, I2idx)
+	IR = slice(A, R1idx, I2idx)
 
-	RL = slice(A, Lidx, Ridx)
-	RI = slice(A, Iidx, Ridx)
-	RR = slice(A, Ridx, Ridx)
+	RL = slice(A, Lidx, R2idx)
+	RI = slice(A, I1idx, R2idx)
+	RR = slice(A, R1idx, R2idx)
 
 	SplitMatrix( LL, LI, LR, IL, II, IR, RL, RI, RR )
 end
