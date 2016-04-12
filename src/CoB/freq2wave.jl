@@ -20,17 +20,18 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Fl
 
 	# The number of internal wavelets in reconstruction
 	N = 2^J
+	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
+	xi = samples/N
+	frac!(xi)
 	if hasboundary(wavename)
 		F = waveparse( wavename, true )
-		N -= 2*van_moment(F)
+		vm = van_moment(F)
+		N -= 2*vm
 		if N <= 0
 			error("Too few wavelets: Boundary functions overlap")
 		end
 	end
 
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
-	xi = samples/N
-	frac!(xi)
 	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
 	p = NFFTPlan(xi, N)
 
@@ -48,7 +49,6 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Fl
 		#= W = Nullable(W) =#
 	end
 
-	# Diagonal matrix for multiplication with internal scaling function
 	diag = FT .* cis(-pi*samples)
 
 	# Wavelets w/o boundary
@@ -128,7 +128,7 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	F[:,1:vm] = T.left
 
 	# Internal function
-	for n = (vm+1):(N-vm)
+	for n = vm+1:N-vm
 		for m = 1:M
 			@inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
 			#= @inbounds F[m,n] = W[m]*T.FT[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
@@ -238,7 +238,7 @@ function freq2wave(samples::AbstractMatrix, wavename::AbstractString, J::Int; B:
 end
 
 
-function Base.A_mul_B!{D}(y::Vector{Complex{Float64}}, T::Freq2NoBoundaryWave{D}, X::AbstractArray{Complex{Float64},D})
+function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave{D}, X::DenseArray{Complex{Float64},D})
 	@assert size(T,1) == length(y)
 	@assert wsize(T) == size(X)
 
@@ -253,7 +253,7 @@ function Base.A_mul_B!{D}(y::Vector{Complex{Float64}}, T::Freq2NoBoundaryWave{D}
 end
 
 
-function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::AbstractVector{Complex{Float64}})
+function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::DenseVector{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert (Nx = size(T,2)) == length(x)
 
@@ -278,7 +278,7 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::
 	return y
 end
 
-@debug function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::AbstractMatrix{Complex{Float64}})
+@debug function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}})
 	@assert size(T,1) == length(y)
 	@assert ((Nx,Ny) = wsize(T)) == size(X)
 	
@@ -315,7 +315,7 @@ end
 	return y
 end
 
-function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2Wave{2}, x::AbstractVector{Complex{Float64}})
+function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, x::DenseVector{Complex{Float64}})
 	@assert size(T,2) == length(x)
 
 	X = reshape_view(x, wsize(T))
@@ -324,15 +324,20 @@ function Base.A_mul_B!(y::Vector{Complex{Float64}}, T::Freq2Wave{2}, x::Abstract
 	return y
 end
 
-function Base.(:(*))(T::Freq2Wave, x::AbstractVector)
+function Base.(:(*))(T::Freq2Wave, x::DenseArray)
 	y = Array(Complex{Float64}, size(T,1))
-	A_mul_B!( y, T, complex(float(x)) )
+
+	if !isa(x, Array{Complex{Float64}})
+		x = map(Complex{Float64}, x)
+	end
+
+	A_mul_B!( y, T, x )
 
 	return y
 end
 
 
-function Base.Ac_mul_B!{D}(Z::AbstractArray{Complex{Float64},D}, T::Freq2NoBoundaryWave{D}, v::AbstractVector{Complex{Float64}})
+function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundaryWave{D}, v::DenseVector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert wsize(T) == size(Z)
 
@@ -347,7 +352,7 @@ function Base.Ac_mul_B!{D}(Z::AbstractArray{Complex{Float64},D}, T::Freq2NoBound
 	return Z
 end
 
-function Base.Ac_mul_B!(z::AbstractVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, v::AbstractVector{Complex{Float64}})
+function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, v::DenseVector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert (Nz = size(T,2)) == length(z)
 
@@ -374,14 +379,14 @@ function Base.Ac_mul_B!(z::AbstractVector{Complex{Float64}}, T::Freq2BoundaryWav
 	return z
 end
 
-function Base.Ac_mul_B!(Z::AbstractMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2}, v::AbstractVector{Complex{Float64}})
+function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2}, v::DenseVector{Complex{Float64}})
 	@assert size(T,1) == length(v)
 	@assert wsize(T) == length(Z)
 	
 	error("not implemented")
 end
 
-function Base.Ac_mul_B!(z::AbstractVector{Complex{Float64}}, T::Freq2Wave{2}, v::AbstractVector{Complex{Float64}})
+function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, v::DenseVector{Complex{Float64}})
 	@assert size(T,2) == length(z)
 
 	Z = reshape_view(z, wsize(T))
@@ -400,9 +405,13 @@ function Base.Ac_mul_B(T::Freq2Wave, v::Vector)
 end
 
 function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
+	if !isa(y, Array{Complex{Float64}})
+		z = map(Complex{Float64}, y)
+	end
+
 	# Non-uniform samples: Scale observations
 	if !isuniform(T)
-		y .*= get(T.weights)
+		z .*= get(T.weights)
 	end
 
 	# TODO: Exact solution for 2D uniform samples?
@@ -410,7 +419,7 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 	println("Solution via conjugate gradients... ")
 	# TODO: Better initial guess?
 	x0 = zeros(Complex{Float64}, wsize(T))
-	x = cgnr(T, complex(y), x0)
+	x = cgnr(T, z, x0)
 end
 
 
@@ -533,6 +542,10 @@ function van_moment(T::Freq2Wave)
 	else
 		return van_moment(T.wavename)
 	end
+end
+
+function Base.eltype(T::Freq2Wave)
+	return Complex{Float64}
 end
 
 function Base.show{D}(io::IO, T::Freq2Wave{D})
