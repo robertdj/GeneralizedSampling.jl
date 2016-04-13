@@ -3,7 +3,7 @@
 
 In-place Hadamard product/element-wise matrix multiplication; the first argument is modified.
 """->
-function had!{T<:Number}(A::Array{T}, B::Array{T})
+function had!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
 	@assert size(A) == size(B)
 	for idx in eachindex(A)
 		@inbounds A[idx] *= B[idx]
@@ -78,14 +78,18 @@ end
 
 Compute weights for sampling points `xi`.
 
-- For 1D points `xi` must be a *sorted* vector.
+- For 1D points `xi` must be a vector.
 - For 2D points `xi` must be a matrix with 2 columns.
 """->
-function weights(xi::Vector, bandwidth::Real)
-	# TODO: Remove this assumption?
-	@assert issorted(xi)
+function weights(xi::DenseVector{Float64}, bandwidth::Real)
+	@assert maxabs(xi) <= bandwidth
 
-	# TODO: Check that bandwidth is sufficiently large
+	is_xi_sorted = issorted(xi)
+	if !is_xi_sorted
+		sort_idx = sortperm(xi)
+		inv_sort_idx = invperm(sort_idx)
+		xi = xi[sort_idx]
+	end
 
 	N = length(xi)
 	mu = Array(Float64, N)
@@ -102,13 +106,15 @@ function weights(xi::Vector, bandwidth::Real)
 		@inbounds mu[n] = 0.5*(xi[n+1] - xi[n-1])
 	end
 
-	return mu
+	!is_xi_sorted && permute!(mu, inv_sort_idx)
+
+	return mu 
 end
 
 function weights(xi::Matrix, bandwidth::Real)
 	# TODO: Which dim is 2?
 	@assert size(xi,2) == 2
-	@assert maximum(abs(xi)) <= bandwidth
+	@assert maxabs(xi) <= bandwidth
 
 	voronoiarea(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
 end
@@ -207,14 +213,12 @@ end
 Return `true` if `wavename` is of the form `dbN`, where `N` is an integer.
 """->
 function isdaubechies(wavename::AbstractString)
-	lowername = lowercase(wavename)
-
-	if ishaar(lowername)
+	if ishaar(wavename)
 		return true
 	end
 
-	prefix = lowername[1:2]
-	N = parse(lowername[3:end])
+	prefix = lowercase(wavename[1:2])
+	N = parse(wavename[3:end])
 	return prefix == "db" && isa( N, Integer )
 end
 
@@ -241,7 +245,8 @@ Split `x` into 3 parts:
 Left, internal and right, where left and right are `border` outmost entries.
 """->
 function split(x::DenseVector, border::Int)
-	N = length(x)
+	@assert border >= 1
+	@assert (N = length(x)) > 2*border
 
 	L = slice(x, 1:border)
 	I = slice(x, border+1:N-border)
@@ -283,7 +288,6 @@ With both the horizontal and the vertical part divided in `L`eft,
 """->
 function split(A::DenseMatrix, border::Int)
 	@assert border >= 1
-
 	N = size(A)
 	@assert minimum(N) > 2*border
 

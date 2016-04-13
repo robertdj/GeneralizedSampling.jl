@@ -18,7 +18,7 @@ function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::Abstrac
 	# Initialize
 	x = copy(x0)
 	y = A*x
-	r = b - A*x
+	r = b - y
 	z = A'*r
 	p = copy(z)
 	oneT = one(T)
@@ -66,7 +66,6 @@ function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::Abstr
 	r = b - y
 	z = T'*r
 	p = copy(z)
-
 	Cone = one(Complex{Float64})
 
 	for iter = 1:maxiter
@@ -77,7 +76,7 @@ function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::Abstr
 		xdiff = mu*norm(p)
 
 		BLAS.axpy!(-mu, y, r) # r = r - mu*y
-		Ac_mul_B!(z, T, r)
+		Ac_mul_B!(z, T, r) # z = T'*r
 		tau = vecnorm(z)^2 / ztz
 
 		# p = z + tau*p

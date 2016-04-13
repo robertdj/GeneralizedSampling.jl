@@ -19,6 +19,7 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Fl
 	const FT = FourScalingFunc( samples, wavename, J )
 
 	# Diagonal matrix used in 'multiplication' with NFFT
+	# TODO: Multiply with weights (in the 1D case only)?
 	const diag = FT .* cis(-pi*samples)
 
 	# Weights for non-uniform samples
@@ -359,7 +360,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1
 	#= z[1:vm] = T.left'*v =#
 	#= z[Nz-vm+1:Nz] = T.right'*v =#
 	Ac_mul_B!( zleft, T.left, v )
-	Ac_mul_B!( zright, T.left, v )
+	Ac_mul_B!( zright, T.right, v )
 
 	return z
 end
