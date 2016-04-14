@@ -49,8 +49,8 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Fl
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
 		F = waveparse( wavename, true )
-		const left = FourDaubScaling(samples, F)
-		const right = FourDaubScaling(samples, F)
+		const left = FourDaubScaling(samples, F, 'L')
+		const right = FourDaubScaling(samples, F, 'R')
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -221,8 +221,8 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int; B::Fl
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
 		F = waveparse( wavename, true )
-		const left = cat(3, FourDaubScaling(samplesx, F), FourDaubScaling(samplesy, F) )
-		const right = cat(3, FourDaubScaling(samplesx, F), FourDaubScaling(samplesy, F) )
+		const left = cat(3, FourDaubScaling(samplesx, F, 'L'), FourDaubScaling(samplesy, F, 'L') )
+		const right = cat(3, FourDaubScaling(samplesx, F, 'R'), FourDaubScaling(samplesy, F, 'R') )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
