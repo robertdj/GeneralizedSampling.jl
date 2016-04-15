@@ -214,7 +214,7 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int; B::Fl
 	xi = samples'
 	scale!(xi, 1/2^J)
 	frac!(xi)
-	p = NFFTPlan(xi, (Nint,Nint))
+	const p = NFFTPlan(xi, (Nint,Nint))
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
@@ -345,6 +345,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1
 	@assert size(T,1) == length(v)
 	@assert (Nz = size(T,2)) == length(z)
 
+	# TODO: Move this weighing into freq2wave? For 2D it must be # sqrt'ed
 	if !isuniform(T)
 		v .*= get(T.weights)
 	end
@@ -357,8 +358,6 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1
 	NFFT.nfft_adjoint!(T.NFFT, Tdiag, zint)
 
 	# Update z with boundary contributions
-	#= z[1:vm] = T.left'*v =#
-	#= z[Nz-vm+1:Nz] = T.right'*v =#
 	Ac_mul_B!( zleft, T.left, v )
 	Ac_mul_B!( zright, T.right, v )
 
@@ -381,7 +380,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, v::De
 	return z
 end
 
-function Base.Ac_mul_B(T::Freq2Wave, v::DenseVector)
+function Base.Ac_mul_B(T::Freq2Wave, v::AbstractVector)
 	if !isa(x, Array{Complex{Float64}})
 		v = map(Complex{Float64}, v)
 	end
@@ -427,25 +426,27 @@ In 2D, the reconstruction grid is sorted by the `y` coordinate, i.e., the order 
 etc
 """->
 function Base.collect(T::Freq2NoBoundaryWave{2})
-	M = size(T,1)
-	Nx, Ny = wsize(T)
+	const M = size(T,1)
+	const Nx, Ny = wsize(T)
 	# TODO: Check if the matrix fits in memory
 	F = Array(Complex{Float64}, M, size(T,2))
 
-	xsample = T.samples[:,1]/Nx
-	ysample = T.samples[:,2]/Ny
+	#= xsample = T.samples[:,1]/Nx =#
+	#= ysample = T.samples[:,2]/Ny =#
 
-	# DFT matrix
-	translx = [0:Nx-1;] - Nx/2
-	transly = [0:Ny-1;] - Ny/2
+	#= translx = [0:Nx-1;] - Nx/2 =#
+	#= transly = [0:Ny-1;] - Ny/2 =#
 	idx = 0
 	for ny = 1:Ny
-		yidx = transly[ny]
+		#= yidx = transly[ny] =#
 		for nx = 1:Nx
-			xidx = translx[nx]
+			#= xidx = translx[nx] =#
 			idx += 1
 			for m = 1:M
-				@inbounds F[m,idx] = T.diag[m]*cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) )
+				#= @inbounds F[m,idx] = T.diag[m]*cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) ) =#
+				#= @inbounds F[m,idx] = T.FT[m,1]*T.FT[m,2]*cis( -2*pi*((nx-1)*T.samples[m,1]/Nx + (ny-1)*T.samples[m,2]/Ny) ) =#
+				# TODO: T.FT -> T.FT'
+				@inbounds F[m,idx] = T.FT[m,1]*T.FT[m,2]*cis( -2*pi*((nx-1)*T.NFFT.x[1,m] + (ny-1)*T.NFFT.x[2,m]) )
 			end
 		end
 	end
@@ -464,10 +465,9 @@ function Base.collect(T::Freq2BoundaryWave{2})
 	F = Array(Complex{Float64}, M, size(T,2))
 
 	idx = 0
-	for nx = 1:Nx
-		for ny = 1:Ny
+	for ny = 1:Ny
+		for nx = 1:Nx
 			idx += 1
-			# TODO: Don't loop over m; insert entire column
 			for m = 1:M
 				@inbounds F[m,idx] = FourScaling(T, m, (nx,ny))
 			end
@@ -484,19 +484,18 @@ end
 @doc """
 	FourScaling(T::Freq2Wave{2}, d::Integer, m::Integer, n::Integer) -> Number
 
-Fourier transform of the `n`'th basis function at the `d`'th coordinate of the `m`'th frequency.
+Fourier transform of the `n`'th basis function at the `d`'th coordinate at the `m`'th frequency.
 """->
 function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer)
 	# TODO: The majority of the time is spent in the following 4 lines
-	const M = size(T,1)
-	@assert 1 <= m <= M
+	#= const M = size(T,1) =#
+	#= @assert 1 <= m <= M =#
 	const N = wsize(T)[d]
-	@assert 1 <= n <= N
+	#= @assert 1 <= n <= N =#
 	const vm = van_moment(T)
 
 	if vm < n <= N-vm
-		#= y = T.FT[m,d]*cis( -2*pi*T.samples[m]*(n-1-N/2)/N ) =#
-		y = T.FT[m,d]*cis( -2*pi*T.samples[m]*(n-1)/N )
+		y = T.FT[m,d]*cis( -2*pi*(n-1)*T.samples[m,d]/N )
 	elseif 1 <= n <= vm
 		y = T.left[m, n, d]
 	elseif N-vm < n <= N
@@ -506,7 +505,7 @@ function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer
 	return y
 end
 
-function FourScaling(T::Freq2Wave{2}, m::Integer, n::Tuple{Integer,Integer})
+function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Tuple{Integer,Integer})
 	FourScaling(T,m,n[1],1) * FourScaling(T,m,n[2],2)
 end
 
