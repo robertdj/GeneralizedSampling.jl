@@ -257,13 +257,13 @@ end
 
 type SplitMatrix
 	LL::AbstractMatrix
-	LI::AbstractMatrix
-	LR::AbstractMatrix
 	IL::AbstractMatrix
-	II::AbstractMatrix
-	IR::AbstractMatrix
 	RL::AbstractMatrix
+	LI::AbstractMatrix
+	II::AbstractMatrix
 	RI::AbstractMatrix
+	LR::AbstractMatrix
+	IR::AbstractMatrix
 	RR::AbstractMatrix
 end
 
@@ -278,12 +278,12 @@ With both the horizontal and the vertical part divided in `L`eft,
 `I`nternal and `R`ight, the parts are
 
 	 ________________ 
-	| LL |  IL  | RL |
+	| LL |  LI  | LR |
 	|____|______|____|
 	|    |      |    |
-	| LI |  II  | RI |
+	| IL |  II  | IR |
 	|____|______|____|
-	| LR |  IR  | RR |
+	| RL |  RI  | RR |
 	|____|______|____|
 """->
 function split(A::DenseMatrix, border::Int)
@@ -298,17 +298,18 @@ function split(A::DenseMatrix, border::Int)
 	R2idx = N[2]-border+1:N[2]
 
 	LL = slice(A, Lidx, Lidx)
-	LI = slice(A, I1idx, Lidx)
-	LR = slice(A, R1idx, Lidx)
+	IL = slice(A, I1idx, Lidx)
+	RL = slice(A, R1idx, Lidx)
 
-	IL = slice(A, Lidx, I2idx)
+	LI = slice(A, Lidx, I2idx)
 	II = slice(A, I1idx, I2idx)
-	IR = slice(A, R1idx, I2idx)
+	RI = slice(A, R1idx, I2idx)
 
-	RL = slice(A, Lidx, R2idx)
-	RI = slice(A, I1idx, R2idx)
+	LR = slice(A, Lidx, R2idx)
+	IR = slice(A, I1idx, R2idx)
 	RR = slice(A, R1idx, R2idx)
 
-	SplitMatrix( LL, LI, LR, IL, II, IR, RL, RI, RR )
+	#= SplitMatrix( LL, LI, LR, IL, II, IR, RL, RI, RR ) =#
+	SplitMatrix( LL, IL, RL, LI, II, RI, LR, IR, RR )
 end
 
