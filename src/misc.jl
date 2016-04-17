@@ -1,12 +1,24 @@
 @doc """
-	had!(A, B)
+	had!(A, B) -> A
 
-In-place Hadamard product/element-wise matrix multiplication; the first argument is modified.
+In-place Hadamard product: Replace `A` with `A.*B`.
 """->
 function had!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
 	@assert size(A) == size(B)
 	for idx in eachindex(A)
 		@inbounds A[idx] *= B[idx]
+	end
+end
+
+@doc """
+	yphad!(y, a, b) -> y
+
+Replace `y` with `y + a.*b`.
+"""->
+function yphad!{T<:Number}(y::DenseVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
+	@assert (Ny = length(y)) == length(a) == length(b)
+	for ny in 1:Ny
+		@inbounds y[ny] += a[ny] * b[ny]
 	end
 end
 

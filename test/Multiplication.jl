@@ -35,7 +35,7 @@ begin
 	N = size(T1,2)
 	K = N/2 # bandwidth
 	samples2 = N*rand(M) - K
-	sort!(samples2)
+	#= sort!(samples2) =#
 
 	# No boundary
 	T2 = freq2wave(samples2, "haar", J; B=K)
@@ -92,6 +92,8 @@ A1 = collect(T1)
 
 # With boundary
 T1b = freq2wave(samples1, "db2", J)
+#= T = freq2wave(samples1, "db2", J) =#
+#= T1b = Freq2BoundaryWave(T.samples, ones(T.FT), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT, zeros(T.left), zeros(T.right)) =#
 A1b = collect(T1b)
 
 
@@ -118,16 +120,21 @@ y2 = A1*x
 #@show norm(y1 - y2)
 @test_approx_eq_eps y1 y2 EPS
 
-y1b = T1b*x
-y2b = A1b*x
+X = zeros(wsize(T1b))
+S = split(X, van_moment(T1b))
+for idx in eachindex(S.LL); S.LL[idx] = rand(); end
+#= for idx in eachindex(S.II); S.II[idx] = rand(); end =#
+
+y1b = T1b*vec(X)
+y2b = A1b*vec(X)
 @show norm(y1b - y2b)
 #@test_approx_eq_eps y1b y2b EPS
 
 v = rand(size(T1,1))
 z1 = T1'*v
 z2 = A1'*v
-#@show norm(z1 - z2)
-@test_approx_eq_eps z1 z2 EPS
+@show norm(z1 - z2)
+#@test_approx_eq_eps z1 z2 EPS
 
 #=
 z1b = T2b'*v

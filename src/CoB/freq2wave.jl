@@ -268,7 +268,7 @@ end
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}})
 	@assert size(T,1) == length(y)
-	@assert ((Nx,Ny) = wsize(T)) == size(X)
+	@assert wsize(T) == size(X)
 	
 	const vm = van_moment(T)
 	const S = split(X, vm)
@@ -276,31 +276,44 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 	# Internal scaling function
 	NFFT.nfft!(T.NFFT, S.II, y)
 	had!(y, T.diag)
-	#= @show y[1:10] =#
+
+	# The non-internal contribution have a multiplication from each
+	# dimension of X
+	innery = similar(y)
 
 	# Update y with border contributions
 	for k in 1:vm
-		y += T.left[:,k,1] .* ( T.left[:,:,2]*S.LL[:,k] ) # LL
-		y += T.left[:,k,1] .* ( T.right[:,:,2]*S.LR[:,k] ) # LR
-		y += T.right[:,k,1] .* ( T.left[:,:,2]*S.RL[:,k] ) # RL
-		y += T.right[:,k,1] .* ( T.right[:,:,2]*S.RR[:,k] ) # RR
+		# LL
+		A_mul_B!( innery, T.left[:,:,1], S.LL[:,k] )
+		yphad!(y, T.left[:,k,2], innery)
+		# LR
+		A_mul_B!( innery, T.left[:,:,1], S.LR[:,k] )
+		yphad!(y, T.right[:,k,2], innery)
+		# RL
+		A_mul_B!( innery, T.right[:,:,1], S.RL[:,k] )
+		yphad!(y, T.left[:,k,2], innery)
+		# RR
+		A_mul_B!( innery, T.right[:,:,1], S.RR[:,k] )
+		yphad!(y, T.right[:,k,2], innery)
 	end
-	#= @show y[1:10] =#
 
 	# Update y with side contributions
 	# Fourier transform of the internal functions using 1D NFFT
-	const px = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
-	const py = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
+	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
+	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
-		y += T.left[:,k,1] .* nfft(py, S.LI[:,k]) # LI
-		y += T.right[:,k,1] .* nfft(py, S.LI[:,k]) # RI
-		y += T.left[:,k,1] .* nfft(px, vec(S.IL[k,:])) # IL
-		y += T.right[:,k,1] .* nfft(px, vec(S.IR[k,:])) # IR
+		# IL
+		NFFT.nfft!(p1, S.IL[:,k], innery)
+		had!(innery, T.FT[:,1])
+		had!(innery, cis(-pi*T.samples[:,1]))
+		yphad!(y, T.left[:,k,2], innery)
+
+		#= y += T.right[:,k,1] .* nfft(py, S.LI[:,k]) # RI =#
+		#= y += T.left[:,k,1] .* nfft(px, vec(S.IL[k,:])) # IL =#
+		#= y += T.right[:,k,1] .* nfft(px, vec(S.IR[k,:])) # IR =#
 	end
 
-	if !isuniform(T)
-		had!(y, get(T.weights))
-	end
+	#= !isuniform(T) && had!(y, get(T.weights)) =#
 
 	return y
 end
@@ -487,6 +500,7 @@ end
 Fourier transform of the `n`'th basis function at the `d`'th coordinate at the `m`'th frequency.
 """->
 function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer)
+	# TODO: Prefix this function with unsafe_ and skip all checks
 	# TODO: The majority of the time is spent in the following 4 lines
 	#= const M = size(T,1) =#
 	#= @assert 1 <= m <= M =#
@@ -495,11 +509,11 @@ function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer
 	const vm = van_moment(T)
 
 	if vm < n <= N-vm
-		y = T.FT[m,d]*cis( -2*pi*(n-1)*T.samples[m,d]/N )
+		@inbounds y = T.FT[m,d]*cis( -2*pi*(n-1)*T.samples[m,d]/N )
 	elseif 1 <= n <= vm
-		y = T.left[m, n, d]
+		@inbounds y = T.left[m, n, d]
 	elseif N-vm < n <= N
-		y = T.right[m, n-N+vm, d]
+		@inbounds y = T.right[m, n-N+vm, d]
 	end
 
 	return y
