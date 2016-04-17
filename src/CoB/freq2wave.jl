@@ -192,7 +192,8 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int; B::Fl
 	# Diagonal matrix for multiplication with internal scaling function
 	samplesx = slice(samples, :, 1)
 	samplesy = slice(samples, :, 2)
-	const diag = vec(prod(FT,2)) .* cis( -pi*(samplesx + samplesy) )
+	#= const diag = vec(prod(FT,2)) .* cis( -pi*(samplesx + samplesy) ) =#
+	const diag = FT .* cis( -pi*samples )
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
@@ -234,11 +235,11 @@ function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWa
 	@assert wsize(T) == size(X)
 
 	NFFT.nfft!(T.NFFT, X, y)
-	had!(y, T.diag)
-
-	if !isuniform(T)
-		had!(y, get(T.weights))
+	for d = 1:D
+		had!(y, T.diag[:,d])
 	end
+
+	!isuniform(T) && had!(y, get(T.weights))
 
 	return y
 end
@@ -259,9 +260,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 	BLAS.gemv!('N', Cone, T.left, xleft, Cone, y)
 	BLAS.gemv!('N', Cone, T.right, xright, Cone, y)
 
-	if !isuniform(T)
-		had!(y, get(T.weights))
-	end
+	!isuniform(T) && had!(y, get(T.weights))
 
 	return y
 end
@@ -275,13 +274,17 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 
 	# Internal scaling function
 	NFFT.nfft!(T.NFFT, S.II, y)
-	had!(y, T.diag)
+	had!(y, T.diag[:,1])
+	had!(y, T.diag[:,2])
 
 	# The non-internal contribution have a multiplication from each
 	# dimension of X
 	innery = similar(y)
 
-	# Update y with border contributions
+	# Update y with border and side contributions
+	# Fourier transform of the internal functions using 1D NFFT
+	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
+	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
 		# LL
 		A_mul_B!( innery, T.left[:,:,1], S.LL[:,k] )
@@ -295,25 +298,29 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 		# RR
 		A_mul_B!( innery, T.right[:,:,1], S.RR[:,k] )
 		yphad!(y, T.right[:,k,2], innery)
-	end
 
-	# Update y with side contributions
-	# Fourier transform of the internal functions using 1D NFFT
-	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
-	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
-	for k in 1:vm
+		# LI
+		NFFT.nfft!(p2, vec(S.LI[k,:]), innery) # DFT part of internal
+		had!(innery, T.diag[:,2]) # Fourier transform of internal
+		yphad!(y, T.left[:,k,1], innery) # Contribution from left
+
 		# IL
 		NFFT.nfft!(p1, S.IL[:,k], innery)
-		had!(innery, T.FT[:,1])
-		had!(innery, cis(-pi*T.samples[:,1]))
+		had!(innery, T.diag[:,1])
 		yphad!(y, T.left[:,k,2], innery)
 
-		#= y += T.right[:,k,1] .* nfft(py, S.LI[:,k]) # RI =#
-		#= y += T.left[:,k,1] .* nfft(px, vec(S.IL[k,:])) # IL =#
-		#= y += T.right[:,k,1] .* nfft(px, vec(S.IR[k,:])) # IR =#
+		# RI
+		NFFT.nfft!(p2, vec(S.RI[k,:]), innery)
+		had!(innery, T.diag[:,2])
+		yphad!(y, T.right[:,k,1], innery)
+
+		# IR
+		NFFT.nfft!(p1, S.IR[:,k], innery)
+		had!(innery, T.diag[:,1])
+		yphad!(y, T.right[:,k,2], innery)
 	end
 
-	#= !isuniform(T) && had!(y, get(T.weights)) =#
+	!isuniform(T) && had!(y, get(T.weights))
 
 	return y
 end
@@ -343,7 +350,8 @@ function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundary
 	@assert size(T,1) == length(v)
 	@assert wsize(T) == size(Z)
 
-	Tdiag = conj(T.diag)
+	Tdiag = vec(prod(T.diag, 2))
+	conj!(Tdiag)
 	if !isuniform(T)
 		had!(Tdiag, get(T.weights))
 	end

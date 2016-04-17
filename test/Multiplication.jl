@@ -120,21 +120,17 @@ y2 = A1*x
 #@show norm(y1 - y2)
 @test_approx_eq_eps y1 y2 EPS
 
-X = zeros(wsize(T1b))
-S = split(X, van_moment(T1b))
-for idx in eachindex(S.LL); S.LL[idx] = rand(); end
-#= for idx in eachindex(S.II); S.II[idx] = rand(); end =#
-
+X = rand(wsize(T1b))
 y1b = T1b*vec(X)
 y2b = A1b*vec(X)
-@show norm(y1b - y2b)
-#@test_approx_eq_eps y1b y2b EPS
+#@show norm(y1b - y2b)
+@test_approx_eq_eps y1b y2b EPS
 
 v = rand(size(T1,1))
 z1 = T1'*v
 z2 = A1'*v
-@show norm(z1 - z2)
-#@test_approx_eq_eps z1 z2 EPS
+#@show norm(z1 - z2)
+@test_approx_eq_eps z1 z2 EPS
 
 #=
 z1b = T2b'*v

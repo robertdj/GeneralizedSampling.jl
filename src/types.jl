@@ -23,7 +23,7 @@ macro common_freq2wave()
 	esc(quote
 		# Sampling
 		# TODO: Are the parts of samples saved in NFFT sufficient for collect?
-		samples::DenseArray{Float64, D}
+		samples::Array{Float64, D}
 		FT::Array{Complex{Float64}, D}
 		weights::Nullable{Vector{Complex{Float64}}}
 
@@ -32,7 +32,8 @@ macro common_freq2wave()
 		wavename::AbstractString
 
 		# In 1D: T = [left diag*NFFT right]
-		diag::Vector{Complex{Float64}}
+		# In 2D, diagonals for each dimension is needed
+		diag::Array{Complex{Float64}, D}
 		NFFT::NFFT.NFFTPlan{D,Float64}
 	end)
 end
@@ -45,8 +46,6 @@ end
 # Uniform samples, boundary correction
 immutable Freq2BoundaryWave{D} <: Freq2Wave{D}
 	@common_freq2wave()
-	#= left::Matrix{Complex{Float64}} =#
-	#= right::Matrix{Complex{Float64}} =#
 	left::Array{Complex{Float64}}
 	right::Array{Complex{Float64}}
 end
