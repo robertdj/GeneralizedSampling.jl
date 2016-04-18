@@ -283,6 +283,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 
 	# Update y with border and side contributions
 	# Fourier transform of the internal functions using 1D NFFT
+	# TODO: Include these "1D" NFFT's in NFFT package?
 	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
 	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
@@ -352,9 +353,7 @@ function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundary
 
 	Tdiag = vec(prod(T.diag, 2))
 	conj!(Tdiag)
-	if !isuniform(T)
-		had!(Tdiag, get(T.weights))
-	end
+	!isuniform(T) && had!(Tdiag, get(T.weights))
 	had!(Tdiag, v)
 
 	NFFT.nfft_adjoint!(T.NFFT, Tdiag, Z)
@@ -366,21 +365,23 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1
 	@assert size(T,1) == length(v)
 	@assert (Nz = size(T,2)) == length(z)
 
-	# TODO: Move this weighing into freq2wave? For 2D it must be # sqrt'ed
-	if !isuniform(T)
-		v .*= get(T.weights)
-	end
-
 	zleft, zint, zright = split(z, van_moment(T))
+
+	# TODO: Is this copying better than had!(*, get(T.weights)) for every Ac_mul_B!?
+	if isuniform(T) 
+		weigthedV = v
+	else
+		weigthedV = v .* get(T.weights)
+	end
 
 	# Internal scaling function
 	Tdiag = conj(T.diag)
-	had!(Tdiag, v)
+	had!(Tdiag, weigthedV)
 	NFFT.nfft_adjoint!(T.NFFT, Tdiag, zint)
 
 	# Update z with boundary contributions
-	Ac_mul_B!( zleft, T.left, v )
-	Ac_mul_B!( zright, T.right, v )
+	Ac_mul_B!( zleft, T.left, weigthedV )
+	Ac_mul_B!( zright, T.right, weigthedV )
 
 	return z
 end
@@ -389,7 +390,23 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 	@assert size(T,1) == length(v)
 	@assert wsize(T) == length(Z)
 	
-	error("not implemented")
+	#= const vm = van_moment(T) =#
+	#= S = split(Z, vm) =#
+	S = split(Z, van_moment(T))
+
+	if isuniform(T) 
+		weigthedV = v
+	else
+		weigthedV = v .* get(T.weights)
+	end
+
+	# Internal coefficients
+	Tdiag = vec(prod(T.diag, 2))
+	conj!(Tdiag)
+	had!(Tdiag, weigthedV)
+	NFFT.nfft_adjoint!(T.NFFT, Tdiag, S.II)
+
+	return Z
 end
 
 function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, v::DenseVector{Complex{Float64}})

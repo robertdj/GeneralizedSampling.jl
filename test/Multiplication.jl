@@ -4,6 +4,10 @@ using Base.Test
 #=
 Multiplication with a Freq2Wave element should give the same result as
 multiplication with the collected matrix.
+
+For both 1D and 2D samples and the 4 combinations of non-uniform samples
+and wavelets with and without boundaries are tested with the
+multiplications * and '*
 =#
 
 #= const EPS = 1e-5 =#
@@ -15,68 +19,85 @@ EPS = 1e-5
 begin
 	J = 3
 	M = 2^(J+1)
+	N = 2^J
+
+	x = rand(N)
+	v = rand(M)
 
 	# ----------------------------------------
 	# Compute matrices
 
-	# Uniform points
-	samples1 = grid(M, 0.5)
+	# Uniform points, No Boundary
+	Usamples = grid(M, 0.5)
+	TUNB = freq2wave(Usamples, "haar", J)
+	AUNB = collect(TUNB)
 
-	# No boundary
-	T1 = freq2wave(samples1, "haar", J)
-	A1 = collect(T1)
+	y1UNB = TUNB*x
+	y2UNB = AUNB*x
+	#@show norm(y1UNB - y2UNB)
+	@test_approx_eq_eps y1UNB y2UNB EPS
 
-	# With boundary
-	T1b = freq2wave(samples1, "db2", J)
-	A1b = collect(T1b)
+	z1UNB = TUNB'*v
+	z2UNB = AUNB'*v
+	#@show norm(z1UNB - z2UNB)
+	@test_approx_eq_eps z1UNB z2UNB EPS
+
+
+	# Uniform points, with Boundary
+	TUB = freq2wave(Usamples, "db2", J)
+	AUB = collect(TUB)
+
+	y1UB = TUB*x
+	y2UB = AUB*x
+	#@show norm(y1UB - y2UB)
+	@test_approx_eq_eps y1UB y2UB EPS
+
+	z1UB = TUNB'*v
+	z2UB = AUNB'*v
+	#@show norm(z1UB - z2UB)
+	@test_approx_eq_eps z1UB z2UB EPS
 
 
 	# Non-uniform points
-	N = size(T1,2)
 	K = N/2 # bandwidth
-	samples2 = N*rand(M) - K
-	#= sort!(samples2) =#
+	NUsamples = N*rand(M) - K
+	#= sort!(NUsamples) =#
 
-	# No boundary
-	T2 = freq2wave(samples2, "haar", J; B=K)
-	A2 = collect(T2)
+	# Non-Uniform points, No Boundary
+	TNUNB = freq2wave(NUsamples, "haar", J; B=K)
+	ANUNB = collect(TNUNB)
 
-	# With boundary
-	T2b = freq2wave(samples2, "db2", J; B=K)
-	A2b = collect(T2b)
+	y1NUNB = TNUNB*x
+	y2NUNB = ANUNB*x
+	#@show norm(y1NUNB - y2NUNB)
+	@test_approx_eq_eps y1NUNB y2NUNB EPS
+
+	z1NUNB = TNUNB'*v
+	z2NUNB = ANUNB'*v
+	#@show norm(z1NUNB - z2NUNB)
+	@test_approx_eq_eps z1NUNB z2NUNB EPS
 
 
-	# ----------------------------------------
-	# Perform computations
+	# Non-Uniform points, with Boundary
+	TNUB = freq2wave(NUsamples, "db2", J; B=K)
+	ANUB = collect(TNUB)
 
-	x = rand(N)
-	y1 = T1*x
-	y2 = A1*x
-	#@show norm(y1 - y2)
-	@test_approx_eq_eps y1 y2 EPS
+	y1NUB = TNUB*x
+	y2NUB = ANUB*x
+	#@show norm(y1NUB - y2NUB)
+	@test_approx_eq_eps y1NUB y2NUB EPS
 
-	y1b = T1b*x
-	y2b = A1b*x
-	#@show norm(y1b - y2b)
-	@test_approx_eq_eps y1b y2b EPS
-
-	v = rand(M)
-	z1 = T1'*v
-	z2 = A1'*v
-	#@show norm(z1 - z2)
-	@test_approx_eq_eps z1 z2 EPS
-
-	z1b = T2b'*v
-	z2b = A2b'*v
-	#@show norm(z1b - z2b)
-	@test_approx_eq_eps z1b z2b EPS
-
+	z1NUB = TNUB'*v
+	z2NUB = ANUB'*v
+	#@show norm(z1NUB - z2NUB)
+	@test_approx_eq_eps z1NUB z2NUB EPS
 end
 
 
 # ------------------------------------------------------------
 # 2D
 
+#=
 J = 3
 M = 2^(J+1)
 
@@ -103,6 +124,7 @@ K = N/2 # bandwidth
 samples2 = N*rand(size(T1,1),2) - K
 
 # No boundary
+# TODO: This one is not being tested
 T2 = freq2wave(samples2, "haar", J; B=K)
 A2 = collect(T2)
 
@@ -129,10 +151,9 @@ y2b = A1b*vec(X)
 v = rand(size(T1,1))
 z1 = T1'*v
 z2 = A1'*v
-#@show norm(z1 - z2)
-@test_approx_eq_eps z1 z2 EPS
+@show norm(z1 - z2)
+#@test_approx_eq_eps z1 z2 EPS
 
-#=
 z1b = T2b'*v
 z2b = A2b'*v
 #@show norm(z1b - z2b)
