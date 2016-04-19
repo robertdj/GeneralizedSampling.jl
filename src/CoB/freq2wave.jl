@@ -367,7 +367,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1
 
 	zleft, zint, zright = split(z, van_moment(T))
 
-	# TODO: Is this copying better than had!(*, get(T.weights)) for every Ac_mul_B!?
+	# TODO: Is this copying better than had!(*, get(T.weights)) for every part of S?
 	if isuniform(T) 
 		weigthedV = v
 	else
@@ -388,12 +388,12 @@ end
 
 function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2}, v::DenseVector{Complex{Float64}})
 	@assert size(T,1) == length(v)
-	@assert wsize(T) == length(Z)
+	@assert wsize(T) == size(Z)
 	
-	#= const vm = van_moment(T) =#
-	#= S = split(Z, vm) =#
-	S = split(Z, van_moment(T))
+	const vm = van_moment(T)
+	S = split(Z, vm)
 
+	# TODO: Is this copying better than had!(*, get(T.weights)) for every part of S?
 	if isuniform(T) 
 		weigthedV = v
 	else
@@ -401,10 +401,74 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 	end
 
 	# Internal coefficients
-	Tdiag = vec(prod(T.diag, 2))
-	conj!(Tdiag)
-	had!(Tdiag, weigthedV)
-	NFFT.nfft_adjoint!(T.NFFT, Tdiag, S.II)
+	innerv = vec(prod(T.diag, 2))
+	conj!(innerv)
+	had!(innerv, weigthedV)
+	NFFT.nfft_adjoint!(T.NFFT, innerv, S.II)
+
+	# Temporary arrays for holding results of the "inner" multiplication.
+	# Assuming that T.NFFT.N[1] == T.NFFT.N[2] only one cornercol and
+	# sidecol is needed
+	cornercol = Array(Complex{Float64}, vm)
+	const Nint = size(S.IL,1)
+	sidecol = Array(Complex{Float64}, Nint)
+
+	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
+	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
+	for k in 1:vm
+		# LL
+		conj!(innerv, T.left[:,k,2])
+		had!(innerv, weigthedV)
+		Ac_mul_B!( cornercol, T.left[:,:,1], innerv )
+		copy!( S.LL, 1+(k-1)*vm, cornercol, 1, vm )
+
+		# RL: Reusing innerv
+		Ac_mul_B!( cornercol, T.right[:,:,1], innerv )
+		copy!( S.RL, 1+(k-1)*vm, cornercol, 1, vm )
+
+		# IL: Reusing innerv
+		hadc!(innerv, T.diag[:,1])
+		NFFT.nfft_adjoint!(p1, innerv, sidecol)
+		copy!( S.IL, 1+(k-1)*Nint, sidecol, 1, Nint )
+
+		# LI
+		conj!(innerv, T.left[:,k,1])
+		had!(innerv, weigthedV)
+		hadc!(innerv, T.diag[:,2])
+		NFFT.nfft_adjoint!(p2, innerv, sidecol)
+		# The LI and RI component should be transposed in order to copy
+		# sidecol results in-place. 
+		# TODO: Can ReshapedArrays help with this (when they are ready)?
+		#= BLAS.blascopy!( Nint, sidecol, 1, S.LI, vm ) =#
+		#= copy!( S.LI, 1+(k-1)*vm, sidecol, 1, vm ) =#
+		for n in 1:Nint
+			S.LI[k,n] = sidecol[n]
+		end
+
+		# RI
+		conj!(innerv, T.right[:,k,1])
+		had!(innerv, weigthedV)
+		hadc!(innerv, T.diag[:,2])
+		NFFT.nfft_adjoint!(p2, innerv, sidecol)
+		for n in 1:Nint
+			S.RI[k,n] = sidecol[n]
+		end
+
+		# LR
+		conj!(innerv, T.right[:,k,2])
+		had!(innerv, weigthedV)
+		Ac_mul_B!( cornercol, T.left[:,:,1], innerv )
+		copy!( S.LR, 1+(k-1)*vm, cornercol, 1, vm )
+
+		# RR: Reusing innerv
+		Ac_mul_B!( cornercol, T.right[:,:,1], innerv )
+		copy!( S.RR, 1+(k-1)*vm, cornercol, 1, vm )
+
+		# IR: Reusing innerv
+		hadc!(innerv, T.diag[:,1])
+		NFFT.nfft_adjoint!(p1, innerv, sidecol)
+		copy!( S.IR, 1+(k-1)*Nint, sidecol, 1, Nint )
+	end
 
 	return Z
 end

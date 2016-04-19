@@ -11,6 +11,19 @@ function had!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
 end
 
 @doc """
+	hadc!(A, B) -> A
+
+In-place Hadamard product with complex conjugation: Replace `A` with
+`A.*conj(B)`.
+"""->
+function hadc!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
+	@assert size(A) == size(B)
+	for idx in eachindex(A)
+		@inbounds A[idx] *= conj(B[idx])
+	end
+end
+
+@doc """
 	yphad!(y, a, b) -> y
 
 Replace `y` with `y + a.*b`.
@@ -22,8 +35,20 @@ function yphad!{T<:Number}(y::DenseVector{T}, a::AbstractVector{T}, b::AbstractV
 	end
 end
 
+@doc """
+	conj!(A, B) -> A
 
-function isuniform( points::Matrix )
+Replace `A` with `conj(B)`.
+"""->
+function Base.conj!(A::DenseArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
+	@assert size(A) == size(B)
+	for idx in eachindex(A)
+		@inbounds A[idx] = conj(B[idx])
+	end
+	return A
+end
+
+function isuniform{T<:Real}( points::DenseMatrix{T} )
 	M, D = size(points)
 	@assert D == 2
 
@@ -53,7 +78,9 @@ With even `M` the grid has one extra point on the negative values.
 
 The points are scaled by `scale` which by default is 1.
 """->
-function grid(M::Int, grid_dist=1)
+function grid(M::Int, grid_dist::Real=1)
+	@assert grid_dist > 0
+
 	startx = -div(M,2)
 	endx = (isodd(M) ? -startx : -startx-1)
 
@@ -73,7 +100,9 @@ end
 
 The points are scaled by `scale` which by default is 1.
 """->
-function grid( M::Tuple{Integer,Integer}, grid_dist=1)
+function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1)
+	@assert grid_dist > 0
+
 	# The points are sorted by the x coordinate
 	gridx = grid(M[1], grid_dist)
 	x = kron(gridx, ones(M[2]))
@@ -94,6 +123,7 @@ Compute weights for sampling points `xi`.
 - For 2D points `xi` must be a matrix with 2 columns.
 """->
 function weights(xi::DenseVector{Float64}, bandwidth::Real)
+	@assert bandwidth > 0
 	@assert maxabs(xi) <= bandwidth
 
 	is_xi_sorted = issorted(xi)
@@ -123,8 +153,10 @@ function weights(xi::DenseVector{Float64}, bandwidth::Real)
 	return mu 
 end
 
-function weights(xi::Matrix, bandwidth::Real)
+# TODO: Default bandwidth = maxabs(xi)?
+function weights(xi::DenseMatrix{Float64}, bandwidth::Real)
 	# TODO: Which dim is 2?
+	@assert bandwidth > 0
 	@assert size(xi,2) == 2
 	@assert maxabs(xi) <= bandwidth
 
@@ -141,8 +173,11 @@ Compute the density of the sampling points `xi` with bandwidth `K`:
 - In 2D, `xi` must be an `M-by-2` matrix and the density is the smallest number δ that allows a covering of the "bandwidth area" with circles centered in the points of `xi` and radii δ.
 Currently, the "bandwidth area" is a square centered at the origin and with sidelength `2*K`. 
 """->
-function density(xi::Vector, bandwidth::Number)
+function density(xi::DenseVector{Float64}, bandwidth::Real)
+	@assert bandwidth > 0
+	# TODO: Remove this assumption; like weights
 	@assert issorted(xi)
+	@assert maxabs(xi) <= bandwidth
 
 	N = length(xi)
 	if xi[1] < -bandwidth || xi[N] > bandwidth
@@ -165,7 +200,8 @@ function density(xi::Vector, bandwidth::Number)
 	return density
 end
 
-function density(xi::Matrix{Float64}, bandwidth::Real)
+function density(xi::DenseMatrix{Float64}, bandwidth::Real)
+	@assert bandwidth > 0
 	M, dim = size(xi)
 	@assert dim == 2
 
@@ -321,7 +357,6 @@ function split(A::DenseMatrix, border::Int)
 	IR = slice(A, I1idx, R2idx)
 	RR = slice(A, R1idx, R2idx)
 
-	#= SplitMatrix( LL, LI, LR, IL, II, IR, RL, RI, RR ) =#
 	SplitMatrix( LL, IL, RL, LI, II, RI, LR, IR, RR )
 end
 
