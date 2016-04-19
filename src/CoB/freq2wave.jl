@@ -483,7 +483,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, v::De
 end
 
 function Base.Ac_mul_B(T::Freq2Wave, v::AbstractVector)
-	if !isa(x, Array{Complex{Float64}})
+	if !isa(v, Array{Complex{Float64}})
 		v = map(Complex{Float64}, v)
 	end
 
