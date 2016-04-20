@@ -1,20 +1,20 @@
 module GeneralizedSampling
 
-using ArrayViews
 using NFFT
 using WaveletPlot
 
 import Deldir: deldir, voronoiarea
 import Wavelets: wavelet, WT
-#= import ArrayViews: view, reshape_view =#
+import ArrayViews: reshape_view
 
 const sqrt2 = sqrt(2)
+const SMALL_PREC = eps()
+const LARGE_PREC = sqrt(eps())
 
 export
 	# Types
 	CoB,
 	Freq2Wave,
-	freq2wave,
 
 	# Fourier transforms
 	FourHaarScaling,
@@ -24,13 +24,11 @@ export
 	# Linear equation solvers
 	cgnr,
 
-	# Special multiplication
-	mul!,
-	mulT!,
+	# Special CoB functions
+	freq2wave,
 	collect,
 
 	# misc
-	had!,
 	isuniform,
 	weights,
 	wscale,
@@ -39,12 +37,11 @@ export
 	frac,
 	frac!,
 	grid,
-	wavefilter
 
 
-include("types.jl")
-include("misc.jl")
+include("Types.jl")
+include("Misc.jl")
 include("FourierTransforms.jl")
-#= include("CGNR.jl") =#
+include("CGNR.jl")
 
 end # module

@@ -9,10 +9,10 @@ Conjugate gradient for normal equations residual method for solving the least sq
 
 The iteration stops when `norm(xnew - xold) < prec` or after at most `maxiter` iterations.
 """->
-function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::AbstractVector{T}; prec=sqrt(eps()), maxiter=length(x0))
+function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::AbstractVector{T}; prec=LARGE_PREC, maxiter=length(x0))
 	@assert size(A,1) == length(b)
 	@assert size(A,2) == length(x0)
-	@assert prec >= eps()
+	@assert prec >= SMALL_PREC
 	@assert maxiter >= 1
 
 	# Initialize
@@ -54,10 +54,11 @@ end
 Conjugate gradient for normal equations residual method for `Freq2Wave`.
 The initial point `x0` must be of the same dimension as `T`.
 """->
-function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=sqrt(eps()), maxiter=length(x0))
+function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=LARGE_PREC, maxiter=length(x0))
+	# TODO: Assertions in macro?
 	@assert size(T,1) == length(b)
 	@assert wsize(T) == size(x0)
-	@assert prec >= eps()
+	@assert prec >= SMALL_PREC
 	@assert maxiter >= 1
 
 	# Initialize

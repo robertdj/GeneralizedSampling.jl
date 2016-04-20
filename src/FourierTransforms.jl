@@ -65,10 +65,10 @@ to control this there are optional arguments:
 - `prec`: Include factors that are numerically smaller than 1-prec.
 - `maxCount`: The maximum number of factors.
 """->
-function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=eps(), maxCount=100)
+function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=SMALL_PREC, maxCount=100)
 	# TODO: prec limit as global constant?
 	@assert isapprox(sum(C), 1.0)
-	@assert prec >= eps()
+	@assert prec >= SMALL_PREC
 	@assert maxCount >= 1
 
 	const almost1 = 1.0 - prec
@@ -216,9 +216,9 @@ The Fourier transform at `xi` of a Daubechies boundary scaling function.
 
 The optional arguments are the precision `prec` and maximum number of iterations `maxcount`.
 """->
-function FourDaubScaling( xi::Real, C::Vector{Float64}, U::Matrix{Float64}, V::Matrix{Float64}; prec=sqrt(eps()), maxcount=50 )
+function FourDaubScaling( xi::Real, C::Vector{Float64}, U::Matrix{Float64}, V::Matrix{Float64}; prec=LARGE_PREC, maxcount=50 )
 	# TODO: Assertions in macro?
-	@assert prec >= eps()
+	@assert prec >= SMALL_PREC
 	@assert maxcount >= 1
 	# TODO: Skip this assertion?
 	@assert isapprox(sum(C), 1.0)
