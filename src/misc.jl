@@ -1,61 +1,58 @@
 @doc """
-	had!(A, B)
+	had!(A, B) -> A
 
-In-place Hadamard product/element-wise matrix multiplication; the first argument is modified.
+In-place Hadamard product: Replace `A` with `A.*B`.
 """->
-function had!{T<:Number}(A::Matrix{T}, B::Matrix{T})
-	m,n = size(A)
-	@assert (m,n) == size(B)
-	for j in 1:n
-		for i in 1:m
-			@inbounds A[i,j] *= B[i,j]
-		end
+function had!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
+	@assert size(A) == size(B)
+	for idx in eachindex(A)
+		@inbounds A[idx] *= B[idx]
 	end
 end
-
-function had!{T<:Number}(A::Vector{T}, B::Vector{T})
-	m = length(A)
-	@assert m == length(B)
-	for i in 1:m
-		@inbounds A[i] *= B[i]
-	end
-end
-
 
 @doc """
-	isuniform(x; prec)
+	hadc!(A, B) -> A
 
-Test if the sampling points in `x` are on a uniform grid with precision `prec`.
-
-`x` is a vector for 1D points and an `M`-by-2 matrix for 2D points.
-""" ->
-function isuniform( x::Vector; prec::Float64=sqrt(eps()) )
-	M = length(x)
-
-	if M <= 2
-		return true
+In-place Hadamard product with complex conjugation: Replace `A` with
+`A.*conj(B)`.
+"""->
+function hadc!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
+	@assert size(A) == size(B)
+	for idx in eachindex(A)
+		@inbounds A[idx] *= conj(B[idx])
 	end
-
-	diff = abs(x[1] - x[2])
-
-	# TODO: Use isapprox?
-	for n = 3:M
-		d = abs(x[n-1] - x[n])
-		if abs(d - diff) > prec
-			return false
-		end
-	end
-
-	return true
 end
 
-function isuniform( points::Matrix; prec::Float64=sqrt(eps()) )
+@doc """
+	yphad!(y, a, b) -> y
+
+Replace `y` with `y + a.*b`.
+"""->
+function yphad!{T<:Number}(y::DenseVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
+	@assert (Ny = length(y)) == length(a) == length(b)
+	for ny in 1:Ny
+		@inbounds y[ny] += a[ny] * b[ny]
+	end
+end
+
+@doc """
+	conj!(A, B) -> A
+
+Replace `A` with `conj(B)`.
+"""->
+function Base.conj!(A::DenseArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
+	@assert size(A) == size(B)
+	for idx in eachindex(A)
+		@inbounds A[idx] = conj(B[idx])
+	end
+	return A
+end
+
+function isuniform{T<:Real}( points::DenseMatrix{T} )
 	M, D = size(points)
 	@assert D == 2
 
-	if M <= 2
-		return true
-	end
+	M <= 2 && return true
 
 	x = sort( points[:,1] )
 	uniquex = unique(x)
@@ -65,34 +62,55 @@ function isuniform( points::Matrix; prec::Float64=sqrt(eps()) )
 	uniquey = unique(y)
 	My = length(uniquey)
 
-	if !isuniform(uniquex; prec=prec) || !isuniform(uniquey; prec=prec) || Mx*My != M
+	if isuniform(uniquex) && isuniform(uniquey) && Mx*My == M
+		return true
+	else
 		return false
 	end
-
-	return true
 end
 
 
 @doc """
-	grid(Mx, My, scale)
+	grid(M, scale) -> Vector
 
-2D points on an `Mx`-by-`My` grid centered around the origin.
-With even `M`'s the grid has one extra point on the negative values.
+Equidistant 1D points centered around the origin.
+With even `M` the grid has one extra point on the negative values.
 
-By default, `My` = `Mx`.
 The points are scaled by `scale` which by default is 1.
 """->
-function grid(Mx::Int, My::Int=Mx, scale::Float64=1.0)
-	startx = -div(Mx,2)
-	endx = (isodd(Mx) ? -startx : -startx-1)
+function grid(M::Int, grid_dist::Real=1)
+	@assert grid_dist > 0
+
+	startx = -div(M,2)
+	endx = (isodd(M) ? -startx : -startx-1)
+
+	x = collect( float(startx):float(endx) )
+
+	if grid_dist != one(grid_dist)
+		scale!(grid_dist, x)
+	end
+
+	return x
+end
+
+@doc """
+	grid( (Mx,My), scale) -> Matrix
+
+2D points on an `Mx`-by-`My` grid centered around the origin.
+
+The points are scaled by `scale` which by default is 1.
+"""->
+function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1)
+	@assert grid_dist > 0
+
 	# The points are sorted by the x coordinate
-	x = kron([startx:endx;], ones(My))
+	gridx = grid(M[1], grid_dist)
+	x = kron(gridx, ones(M[2]))
 
-	starty = -div(My,2)
-	endy = (isodd(My) ? -starty : -starty-1)
-	y = repmat([starty:endy;], Mx)
+	gridy = grid(M[2], grid_dist)
+	y = repmat(gridy, M[1])
 
-	points = scale*[x y]
+	return hcat(x, y)
 end
 
 
@@ -101,14 +119,19 @@ end
 
 Compute weights for sampling points `xi`.
 
-- For 1D points `xi` must be a *sorted* vector.
+- For 1D points `xi` must be a vector.
 - For 2D points `xi` must be a matrix with 2 columns.
 """->
-function weights(xi::Vector, bandwidth::Real)
-	# TODO: Remove this assumption?
-	@assert issorted(xi)
+function weights(xi::DenseVector{Float64}, bandwidth::Real)
+	@assert bandwidth > 0
+	@assert maxabs(xi) <= bandwidth
 
-	# TODO: Check that bandwidth is sufficiently large
+	is_xi_sorted = issorted(xi)
+	if !is_xi_sorted
+		sort_idx = sortperm(xi)
+		inv_sort_idx = invperm(sort_idx)
+		xi = xi[sort_idx]
+	end
 
 	N = length(xi)
 	mu = Array(Float64, N)
@@ -125,12 +148,17 @@ function weights(xi::Vector, bandwidth::Real)
 		@inbounds mu[n] = 0.5*(xi[n+1] - xi[n-1])
 	end
 
-	return mu
+	!is_xi_sorted && permute!(mu, inv_sort_idx)
+
+	return mu 
 end
 
-function weights(xi::Matrix, bandwidth::Real)
+# TODO: Default bandwidth = maxabs(xi)?
+function weights(xi::DenseMatrix{Float64}, bandwidth::Real)
+	# TODO: Which dim is 2?
+	@assert bandwidth > 0
 	@assert size(xi,2) == 2
-	@assert maximum(abs(xi)) <= bandwidth
+	@assert maxabs(xi) <= bandwidth
 
 	voronoiarea(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
 end
@@ -145,8 +173,11 @@ Compute the density of the sampling points `xi` with bandwidth `K`:
 - In 2D, `xi` must be an `M-by-2` matrix and the density is the smallest number δ that allows a covering of the "bandwidth area" with circles centered in the points of `xi` and radii δ.
 Currently, the "bandwidth area" is a square centered at the origin and with sidelength `2*K`. 
 """->
-function density(xi::Vector, bandwidth::Number)
+function density(xi::DenseVector{Float64}, bandwidth::Real)
+	@assert bandwidth > 0
+	# TODO: Remove this assumption; like weights
 	@assert issorted(xi)
+	@assert maxabs(xi) <= bandwidth
 
 	N = length(xi)
 	if xi[1] < -bandwidth || xi[N] > bandwidth
@@ -169,7 +200,8 @@ function density(xi::Vector, bandwidth::Number)
 	return density
 end
 
-function density(xi::Matrix{Float64}, bandwidth::Real)
+function density(xi::DenseMatrix{Float64}, bandwidth::Real)
+	@assert bandwidth > 0
 	M, dim = size(xi)
 	@assert dim == 2
 
@@ -207,58 +239,124 @@ end
 	frac(x)
 	frac!(x)
 
-The fractional part of x as a number in [-0.5, 0.5).
+The fractional part of `x` as a number in [-0.5, 0.5).
 """->
-function frac(x::Array{Float64})
+function frac(x::DenseArray{Float64})
 	y = copy(x)
 	frac!(y)
 
 	return y
 end
 
-function frac!(x::Array{Float64})
-	N = length(x)
-	for n = 1:N
-		@inbounds x[n] -= round(x[n])
+function frac!(x::DenseArray{Float64})
+	for idx in eachindex(x)
+		@inbounds x[idx] -= round( x[idx] )
 	end
 end
 
 
 @doc """
-	wavename(name)
+	isdaubechies(wavename::AbstractString) -> Bool
 
-Return the characteristics of a wavelet needed for computations.
+Return `true` if `wavename` is of the form `dbN`, where `N` is an integer.
 """->
-function wavename(name::AbstractString)
-	lname = lowercase(name)
-
-	if lname == "haar"
-		return "Haar"
-	elseif lname[1:2] == "db" && typeof(parse(lname[3:end])) <: Integer
-		return ("Daubechies", parse(lname[3:end]))
-	else
-		error("Uknown wavelet name")
+function isdaubechies(wavename::AbstractString)
+	if ishaar(wavename)
+		return true
 	end
+
+	prefix = lowercase(wavename[1:2])
+	N = parse(wavename[3:end])
+	return prefix == "db" && isa( N, Integer )
 end
 
 @doc """
-	wavefilter(name)
+	ishaar(wavename::AbstractString) -> Bool
 
-Return the low pass filter coefficients of the wavelet `name`.
-
-Uses the `Wavelets` package.
+Return `true` if `wavename` is "haar" or "db1".
 """->
-function wavefilter(name::AbstractString)
-	parsed_name = wavename(name)
+function ishaar(wavename::AbstractString)
+	lowername = lowercase(wavename)
 
-	if parsed_name == "Haar"
-		C = wavelet( WT.Haar() )
-	elseif parsed_name[1] == "Daubechies"
-		C = wavelet( WT.Daubechies{parsed_name[2]}() )
+	if lowername == "haar" || lowername == "db1"
+		return true
 	else
-		error("Uknown wavelet name")
+		return false
 	end
+end
 
-	return C.qmf
+
+@doc """
+	split(x::Vector, border::Int) -> SubVector, SubVector, SubVector
+
+Split `x` into 3 parts:
+Left, internal and right, where left and right are `border` outmost entries.
+"""->
+function split(x::DenseVector, border::Int)
+	@assert border >= 1
+	@assert (N = length(x)) > 2*border
+
+	L = slice(x, 1:border)
+	I = slice(x, border+1:N-border)
+	R = slice(x, N-border+1:N)
+
+	return L, I, R
+end
+
+type SplitMatrix
+	LL::AbstractMatrix
+	IL::AbstractMatrix
+	RL::AbstractMatrix
+	LI::AbstractMatrix
+	II::AbstractMatrix
+	RI::AbstractMatrix
+	LR::AbstractMatrix
+	IR::AbstractMatrix
+	RR::AbstractMatrix
+end
+
+@doc """
+	split(A::Matrix, border) -> SplitMatrix
+
+Split `A` into 9 parts:
+4 corners, 4 sides and the internal part. `border` is the width of the
+boundary.
+
+With both the horizontal and the vertical part divided in `L`eft,
+`I`nternal and `R`ight, the parts are
+
+	 ________________ 
+	| LL |  LI  | LR |
+	|____|______|____|
+	|    |      |    |
+	| IL |  II  | IR |
+	|____|______|____|
+	| RL |  RI  | RR |
+	|____|______|____|
+"""->
+function split(A::DenseMatrix, border::Int)
+	@assert border >= 1
+	N = size(A)
+	@assert minimum(N) > 2*border
+
+	Lidx = 1:border
+	I1idx = border+1:N[1]-border
+	R1idx = N[1]-border+1:N[1]
+	I2idx = border+1:N[2]-border
+	R2idx = N[2]-border+1:N[2]
+
+	LL = slice(A, Lidx, Lidx)
+	IL = slice(A, I1idx, Lidx)
+	RL = slice(A, R1idx, Lidx)
+
+	LI = slice(A, Lidx, I2idx)
+	II = slice(A, I1idx, I2idx)
+	RI = slice(A, R1idx, I2idx)
+
+	LR = slice(A, Lidx, R2idx)
+	IR = slice(A, I1idx, R2idx)
+	RR = slice(A, R1idx, R2idx)
+
+	SplitMatrix( LL, IL, RL, LI, II, RI, LR, IR, RR )
 end
 

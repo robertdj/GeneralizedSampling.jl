@@ -9,30 +9,34 @@ Conjugate gradient for normal equations residual method for solving the least sq
 
 The iteration stops when `norm(xnew - xold) < prec` or after at most `maxiter` iterations.
 """->
-function cgnr{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=sqrt(eps()), maxiter=length(x0))
+function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::AbstractVector{T}; prec=sqrt(eps()), maxiter=length(x0))
 	@assert size(A,1) == length(b)
 	@assert size(A,2) == length(x0)
+	@assert prec >= eps()
+	@assert maxiter >= 1
 
 	# Initialize
 	x = copy(x0)
-	r = b - A*x
+	y = A*x
+	r = b - y
 	z = A'*r
 	p = copy(z)
-	tone = one(T)
+	oneT = one(T)
 
 	for iter = 1:maxiter
 		ztz = norm(z)^2
-		mu = ztz / norm(A*p)^2
+		A_mul_B!(y, A, p) # y = A*p
+		mu = ztz / norm(y)^2
 		BLAS.axpy!(mu, p, x) # x = x + mu*p
 		xdiff = mu*norm(p)
 
-		BLAS.gemv!('N', convert(T,-mu), A, p, tone, r) # r = r - mu*A*p
-		z = A'*r
+		BLAS.axpy!(-mu, y, r) # r = r - mu*y
+		Ac_mul_B!(z, A, r) # z = A'*r
 		tau = norm(z)^2 / ztz
 
 		# p = z + tau*p
 		scale!(p, tau)
-		BLAS.axpy!(tone, z, p)
+		BLAS.axpy!(oneT, z, p)
 
 		# Check for convergence: |xnew - xold|
 		if xdiff < prec
@@ -45,42 +49,39 @@ function cgnr{T<:Number}(A::Matrix{T}, b::Vector{T}, x0::Vector{T}; prec=sqrt(ep
 end
 
 @doc """
-	cgnr(T::Freq2wave, b, x0; ...)
+	cgnr(T::Freq2wave, b, x0; ...) -> x
 
-Conjugate gradient for normal equations residual method for `Freq2wave`.
+Conjugate gradient for normal equations residual method for `Freq2Wave`.
 The initial point `x0` must be of the same dimension as `T`.
 """->
-function cgnr{D}(T::Freq2wave{D}, b::Vector{Complex{Float64}}, x0::DenseArray{Complex{Float64},D}; prec=sqrt(eps()), maxiter=length(x0))
+function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=sqrt(eps()), maxiter=length(x0))
 	@assert size(T,1) == length(b)
 	@assert wsize(T) == size(x0)
+	@assert prec >= eps()
+	@assert maxiter >= 1
 
 	# Initialize
 	x = copy(x0)
-
-	y = similar(b)
-	mul!(T, x, y) # y = T*x
+	y = T*x
 	r = b - y
-
-	z = similar(x0)
-	mulT!(T, r, z) # z = T'*r
+	z = T'*r
 	p = copy(z)
-
-	cone = one(Complex{Float64})
+	Cone = one(Complex{Float64})
 
 	for iter = 1:maxiter
 		ztz = vecnorm(z)^2
-		mul!(T, p, y) # y = T*x
+		A_mul_B!(y, T, p) # y = T*p
 		mu = ztz / vecnorm(y)^2
 		BLAS.axpy!(mu, p, x) # x = x + mu*p
 		xdiff = mu*norm(p)
 
 		BLAS.axpy!(-mu, y, r) # r = r - mu*y
-		mulT!(T, r, z) # z = T'*r
+		Ac_mul_B!(z, T, r) # z = T'*r
 		tau = vecnorm(z)^2 / ztz
 
 		# p = z + tau*p
 		scale!(p, tau)
-		BLAS.axpy!(cone, z, p)
+		BLAS.axpy!(Cone, z, p)
 
 		# Check for convergence: |xnew - xold|
 		if xdiff < prec
