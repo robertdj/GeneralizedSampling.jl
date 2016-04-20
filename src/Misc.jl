@@ -48,6 +48,11 @@ function Base.conj!(A::DenseArray{Complex{Float64}}, B::AbstractArray{Complex{Fl
 	return A
 end
 
+@doc """
+	isuniform( points::Matrix ) -> Bool
+
+Test if the rows in the `M`-by-2 matrix `points` are on a uniform 2D grid.
+"""->
 function isuniform{T<:Real}( points::DenseMatrix{T} )
 	M, D = size(points)
 	@assert D == 2
@@ -79,6 +84,7 @@ With even `M` the grid has one extra point on the negative values.
 The points are scaled by `scale` which by default is 1.
 """->
 function grid(M::Int, grid_dist::Real=1)
+	@assert M >= 2
 	@assert grid_dist > 0
 
 	startx = -div(M,2)
@@ -101,6 +107,7 @@ end
 The points are scaled by `scale` which by default is 1.
 """->
 function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1)
+	@assert minimum(M) >= 2
 	@assert grid_dist > 0
 
 	# The points are sorted by the x coordinate
@@ -115,16 +122,18 @@ end
 
 
 @doc """
-	weights(xi, bandwidth)
+	weights(xi, bandwidth) -> Vector
 
 Compute weights for sampling points `xi`.
 
-- For 1D points `xi` must be a vector.
+- For 1D points `xi` must be a vector. The function is faster if `xi` is sorted.
 - For 2D points `xi` must be a matrix with 2 columns.
 """->
-function weights(xi::DenseVector{Float64}, bandwidth::Real)
+function weights(xi::AbstractVector{Float64}, bandwidth::Real)
+	# TODO: Make this function return 1D Voronoi areas?
 	@assert bandwidth > 0
 	@assert maxabs(xi) <= bandwidth
+	@assert (Nx = length(xi)) >= 2
 
 	is_xi_sorted = issorted(xi)
 	if !is_xi_sorted
@@ -133,18 +142,17 @@ function weights(xi::DenseVector{Float64}, bandwidth::Real)
 		xi = xi[sort_idx]
 	end
 
-	N = length(xi)
-	mu = Array(Float64, N)
+	mu = Array(Float64, Nx)
 
 	# Boundary cases
-	L = xi[N] - 2*bandwidth
+	L = xi[Nx] - 2*bandwidth
 	mu[1] = 0.5*(xi[2] - L)
 
 	U = xi[1] + 2*bandwidth
-	mu[N] = 0.5*(U - xi[N])
+	mu[Nx] = 0.5*(U - xi[Nx])
 
 	# Non-boundary cases
-	for n = 2:N-1
+	for n in 2:Nx-1
 		@inbounds mu[n] = 0.5*(xi[n+1] - xi[n-1])
 	end
 
@@ -155,9 +163,9 @@ end
 
 # TODO: Default bandwidth = maxabs(xi)?
 function weights(xi::DenseMatrix{Float64}, bandwidth::Real)
-	# TODO: Which dim is 2?
 	@assert bandwidth > 0
 	@assert size(xi,2) == 2
+	@assert size(xi,1) >= 2
 	@assert maxabs(xi) <= bandwidth
 
 	voronoiarea(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
@@ -165,36 +173,31 @@ end
 
 
 @doc """
-	density(xi, K)
+	density(xi, K) -> δ
 
 Compute the density of the sampling points `xi` with bandwidth `K`:
 
-- In 1D, `xi` must be a vector of *sorted* points and the density is the largest difference between two consecutive points in `xi`.
+- In 1D, `xi` must be a vector and δ is the largest difference between two numerically consecutive points in `xi`.
 - In 2D, `xi` must be an `M-by-2` matrix and the density is the smallest number δ that allows a covering of the "bandwidth area" with circles centered in the points of `xi` and radii δ.
 Currently, the "bandwidth area" is a square centered at the origin and with sidelength `2*K`. 
-"""->
-function density(xi::DenseVector{Float64}, bandwidth::Real)
-	@assert bandwidth > 0
-	# TODO: Remove this assumption; like weights
-	@assert issorted(xi)
-	@assert maxabs(xi) <= bandwidth
 
-	N = length(xi)
-	if xi[1] < -bandwidth || xi[N] > bandwidth
-		error("Bandwidth is not sufficiently big")
-	end
+To ensure numerical stability in computations with the associated change of basis matrix, `xi` must contain both negative and positive elements. 
+"""->
+function density(xi::AbstractVector{Float64}, bandwidth::Real)
+	@assert (minx = minimum(x)) < 0
+	@assert 0 < (maxx = maximum(xi)) <= bandwidth
+	@assert (N = length(xi)) >= 2
 
 	# Boundary cases
-	lower_boundary = xi[N] - 2*bandwidth
-	upper_boundary = xi[1] + 2*bandwidth
-	density = max(xi[1] - lower_boundary, upper_boundary - xi[N])
+	lower_boundary = maxx - 2*bandwidth
+	upper_boundary = minx + 2*bandwidth
+	density = max(minx-lower_boundary, upper_boundary-maxx)
 
 	# Non-boundary cases
-	for n = 2:N
-		@inbounds diff = xi[n] - xi[n-1]
-		if diff > density
-			density = diff
-		end
+	xi_sorted = sort(xi)
+	for n in 2:N
+		@inbounds diff = xi_sorted[n] - xi_sorted[n-1]
+		density = max(density, diff)
 	end
 
 	return density
@@ -202,7 +205,9 @@ end
 
 function density(xi::DenseMatrix{Float64}, bandwidth::Real)
 	@assert bandwidth > 0
+	@assert maxabs(xi) <= bandwidth
 	M, dim = size(xi)
+	@assert M >= 2
 	@assert dim == 2
 
 	# Compute Voronoi tesselation
@@ -219,17 +224,12 @@ function density(xi::DenseMatrix{Float64}, bandwidth::Real)
 
 	# Compute the distance from each xi to the corners of its Voronoi cell
 	density = 0.0
-	for n = 1:length(ind)
+	@inbounds for n in 1:length(ind)
 		idx = ind[n]
-		# Distance^2 from end points of Voronoi edge to one of the xi's 
-		# with this edge
+		# Distance^2 from end points of Voronoi edge to one of the xi's with this edge
 		diff1 = (x1[n] - xi[idx,1])^2 + (y1[n] - xi[idx,2])^2
 		diff2 = (x2[n] - xi[idx,1])^2 + (y2[n] - xi[idx,2])^2
-
-		diff = max(diff1, diff2)
-		if diff > density
-			density = diff
-		end
+		density = max(density, diff1, diff2)
 	end
 
 	return sqrt(density)
@@ -261,13 +261,10 @@ end
 Return `true` if `wavename` is of the form `dbN`, where `N` is an integer.
 """->
 function isdaubechies(wavename::AbstractString)
-	if ishaar(wavename)
-		return true
-	end
+	ishaar(wavename) && return true
 
 	prefix = lowercase(wavename[1:2])
-	N = parse(wavename[3:end])
-	return prefix == "db" && isa( N, Integer )
+	return prefix == "db" && isnumber(wavename[3:end])
 end
 
 @doc """

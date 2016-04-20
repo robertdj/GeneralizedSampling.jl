@@ -10,6 +10,7 @@ import ArrayViews: reshape_view
 const sqrt2 = sqrt(2)
 const SMALL_PREC = eps()
 const LARGE_PREC = sqrt(eps())
+const ComplexOne = one(Complex{Float64})
 
 export
 	# Types
@@ -29,14 +30,18 @@ export
 	collect,
 
 	# misc
+	had!,
+	hadc!,
+	yphad!,
 	isuniform,
+	grid,
 	weights,
+	density,
+
 	wscale,
 	wsize,
-	density,
 	frac,
 	frac!,
-	grid,
 
 
 include("Types.jl")

@@ -4,6 +4,7 @@ using Base.Test
 #=
 Test collecting of Freq2Wave:
 - The Fourier transform of the non-boundary part should be the same in a Freq2NoBoundaryWave and Freq2BoundaryWave
+- TODO: Test the boundary parts
 =#
 
 # ------------------------------------------------------------

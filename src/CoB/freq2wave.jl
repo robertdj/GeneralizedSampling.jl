@@ -500,7 +500,6 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 
 	# Non-uniform samples: Scale observations
 	if !isuniform(T)
-		#= had!(y, get(T.weights)) =#
 		y .*= get(T.weights)
 	end
 
