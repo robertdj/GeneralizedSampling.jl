@@ -95,6 +95,11 @@ function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}; arg
 	return Y
 end
 
+function FourDaubScaling( xi, N::Int; args... )
+	C = ifilter(N)
+	scale!(C, 1/sum(C))
+	FourDaubScaling( xi, C; args... )
+end
 
 @doc """
 	FourDaubWavelet(xi, N[, J, k]; ...)
@@ -144,9 +149,7 @@ function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer
 	if ishaar(wavename)
 		return FourHaarScaling(xi, J, k)
 	elseif isdaubechies(wavename)
-		C = ifilter(van_moment(wavename))
-		scale!(C, 1/sum(C))
-		return FourDaubScaling(xi, C, J, k; args...)
+		return FourDaubScaling(xi, van_moment(wavename), J, k; args...)
 	else
 		error("Fourier transform for this wavelet is not implemented")
 	end
@@ -177,30 +180,25 @@ function UVmat(F::BoundaryFilter)
 	return UV[:,1:vm], UV[:,vm+1:end]
 end
 
+
 @doc """
-	FourDaubScaling( xi, F:::ScalingFilters; ... ) -> Matrix
+	FourDaubScaling( xi, N, side::Char; args... )
 
-The Fourier transform at `xi` of the Daubechies boundary scaling function defined by the filters `F`.
+The Fourier transform at `xi` of the Daubechies boundary scaling function with `N` vanishing moments at the left or right `side` ('L' or 'R').
 """->
-function FourDaubScaling( xi, F::ScalingFilters, side::Char; args... )
-	if side == 'L'
-		B = F.left
-	elseif side == 'R'
-		B = F.right
-	else
-		error("Side must be 'L' or 'R'")
-	end
-
+function FourDaubScaling( xi, N::Integer, side::Char; args... )
+	const B = bfilter(N, side)
 	const U, V = UVmat(B)
-	const C = F.internal / sum(F.internal)
+	C = ifilter(N)
+	scale!(C, 1/sum(C))
 
 	FourDaubScaling( xi, C, U, V; args... )
 end
 
 @doc """
-	FourDaubScaling( xi::Real, C::Vector, U::Matrix, V::Matrix; ... ) -> Complex
+	FourDaubScaling( xi::Real, C::Vector, U::Matrix, V::Matrix; ... ) -> Vector
 
-The Fourier transform at `xi` of a Daubechies boundary scaling function. 
+The Fourier transform at `xi` of all the Daubechies boundary scaling functions. 
 `C` is the vector of coefficients for the internal scaling function.
 `U` and `V` are the matrices calculated from the boundary filter.
 
@@ -215,6 +213,7 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}, U::Matrix{Float64}, V::M
 
 	# The notation is copied directly from the article of Poon & Gataric (see references in docs).
 	# v1(xi) is the vector of desired Fourier transforms and v10 = v1(0)
+	# TODO: These lines are independent of xi. Move to array method?
 	const Vcol = size(V,2)
 	const v20 = ones(Float64, Vcol)
 	const v10 = (eye(U) - U) \ V*v20
@@ -243,6 +242,7 @@ function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, C::Vector{Float64}, U:
 
 	return Y'
 end
+
 
 # ------------------------------------------------------------
 # Dilation and translation. 

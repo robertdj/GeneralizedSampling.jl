@@ -221,9 +221,9 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int; B::Fl
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
-		F = waveparse( wavename, true )
-		const left = cat(3, FourDaubScaling(samplesx, F, 'L'), FourDaubScaling(samplesy, F, 'L') )
-		const right = cat(3, FourDaubScaling(samplesx, F, 'R'), FourDaubScaling(samplesy, F, 'R') )
+		vm = van_moment(wavename)
+		const left = cat(3, FourDaubScaling(samplesx, vm, 'L'), FourDaubScaling(samplesy, vm, 'L') )
+		const right = cat(3, FourDaubScaling(samplesx, vm, 'R'), FourDaubScaling(samplesy, vm, 'R') )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
