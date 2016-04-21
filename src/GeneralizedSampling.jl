@@ -1,16 +1,19 @@
 module GeneralizedSampling
 
-using ArrayViews
 using NFFT
-using RCall # Used for Voronoi computations
+using WaveletPlot
+import WaveletPlot: isuniform, van_moment
 
-import Wavelets: wavelet
+import Deldir: deldir, voronoiarea
+import Wavelets: wavelet, WT
+import ArrayViews: reshape_view
 
 export
 	# Types
-	Freq2wave1D,
-	Freq2wave2D,
-	freq2wave,
+	CoB,
+	Freq2Wave,
+	Freq2BoundaryWave,
+	Freq2NoBoundaryWave,
 
 	# Fourier transforms
 	FourHaarScaling,
@@ -20,25 +23,37 @@ export
 	# Linear equation solvers
 	cgnr,
 
-	# Special multiplication
-	mul!,
-	mulT!,
+	# Special CoB functions
+	freq2wave,
 	collect,
 
 	# misc
 	had!,
+	hadc!,
+	yphad!,
 	isuniform,
+	grid,
 	weights,
+	density,
+	van_moment,
+	isdaubechies,
+	ishaar,
+	hasboundary,
+	dim,
+	split,
 	wscale,
 	wsize,
-	density,
 	frac,
-	frac!,
-	grid
+	frac!
 
+const sqrt2 = sqrt(2)
+# TODO: Rename: SMALL_EPS, LARGE_EPS
+const SMALL_PREC = eps()
+const LARGE_PREC = sqrt(eps())
+const ComplexOne = one(Complex{Float64})
 
-include("types.jl")
-include("misc.jl")
+include("Types.jl")
+include("Misc.jl")
 include("FourierTransforms.jl")
 include("CGNR.jl")
 
