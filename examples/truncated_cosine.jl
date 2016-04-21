@@ -24,19 +24,22 @@ end
 using GeneralizedSampling
 
 J = 6
-N = 2^J
-xi = float( collect(-N+1:N) )
+M = 2^(J+1)
+xi = GeneralizedSampling.grid(M)
 f = ftcos(xi)
 
 T = freq2wave(xi, "Haar", J)
-coef = T \ f
+wcoef = T \ f
 
 
 # ------------------------------------------------------------
 # Plot reconstruction
 
-using PyPlot
+using WaveletPlot
+using Winston
 
-x,y = weval( real(coef), 10 )
-plot(x,y)
+x, yw = weval( real(wcoef), 10 )
+plot(x,yw)
+
+oplot(x, tcos(x), "r-")
 
