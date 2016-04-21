@@ -1,6 +1,8 @@
 #= using GeneralizedSampling =#
 using Base.Test
 
+println("Testing NFFT...")
+
 #=
 Test if the (N)FFT part of a Freq2Wave type behaves like a DFT matrix by
 removing the parts related to wavelets.

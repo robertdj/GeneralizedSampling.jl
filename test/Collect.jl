@@ -1,9 +1,12 @@
-#= using GeneralizedSampling =#
+using GeneralizedSampling
 using Base.Test
+
+println("Testing collection of Freq2Wave type...")
 
 #=
 Test collecting of Freq2Wave:
 - The Fourier transform of the non-boundary part should be the same in a Freq2NoBoundaryWave and Freq2BoundaryWave
+- TODO: Test the boundary parts
 =#
 
 # ------------------------------------------------------------

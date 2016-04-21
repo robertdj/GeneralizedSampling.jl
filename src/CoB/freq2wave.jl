@@ -14,13 +14,7 @@ Make change of basis for switching between frequency responses and wavelets.
 function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Float64=NaN)
 	# TODO: Warning if J is too big
 	# TODO: IS it better with B as a non-optional argument?
-
-	# Fourier transform of the internal scaling function
-	const FT = FourScalingFunc( samples, wavename, J )
-
-	# Diagonal matrix used in 'multiplication' with NFFT
-	# TODO: Multiply with weights (in the 1D case only)?
-	const diag = FT .* cis(-pi*samples)
+	# TODO: Optional arguments to pass to FourScalingFunc
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
@@ -30,6 +24,13 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Fl
 		W = sqrt(weights(samples, B))
 		const W = Nullable(complex( W ))
 	end
+
+	# Fourier transform of the internal scaling function
+	const FT = FourScalingFunc( samples, wavename, J )
+
+	# Diagonal matrix used in 'multiplication' with NFFT
+	# TODO: Multiply with weights (in the 1D case only)?
+	const diag = FT .* cis(-pi*samples)
 
 	# The number of internal wavelets in reconstruction
 	Nint = 2^J
@@ -48,9 +49,9 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Fl
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
-		F = waveparse( wavename, true )
-		const left = FourDaubScaling(samples, F, 'L')
-		const right = FourDaubScaling(samples, F, 'R')
+		const vm = van_moment(wavename)
+		const left = FourDaubScaling(samples, vm, 'L')
+		const right = FourDaubScaling(samples, vm, 'R')
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -72,23 +73,6 @@ Does the wavelet in the change of basis matrix `T` have boundary correction.
 """->
 function hasboundary(T::Freq2Wave)
 	isdefined(T, :left)
-end
-
-@doc """
-	hasboundary(wavename::String) -> Bool
-
-Does the `wavename` scaling function have boundary correction.
-"""->
-function hasboundary(wavename::AbstractString)
-	lowername = lowercase(wavename)
-
-	ishaar(lowername) && return false
-
-	if isdaubechies(lowername)
-		return true
-	else
-		error("Only Daubechies scaling functions are valid")
-	end
 end
 
 
@@ -186,15 +170,6 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int; B::Fl
 	@assert size(samples,2) == 2
 	# TODO: Warning if J is too big
 
-	# Fourier transform of the internal scaling function
-	const FT = FourScalingFunc( samples, wavename, J )
-
-	# Diagonal matrix for multiplication with internal scaling function
-	samplesx = slice(samples, :, 1)
-	samplesy = slice(samples, :, 2)
-	#= const diag = vec(prod(FT,2)) .* cis( -pi*(samplesx + samplesy) ) =#
-	const diag = FT .* cis( -pi*samples )
-
 	# Weights for non-uniform samples
 	if isuniform(samples)
 		const W = Nullable{ Vector{Complex{Float64}} }()
@@ -203,6 +178,12 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int; B::Fl
 		W = sqrt(weights(samples, B))
 		const W = Nullable(complex( W ))
 	end
+
+	# Fourier transform of the internal scaling function
+	const FT = FourScalingFunc( samples, wavename, J )
+
+	# Diagonal matrix for multiplication with internal scaling function
+	const diag = FT .* cis( -pi*samples )
 
 	# The number of internal wavelets in reconstruction
 	Nint = 2^J
@@ -221,9 +202,11 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int; B::Fl
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
-		F = waveparse( wavename, true )
-		const left = cat(3, FourDaubScaling(samplesx, F, 'L'), FourDaubScaling(samplesy, F, 'L') )
-		const right = cat(3, FourDaubScaling(samplesx, F, 'R'), FourDaubScaling(samplesy, F, 'R') )
+		vm = van_moment(wavename)
+		samplesx = slice(samples, :, 1)
+		samplesy = slice(samples, :, 2)
+		const left = cat(3, FourDaubScaling(samplesx, vm, 'L'), FourDaubScaling(samplesy, vm, 'L') )
+		const right = cat(3, FourDaubScaling(samplesx, vm, 'R'), FourDaubScaling(samplesy, vm, 'R') )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -235,7 +218,7 @@ function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWa
 	@assert wsize(T) == size(X)
 
 	NFFT.nfft!(T.NFFT, X, y)
-	for d = 1:D
+	for d in 1:D
 		had!(y, T.diag[:,d])
 	end
 
@@ -401,9 +384,9 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 	end
 
 	# Internal coefficients
-	innerv = vec(prod(T.diag, 2))
-	conj!(innerv)
-	had!(innerv, weigthedV)
+	innerv = copy(weigthedV)
+	hadc!(innerv, T.diag[:,1])
+	hadc!(innerv, T.diag[:,2])
 	NFFT.nfft_adjoint!(T.NFFT, innerv, S.II)
 
 	# Temporary arrays for holding results of the "inner" multiplication.
@@ -500,7 +483,6 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 
 	# Non-uniform samples: Scale observations
 	if !isuniform(T)
-		#= had!(y, get(T.weights)) =#
 		y .*= get(T.weights)
 	end
 
