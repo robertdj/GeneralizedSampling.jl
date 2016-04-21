@@ -1,5 +1,11 @@
-using GeneralizedSampling
+#= using GeneralizedSampling =#
 using Base.Test
+
+println("Testing least squares solver...")
+
+#=
+Test the least squares solvers for Freq2wave types and their collected matrices.
+=#
 
 begin
 	J = 10
@@ -8,64 +14,55 @@ begin
 
 	# Uniform samples
 	xi = float( [-M/2:M/2-1;] )
-	T = freq2wave(xi, "Haar", J)
-	A = collect(T)
+	TU = freq2wave(xi, "Haar", J)
+	AU = collect(TU)
 
-	b = complex(rand(M))
-	x0 = complex(rand(N))
+	b = rand(M)
+	x0 = rand(N)
 
-	x = A \ b
+	x1 = AU \ b
+	x2 = TU \ b
 
-	x1 = cgnr(A, b, x0)
-	x2 = cgnr(T, b, x0)
-
-	#@show norm(x - x1, Inf)
-	#@show norm(x - x2, Inf)
-	@test_approx_eq_eps( x, x1, 1e-5 )
-	@test_approx_eq_eps( x, x2, 1e-5 )
+	#@show norm(x1 - x2, Inf)
+	@test_approx_eq_eps x1 x2 1e-5
 
 
 	# Non-uniform samples: Requires high M/N ratio 
 	K = N/2
 	xi = 2*K*rand(M) - K
 	sort!(xi)
-	T = freq2wave(xi, "Haar", J; B=K)
-	A = collect(T)
+	TNU = freq2wave(xi, "Haar", J; B=K)
+	ANU = collect(TNU)
 	b = rand(M) + rand(M)*im
 
-	z = A \ b;
+	# Avoid weighing b for ANU with "\"
+	z0 = zeros(Complex{Float64}, N)
+	z1 = cgnr( ANU, b, z0 )
+	z2 = cgnr( TNU, b, z0 )
 
-	z1 = cgnr(A, b, x0)
-	z2 = cgnr(T, b, x0)
-
-	#@show norm(z - z1, Inf)
-	#@show norm(z - z2, Inf)
-	@test_approx_eq_eps( z, z1, 1e-5 )
-	@test_approx_eq_eps( z, z2, 1e-4 )
+	#@show norm(z1 - z2, Inf)
+	@test_approx_eq_eps z1 z2 1e-4
 end
 
 # 2D
 begin
-	J = 4
+	J = 5
 	M = 2^(J+1)
 
 	# Uniform samples
-	xi = grid(M, M, 0.5)
-	T = freq2wave(xi, "Haar", J)
-	A = collect(T)
+	xi = grid((M,M), 0.5)
+	TU = freq2wave(xi, "Haar", J; B=K)
+	AU = collect(TU)
+	b = rand(size(TU,1))
 
-	b = complex( rand(size(T,1)) )
-	N = wsize(T)
-	x0 = complex(rand(N))
+	x1 = AU \ b
+	x2 = TU \ b
 
-	x = A \ b
+	#@show norm(x1 - vec(x2), Inf)
+	@test_approx_eq_eps x1 x2 1e-5
 
-	x1 = cgnr(A, b, vec(x0))
-	x2 = cgnr(T, b, x0)
 
-	#@show norm(x - x1, Inf)
-	#@show norm(x - vec(x2), Inf)
-	@test_approx_eq_eps( x, x1, 1e-5 )
-	@test_approx_eq_eps( x, x2, 1e-5 )
+	# Non-uniform samples: Solutions are far from identical. Collected
+	# matrix has *high* condition number
 end
 

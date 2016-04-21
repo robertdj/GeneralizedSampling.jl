@@ -1,6 +1,8 @@
 using GeneralizedSampling
 using Base.Test
 
+println("Testing multiplication with Freq2Wave type...")
+
 #=
 Multiplication with a Freq2Wave element should give the same result as
 multiplication with the collected matrix.
