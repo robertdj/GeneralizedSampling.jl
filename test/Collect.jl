@@ -1,4 +1,4 @@
-#= using GeneralizedSampling =#
+using GeneralizedSampling
 using Base.Test
 
 println("Testing collection of Freq2Wave type...")

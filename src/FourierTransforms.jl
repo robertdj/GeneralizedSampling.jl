@@ -95,7 +95,7 @@ function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}; arg
 end
 
 # TODO: method w/o J and k?
-function FourDaubScaling( xi, N::Int, J::Integer, k::Integer; args... )
+function FourDaubScaling( xi, N::Int, J::Integer=0, k::Integer=0; args... )
 	C = ifilter(N)
 	scale!(C, 1/sum(C))
 	FourDaubScaling( xi, C, J, k; args... )

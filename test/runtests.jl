@@ -2,5 +2,6 @@ include("FourierWavelet.jl")
 include("Collect.jl")
 include("Multiplication.jl")
 include("NFFT.jl")
+include("misc.jl")
+include("Freq2Wave.jl")
 include("CGNR.jl")
-

@@ -12,6 +12,8 @@ export
 	# Types
 	CoB,
 	Freq2Wave,
+	Freq2BoundaryWave,
+	Freq2NoBoundaryWave,
 
 	# Fourier transforms
 	FourHaarScaling,
@@ -33,7 +35,12 @@ export
 	grid,
 	weights,
 	density,
-
+	van_moment,
+	isdaubechies,
+	ishaar,
+	hasboundary,
+	dim,
+	split,
 	wscale,
 	wsize,
 	frac,

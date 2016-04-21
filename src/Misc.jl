@@ -184,7 +184,7 @@ Currently, the "bandwidth area" is a square centered at the origin and with side
 To ensure numerical stability in computations with the associated change of basis matrix, `xi` must contain both negative and positive elements. 
 """->
 function density(xi::AbstractVector{Float64}, bandwidth::Real)
-	@assert (minx = minimum(x)) < 0
+	@assert (minx = minimum(xi)) < 0
 	@assert 0 < (maxx = maximum(xi)) <= bandwidth
 	@assert (N = length(xi)) >= 2
 
@@ -306,7 +306,7 @@ end
 Split `x` into 3 parts:
 Left, internal and right, where left and right are `border` outmost entries.
 """->
-function split(x::DenseVector, border::Int)
+function Base.split(x::DenseVector, border::Int)
 	@assert border >= 1
 	@assert (N = length(x)) > 2*border
 
@@ -348,7 +348,7 @@ With both the horizontal and the vertical part divided in `L`eft,
 	| RL |  RI  | RR |
 	|____|______|____|
 """->
-function split(A::DenseMatrix, border::Int)
+function Base.split(A::DenseMatrix, border::Int)
 	@assert border >= 1
 	N = size(A)
 	@assert minimum(N) > 2*border

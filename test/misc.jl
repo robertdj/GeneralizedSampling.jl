@@ -1,4 +1,4 @@
-#= using GeneralizedSampling =#
+using GeneralizedSampling
 using Base.Test
 
 println("Testing miscellaneous functions...")
@@ -89,7 +89,7 @@ end
 
 # A corner in the "middle" of each quadrant
 xi = [0.5 0.5 ; -0.5 0.5 ; -0.5 -0.5 ; 0.5 -0.5]
-@test_approx_eq density(xi,1) sqrt2/2
+@test_approx_eq density(xi,1) sqrt(2)/2
 
 
 # ------------------------------------------------------------
