@@ -282,6 +282,23 @@ function ishaar(wavename::AbstractString)
 	end
 end
 
+@doc """
+	hasboundary(wavename::String) -> Bool
+
+Does the `wavename` scaling function have boundary correction.
+"""->
+function hasboundary(wavename::AbstractString)
+	lowername = lowercase(wavename)
+
+	ishaar(lowername) && return false
+
+	if isdaubechies(lowername)
+		return true
+	else
+		error("Only Daubechies scaling functions are valid")
+	end
+end
+
 
 @doc """
 	split(x::Vector, border::Int) -> SubVector, SubVector, SubVector

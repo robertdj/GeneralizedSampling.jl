@@ -37,7 +37,6 @@ end
 	feval(xi::Float64, C::Vector{Float64})
 
 *F*ilter *eval*uation at `xi` of the filter `C`, i.e., compute
-the linear combination 
 
 	sum( C[n]*exp(-2*pi*n*xi) )
 """->
@@ -95,10 +94,11 @@ function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}; arg
 	return Y
 end
 
-function FourDaubScaling( xi, N::Int; args... )
+# TODO: method w/o J and k?
+function FourDaubScaling( xi, N::Int, J::Integer, k::Integer; args... )
 	C = ifilter(N)
 	scale!(C, 1/sum(C))
-	FourDaubScaling( xi, C; args... )
+	FourDaubScaling( xi, C, J, k; args... )
 end
 
 @doc """
@@ -122,14 +122,14 @@ function FourDaubWavelet{T<:Real}( xi::T, C::Vector{Float64}; args... )
 	return Y
 end
 
-function FourDaubWavelet{T<:Real}( xi::AbstractArray{T}, N::Integer; args... )
+function FourDaubWavelet{T<:Real}( xi::AbstractArray{T}, N::Integer, J::Integer=0, k::Integer=0; args... )
 	# Filter coefficients
 	C = ifilter(N)
 	scale!(C, 1/sum(C))
 
 	Y = Array(Complex{Float64}, size(xi))
 	for idx in eachindex(xi)
-		@inbounds Y[idx] = FourDaubWavelet( xi[idx], C; args... )
+		@inbounds Y[idx] = FourDaubWavelet( xi[idx], C, J, k; args... )
 	end
 
 	return Y
