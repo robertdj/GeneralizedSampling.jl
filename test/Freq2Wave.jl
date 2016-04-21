@@ -24,10 +24,10 @@ TUB = freq2wave(Usamples, wavename, J)
 # Non-Uniform samples, No Boundary
 K = N/2
 NUsamples = N*rand(M) - K
-TNUNB = freq2wave(NUsamples, "haar", J; B=K)
+TNUNB = freq2wave(NUsamples, "haar", J, K)
 
 # Non-Uniform samples, with Boundary
-TNUB = freq2wave(NUsamples, wavename, J; B=K)
+TNUB = freq2wave(NUsamples, wavename, J, K)
 
 
 # ------------------------------------------------------------

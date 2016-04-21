@@ -2,7 +2,7 @@
 # 1D change of basis matrix
 
 @doc """
-	freq2wave(samples, wavename::String, J::Int; B=0)
+	freq2wave(samples, wavename::String, J::Int, B)
 
 Make change of basis for switching between frequency responses and wavelets.
 
@@ -11,7 +11,7 @@ Make change of basis for switching between frequency responses and wavelets.
 - `J` is the scale of the wavelet transform to reconstruct.
 - `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
 """->
-function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int; B::Float64=NaN)
+function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN)
 	# TODO: Warning if J is too big
 	# TODO: IS it better with B as a non-optional argument?
 	# TODO: Optional arguments to pass to FourScalingFunc
@@ -164,7 +164,7 @@ function wsize(T::Freq2Wave)
 end
 
 
-function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int; B::Float64=NaN)
+function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN)
 	# TODO: Samples as 2-by-M? Faster access to each point
 	M = size(samples, 1)
 	@assert size(samples,2) == 2

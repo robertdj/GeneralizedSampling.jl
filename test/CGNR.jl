@@ -31,7 +31,7 @@ begin
 	K = N/2
 	xi = 2*K*rand(M) - K
 	sort!(xi)
-	TNU = freq2wave(xi, "Haar", J; B=K)
+	TNU = freq2wave(xi, "Haar", J, K)
 	ANU = collect(TNU)
 	b = rand(M) + rand(M)*im
 
@@ -51,7 +51,7 @@ begin
 
 	# Uniform samples
 	xi = grid((M,M), 0.5)
-	TU = freq2wave(xi, "Haar", J; B=K)
+	TU = freq2wave(xi, "Haar", J, K)
 	AU = collect(TU)
 	b = rand(size(TU,1))
 

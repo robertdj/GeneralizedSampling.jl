@@ -66,7 +66,7 @@ begin
 	#= sort!(NUsamples) =#
 
 	# Non-Uniform points, No Boundary
-	TNUNB = freq2wave(NUsamples, "haar", J; B=K)
+	TNUNB = freq2wave(NUsamples, "haar", J, K)
 	ANUNB = collect(TNUNB)
 
 	y1NUNB = TNUNB*x
@@ -81,7 +81,7 @@ begin
 
 
 	# Non-Uniform points, with Boundary
-	TNUB = freq2wave(NUsamples, "db2", J; B=K)
+	TNUB = freq2wave(NUsamples, "db2", J, K)
 	ANUB = collect(TNUB)
 
 	y1NUB = TNUB*x
@@ -147,7 +147,7 @@ begin
 	#= sort!(NUsamples) =#
 
 	# Non-Uniform points, No Boundary
-	TNUNB = freq2wave(NUsamples, "haar", J; B=K)
+	TNUNB = freq2wave(NUsamples, "haar", J, K)
 	ANUNB = collect(TNUNB)
 
 	y1NUNB = TNUNB*x
@@ -162,7 +162,7 @@ begin
 
 
 	# Non-Uniform points, with Boundary
-	TNUB = freq2wave(NUsamples, "db2", J; B=K)
+	TNUB = freq2wave(NUsamples, "db2", J, K)
 	ANUB = collect(TNUB)
 
 	y1NUB = TNUB*x
