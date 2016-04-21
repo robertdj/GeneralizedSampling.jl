@@ -24,7 +24,7 @@ macro common_freq2wave()
 		# Sampling
 		# TODO: Are the parts of samples saved in NFFT sufficient for collect?
 		samples::Array{Float64, D}
-		FT::Array{Complex{Float64}, D}
+		internal::Array{Complex{Float64}, D}
 		weights::Nullable{Vector{Complex{Float64}}}
 
 		# Reconstruction

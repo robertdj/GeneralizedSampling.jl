@@ -21,7 +21,7 @@ begin
 	J = Int(log2(N))
 	T = freq2wave(samples, "haar", J)
 
-	TF = Freq2NoBoundaryWave(T.samples, ones(T.FT), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT)
+	TF = Freq2NoBoundaryWave(T.samples, ones(T.internal), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT)
 	F = collect(TF)
 	B = F'*F / N
 
@@ -39,7 +39,7 @@ begin
 	J = Int(log2(M))
 	T = freq2wave(samples, "haar", J)
 
-	TF = Freq2NoBoundaryWave(T.samples, ones(T.FT), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT)
+	TF = Freq2NoBoundaryWave(T.samples, ones(T.internal), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT)
 	F = collect(TF)
 	N = size(TF,2)
 	B = F'*F / N

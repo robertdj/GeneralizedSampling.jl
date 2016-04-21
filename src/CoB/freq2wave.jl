@@ -85,8 +85,8 @@ function Base.collect(T::Freq2NoBoundaryWave{1})
 	F = Array(Complex{Float64}, M, N)
 	for n = 1:N
 		for m = 1:M
-			@inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
-			#= @inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
+			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
+			#= @inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
 		end
 	end
 
@@ -109,8 +109,8 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	# Internal function
 	for n = vm+1:N-vm
 		for m = 1:M
-			@inbounds F[m,n] = T.FT[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
-			#= @inbounds F[m,n] = W[m]*T.FT[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
+			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
+			#= @inbounds F[m,n] = W[m]*T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
 		end
 	end
 
@@ -528,9 +528,9 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 			idx += 1
 			for m = 1:M
 				#= @inbounds F[m,idx] = T.diag[m]*cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) ) =#
-				#= @inbounds F[m,idx] = T.FT[m,1]*T.FT[m,2]*cis( -2*pi*((nx-1)*T.samples[m,1]/Nx + (ny-1)*T.samples[m,2]/Ny) ) =#
-				# TODO: T.FT -> T.FT'
-				@inbounds F[m,idx] = T.FT[m,1]*T.FT[m,2]*cis( -2*pi*((nx-1)*T.NFFT.x[1,m] + (ny-1)*T.NFFT.x[2,m]) )
+				#= @inbounds F[m,idx] = T.internal[m,1]*T.internal[m,2]*cis( -2*pi*((nx-1)*T.samples[m,1]/Nx + (ny-1)*T.samples[m,2]/Ny) ) =#
+				# TODO: T.internal -> T.internal'
+				@inbounds F[m,idx] = T.internal[m,1]*T.internal[m,2]*cis( -2*pi*((nx-1)*T.NFFT.x[1,m] + (ny-1)*T.NFFT.x[2,m]) )
 			end
 		end
 	end
@@ -580,7 +580,7 @@ function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer
 	const vm = van_moment(T)
 
 	if vm < n <= N-vm
-		@inbounds y = T.FT[m,d]*cis( -2*pi*(n-1)*T.samples[m,d]/N )
+		@inbounds y = T.internal[m,d]*cis( -2*pi*(n-1)*T.samples[m,d]/N )
 	elseif 1 <= n <= vm
 		@inbounds y = T.left[m, n, d]
 	elseif N-vm < n <= N

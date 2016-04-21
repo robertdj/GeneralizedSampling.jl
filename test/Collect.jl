@@ -24,7 +24,7 @@ begin
 
 	# With boundary (using the same internal Fourier transform as above)
 	TMP = freq2wave(samples, "db2", J)
-	Tb = Freq2BoundaryWave(TMP.samples, T.FT, TMP.weights, TMP.J, TMP.wavename, T.diag, TMP.NFFT, TMP.left, TMP.right)
+	Tb = Freq2BoundaryWave(TMP.samples, T.internal, TMP.weights, TMP.J, TMP.wavename, T.diag, TMP.NFFT, TMP.left, TMP.right)
 	Ab = collect(Tb)
 
 	vm = van_moment(Tb)
@@ -49,7 +49,7 @@ begin
 
 	# With boundary (using the same internal Fourier transform as above)
 	TMP = freq2wave(samples, "db2", J)
-	Tb = Freq2BoundaryWave(TMP.samples, T.FT, TMP.weights, TMP.J, TMP.wavename, T.diag, TMP.NFFT, TMP.left, TMP.right)
+	Tb = Freq2BoundaryWave(TMP.samples, T.internal, TMP.weights, TMP.J, TMP.wavename, T.diag, TMP.NFFT, TMP.left, TMP.right)
 	Ab = collect(Tb)
 
 	# Select the indices of the internal scaling functions
