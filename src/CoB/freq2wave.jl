@@ -235,7 +235,7 @@ function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWa
 	@assert wsize(T) == size(X)
 
 	NFFT.nfft!(T.NFFT, X, y)
-	for d = 1:D
+	for d in 1:D
 		had!(y, T.diag[:,d])
 	end
 
