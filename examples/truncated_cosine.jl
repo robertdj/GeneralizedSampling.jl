@@ -2,15 +2,15 @@
 # Truncated cosine and its Fourier transform
 
 function tcos(x::Float64)
-	@assert 0 <= x <= 1
-	x <= 0.5 ? 0.0 : cos(2*pi*x)
+	@assert 0.0 <= x <= 1.0
+	x <= 0.5 ? 0.0 : cos(2.0*pi*x)
 end
 
 function ftcos(xi::Float64)
 	if abs(xi) == 1.0
 		return complex(0.25)
 	else
-		return im*xi*( exp(-2*pi*xi*im) + exp(-pi*xi*im) ) / (2*pi*(xi^2-1))
+		return im*xi*( exp(-2.0*pi*xi*im) + exp(-pi*xi*im) ) / (2.0*pi*(xi^2-1))
 	end
 end
 
