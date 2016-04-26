@@ -6,7 +6,7 @@ import WaveletPlot: isuniform, van_moment
 
 import Deldir: deldir, voronoiarea
 import Wavelets: wavelet, WT
-import ArrayViews: reshape_view
+import ArrayViews: reshape_view, flatten_view
 
 export
 	# Types
@@ -51,6 +51,7 @@ const sqrt2 = sqrt(2)
 const SMALL_PREC = eps()
 const LARGE_PREC = sqrt(eps())
 const ComplexOne = one(Complex{Float64})
+const DoublePi = 2.0*pi
 
 include("Types.jl")
 include("Misc.jl")

@@ -11,9 +11,8 @@ Make change of basis for switching between frequency responses and wavelets.
 - `J` is the scale of the wavelet transform to reconstruct.
 - `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
 """->
-function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN)
-	# TODO: Warning if J is too big
-	# TODO: IS it better with B as a non-optional argument?
+function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+	# TODO: Warning if J is too small
 	# TODO: Optional arguments to pass to FourScalingFunc
 
 	# Weights for non-uniform samples
@@ -26,7 +25,7 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	end
 
 	# Fourier transform of the internal scaling function
-	const FT = FourScalingFunc( samples, wavename, J )
+	const FT = FourScalingFunc( samples, wavename, J; args... )
 
 	# Diagonal matrix used in 'multiplication' with NFFT
 	# TODO: Multiply with weights (in the 1D case only)?
@@ -50,8 +49,8 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
 		const vm = van_moment(wavename)
-		const left = FourDaubScaling(samples, vm, 'L')
-		const right = FourDaubScaling(samples, vm, 'R')
+		const left = FourDaubScaling(samples, vm, J, 'L'; args...)'
+		const right = FourDaubScaling(samples, vm, J, 'R'; args...)'
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -205,8 +204,8 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		vm = van_moment(wavename)
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
-		const left = cat(3, FourDaubScaling(samplesx, vm, 'L'), FourDaubScaling(samplesy, vm, 'L') )
-		const right = cat(3, FourDaubScaling(samplesx, vm, 'R'), FourDaubScaling(samplesy, vm, 'R') )
+		const left = cat(3, FourDaubScaling(samplesx, vm, J, 'L')', FourDaubScaling(samplesy, vm, J, 'L')' )
+		const right = cat(3, FourDaubScaling(samplesx, vm, J, 'R')', FourDaubScaling(samplesy, vm, J, 'R')' )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -476,6 +475,13 @@ function Base.Ac_mul_B(T::Freq2Wave, v::AbstractVector)
 	return z
 end
 
+function Base.(:(\))(T::Freq2Wave, Y::AbstractMatrix)
+	@assert length(Y) == (M = size(T,1))
+
+	y = flatten_view(Y)
+	x = T \ y
+end
+
 function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 	if !isa(y, Array{Complex{Float64}})
 		y = map(Complex{Float64}, y)
@@ -488,7 +494,7 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 
 	# TODO: Exact solution for 2D uniform samples?
 
-	println("Solution via conjugate gradients... ")
+	print("Solution via conjugate gradients... ")
 	# TODO: Better initial guess?
 	x0 = zeros(Complex{Float64}, wsize(T))
 	x = cgnr(T, y, x0)
