@@ -7,7 +7,7 @@
 The Fourier transform of the Haar scaling function on scale `J` and translation `k` evaluated at `xi`.
 If not supplied, `J = 0` and `k = 0`.
 """->
-function FourHaarScaling{T<:Real}(xi::T)
+function FourHaarScaling(xi::Real)
 	if xi == zero(xi)
 		return ComplexOne
 	else
@@ -21,7 +21,7 @@ end
 The Fourier transform of the Haar wavelet on scale `J` and translation `k` evaluated at `xi`.
 If not supplied, `J = 0` and `k = 0`.
 """->
-function FourHaarWavelet{T<:Real}(xi::T)
+function FourHaarWavelet(xi::Real)
 	if xi == zero(xi)
 		return zero(Complex{Float64})
 	else
@@ -164,27 +164,23 @@ end
 	UVmat(F::BoundaryFilter) -> Matrix, Matrix
 
 Return the matrices `U` and `V` used in `FourDaubScaling`.
-This notation is copied directly from the article of Poon & Gataric (see references in docs).
-
-Only intended for internal use!
 """->
-function UVmat(F::BoundaryFilter)
-	const vm = van_moment(F)
+function UVmat(B::BoundaryFilter)
+	const vm = length( bfilter(B,0) ) - 1
 
-	UV = zeros(Float64, vm, 3*vm-1)
+	UV = zeros(Complex{Float64}, vm, 3*vm-1)
 
 	for i in 1:vm
-		@inbounds UV[i, 1:vm+2*i-1] = bfilter(F, i-1) / sqrt2
+		@inbounds UV[i, 1:vm+2*i-1] = bfilter(B, i-1) / sqrt2
 	end
 
 	return UV[:,1:vm], UV[:,vm+1:end]
 end
 
-
 @doc """
-	FourDaubScaling( xi, N, side::Char; args... )
+	FourDaubScaling( xi, N[, J], side::Char; args... )
 
-The Fourier transform at `xi` of the Daubechies boundary scaling function with `N` vanishing moments at the left or right `side` ('L' or 'R').
+The Fourier transform at `xi` of the Daubechies boundary scaling function with `N` vanishing moments at scale `J` at the left or right `side` ('L' or 'R').
 """->
 function FourDaubScaling( xi, N::Integer, side::Char; args... )
 	const B = bfilter(N, side)
@@ -192,7 +188,17 @@ function FourDaubScaling( xi, N::Integer, side::Char; args... )
 	C = ifilter(N)
 	scale!(C, 1/sum(C))
 
-	FourDaubScaling( xi, C, U, V; args... )
+	FourDaubScaling( xi, C, real(U), real(V); args... )
+end
+
+function FourDaubScaling( xi, N::Integer, J::Integer, side::Char; args... )
+	@assert J >= 0
+
+	xi = scale( xi, 2.0^(-J) )
+	y = FourDaubScaling(xi, N, side; args...)
+	scale!( y, sqrt(2.0^(-J)) )
+
+	return y
 end
 
 @doc """
@@ -226,10 +232,80 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}, U::Matrix{Float64}, V::M
 	# v1(xi) \approx U^j*v10 + sum_{l=0}^{j-1} U^l*V*v2(xi/2^{l+1}) 
 	v1 = U^maxcount*v10
 	for l in 0:maxcount-1
-		v1 += U^l*V*v2(xi/2^(l+1))
+		v1 += U^l*V*v2(xi/2.0^(l+1))
 	end
 
 	return v1
+end
+
+function FDS{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char; maxcount=50 )
+	@assert 1 <= maxcount <= 100
+	#=
+	- F is a vector with the Fourier transforms of the boundary scaling
+	function at the current xi
+	- F0 is F at the zero vector
+	- phihat is the Fourier transform of the internal scaling function
+	at the current xi (with different phaseshifts)
+
+	For large j,
+	F(xi) \approx U^j*F0 + sum_{l=0}^{j-1} U^l*V*phihat( xi/2^{l+1} )
+	where U & V are from UVmat
+	=#
+
+	const B = bfilter(N, side)
+	const U, V = UVmat(B)
+	const C = ifilter(N) / sum(ifilter(N))
+
+	const Vcol = size(V,2)
+	const v20 = ones(Float64, Vcol)
+	const F0 = complex( (eye(U) - U) \ V*v20 )
+
+	const vm = size(U,1)
+	const Nxi = length(xi)
+	Y = Array(Complex{Float64}, vm, Nxi)
+
+	# Precompute U^l and U^l*V
+	Upower = Dict{Int, Matrix{Complex{Float64}}}()
+	sizehint!(Upower, maxcount)
+	Upower[0] = eye(U)
+
+	UpowerV = Dict{Int, Matrix{Complex{Float64}}}()
+	sizehint!(UpowerV, maxcount)
+	UpowerV[0] = V
+
+	for l in 1:maxcount
+		Upower[l] = U*Upower[l-1]
+		UpowerV[l] = U*UpowerV[l-1]
+	end
+
+	F = Array(Complex{Float64}, vm)
+	phihat = Array(Complex{Float64}, Vcol)
+
+	for nxi in 1:Nxi
+		current_xi = xi[nxi]
+
+		internal = FourDaubScaling(current_xi, C)
+		fill!(F, zero(Complex{Float64}))
+		for l in 0:maxcount-1
+			current_xi *= 0.5
+			internal = FourDaubScaling(current_xi, C)
+			for k in 0:Vcol-1
+				# TODO: 2pi as a const?
+				phihat[k+1] = internal*cis( -2.0*pi*(vm+k)*current_xi )
+			end
+
+			# F = F + U^l*V*z
+			BLAS.gemv!('N', ComplexOne, UpowerV[l], phihat, ComplexOne, F)
+
+			# TODO: Test for convergence
+		end
+		BLAS.gemv!('N', ComplexOne, Upower[maxcount], F0, ComplexOne, F)
+
+		# TODO: Use copy! ?
+		Y[:,nxi] = F
+	end
+
+	return Y
 end
 
 function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, C::Vector{Float64}, U::Matrix{Float64}, V::Matrix{Float64}; args... )

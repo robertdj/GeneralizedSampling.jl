@@ -40,12 +40,17 @@ function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::Abstrac
 
 		# Check for convergence: |xnew - xold|
 		if xdiff < prec
-			println("Number of iterations: ", iter)
+			println(iter, " iterations")
 			break
 		end
 	end
 
 	return x
+end
+
+function cgnr{D}(T::Freq2Wave{D}, B::AbstractArray{Complex{Float64},D}, x0::AbstractArray{Complex{Float64},D}; args...)
+	b = reshape_view(B, size(T,1))
+	cgnr(T, b, x0; args...)
 end
 
 @doc """
@@ -86,7 +91,7 @@ function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::Abstr
 
 		# Check for convergence: |xnew - xold|
 		if xdiff < prec
-			println("Number of iterations: ", iter)
+			println(iter, " iterations")
 			break
 		end
 	end

@@ -83,7 +83,7 @@ With even `M` the grid has one extra point on the negative values.
 
 The points are scaled by `scale` which by default is 1.
 """->
-function grid(M::Int, grid_dist::Real=1)
+function grid(M::Int, grid_dist::Real=1.0)
 	@assert M >= 2
 	@assert grid_dist > 0
 
@@ -106,7 +106,7 @@ end
 
 The points are scaled by `scale` which by default is 1.
 """->
-function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1)
+function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1.0)
 	@assert minimum(M) >= 2
 	@assert grid_dist > 0
 
