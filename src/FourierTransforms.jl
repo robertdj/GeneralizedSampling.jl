@@ -1,5 +1,5 @@
 # ------------------------------------------------------------
-# Exact Fourier transforms of Haar wavelet/scaling function
+# Exact Fourier transforms of Haar scaling function
 
 @doc """
 	FourHaarScaling(xi[, J, k])
@@ -15,23 +15,9 @@ function FourHaarScaling(xi::Real)
 	end
 end
 
-@doc """
-	FourHaarWavelet(xi[, J, k])
-
-The Fourier transform of the Haar wavelet on scale `J` and translation `k` evaluated at `xi`.
-If not supplied, `J = 0` and `k = 0`.
-"""->
-function FourHaarWavelet(xi::Real)
-	if xi == zero(xi)
-		return zero(Complex{Float64})
-	else
-		return (1.0 - cis(-pi*xi))^2 / (2.0*pi*im*xi)
-	end
-end
-
 
 # ------------------------------------------------------------
-# Fourier transform of Daubechies wavelets
+# Fourier transform of Daubechies scaling functions
 
 @doc """
 	feval(xi::Float64, C::Vector{Float64})
@@ -60,7 +46,8 @@ to control this there are optional arguments:
 - `maxcount`: The maximum number of factors.
 """->
 function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=SMALL_PREC, maxcount=100)
-	# TODO: Make this check optional?
+	# TODO: Move these checks to vector version?
+	# TODO: Assertions in macro?
 	@assert isapprox(sum(C), 1.0)
 	@assert prec >= SMALL_PREC
 	@assert maxcount >= 1
@@ -85,7 +72,7 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=SMALL_PREC, maxcoun
 	return Y
 end
 
-function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}; args... )
+function FourDaubScaling( xi::AbstractArray{Float64}, C::Vector{Float64}; args... )
 	Y = Array(Complex{Float64}, size(xi))
 	for idx in eachindex(xi)
 		@inbounds Y[idx] = FourDaubScaling( xi[idx], C; args... )
@@ -101,39 +88,6 @@ function FourDaubScaling( xi, N::Int, J::Integer=0, k::Integer=0; args... )
 	FourDaubScaling( xi, C, J, k; args... )
 end
 
-@doc """
-	FourDaubWavelet(xi, N[, J, k]; ...)
-
-The Fourier transform of the Daubechies `N` wavelet function evaluated at `xi`.
-`N` is the number of zeros at -1.
-
-The optional arguments are passed to `FourDaubScaling`.
-"""->
-function FourDaubWavelet{T<:Real}( xi::T, C::Vector{Float64}; args... )
-	@assert isapprox(sum(C), 1.0)
-
-	xi /= 2.0
-	Y = FourDaubScaling(xi, C; args...)
-
-	# High pass filter
-	Y *= feval( -xi-0.5, C )
-	Y *= cis( 2*pi*xi )
-
-	return Y
-end
-
-function FourDaubWavelet{T<:Real}( xi::AbstractArray{T}, N::Integer, J::Integer=0, k::Integer=0; args... )
-	# Filter coefficients
-	C = ifilter(N)
-	scale!(C, 1/sum(C))
-
-	Y = Array(Complex{Float64}, size(xi))
-	for idx in eachindex(xi)
-		@inbounds Y[idx] = FourDaubWavelet( xi[idx], C, J, k; args... )
-	end
-
-	return Y
-end
 
 @doc """
 	FourScalingFunc( xi, wavename, J=0, k=0; ... )
@@ -211,10 +165,8 @@ The Fourier transform at `xi` of all the Daubechies boundary scaling functions.
 The optional arguments are the precision `prec` and maximum number of iterations `maxcount`.
 """->
 function FourDaubScaling( xi::Real, C::Vector{Float64}, U::Matrix{Float64}, V::Matrix{Float64}; prec=LARGE_PREC, maxcount=50 )
-	# TODO: Assertions in macro?
 	@assert prec >= SMALL_PREC
 	@assert maxcount >= 1
-	# TODO: Skip this assertion?
 	@assert isapprox(sum(C), 1.0)
 
 	# The notation is copied directly from the article of Poon & Gataric (see references in docs).
@@ -238,7 +190,7 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}, U::Matrix{Float64}, V::M
 	return v1
 end
 
-function FDS{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char; maxcount=50 )
+function FDS{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char; maxcount=40 )
 	@assert 1 <= maxcount <= 100
 	#=
 	- F is a vector with the Fourier transforms of the boundary scaling
@@ -252,19 +204,14 @@ function FDS{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char; maxcount=5
 	where U & V are from UVmat
 	=#
 
-	const B = bfilter(N, side)
-	const U, V = UVmat(B)
+	const U, V = UVmat(bfilter(N, side))
 	const C = ifilter(N) / sum(ifilter(N))
 
-	const Vcol = size(V,2)
-	const v20 = ones(Float64, Vcol)
-	const F0 = complex( (eye(U) - U) \ V*v20 )
+	const F0 = complex( (eye(U) - U) \ vec(sum(V,2)) )
 
-	const vm = size(U,1)
-	const Nxi = length(xi)
-	Y = Array(Complex{Float64}, vm, Nxi)
-
+	# ----------------------------------------
 	# Precompute U^l and U^l*V
+
 	Upower = Dict{Int, Matrix{Complex{Float64}}}()
 	sizehint!(Upower, maxcount)
 	Upower[0] = eye(U)
@@ -278,18 +225,25 @@ function FDS{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char; maxcount=5
 		UpowerV[l] = U*UpowerV[l-1]
 	end
 
+	# ----------------------------------------
+
+	const vm = size(U,1)
+	const Nxi = length(xi)
+	Y = Array(Complex{Float64}, vm, Nxi)
+
+	# Arrays for overwriting
 	F = Array(Complex{Float64}, vm)
-	phihat = Array(Complex{Float64}, Vcol)
+	const Vcol = size(V,2) - 1
+	phihat = Array(Complex{Float64}, Vcol+1)
 
 	for nxi in 1:Nxi
-		current_xi = xi[nxi]
-
-		internal = FourDaubScaling(current_xi, C)
 		fill!(F, zero(Complex{Float64}))
+
+		current_xi = xi[nxi]
 		for l in 0:maxcount-1
 			current_xi *= 0.5
 			internal = FourDaubScaling(current_xi, C)
-			for k in 0:Vcol-1
+			for k in 0:Vcol
 				# TODO: 2pi as a const?
 				phihat[k+1] = internal*cis( -2.0*pi*(vm+k)*current_xi )
 			end
@@ -299,9 +253,9 @@ function FDS{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char; maxcount=5
 
 			# TODO: Test for convergence
 		end
+		# F = F + U^maxcount*F0
 		BLAS.gemv!('N', ComplexOne, Upower[maxcount], F0, ComplexOne, F)
 
-		# TODO: Use copy! ?
 		Y[:,nxi] = F
 	end
 
