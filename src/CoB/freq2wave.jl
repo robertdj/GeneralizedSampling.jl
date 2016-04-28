@@ -2,7 +2,7 @@
 # 1D change of basis matrix
 
 @doc """
-	freq2wave(samples, wavename::String, J::Int, B)
+	freq2wave(samples, wavename::String, J::Int, B; ...)
 
 Make change of basis for switching between frequency responses and wavelets.
 
@@ -10,10 +10,10 @@ Make change of basis for switching between frequency responses and wavelets.
 - `wave` is the name of the wavelet; see documentation for possibilities.
 - `J` is the scale of the wavelet transform to reconstruct.
 - `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
+- Optional arguments (if needed) are passed to the functions computing Fourier transforms.
 """->
 function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	# TODO: Warning if J is too small
-	# TODO: Optional arguments to pass to FourScalingFunc
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
@@ -40,7 +40,7 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
 	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
-	xi = samples/2^J
+	xi = samples*2.0^(-J)
 	frac!(xi)
 	const p = NFFTPlan(xi, Nint)
 
@@ -164,7 +164,6 @@ end
 
 
 function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN)
-	# TODO: Samples as 2-by-M? Faster access to each point
 	M = size(samples, 1)
 	@assert size(samples,2) == 2
 	# TODO: Warning if J is too big
@@ -193,7 +192,7 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
 	xi = samples'
-	scale!(xi, 1/2^J)
+	scale!(xi, 2.0^(-J))
 	frac!(xi)
 	const p = NFFTPlan(xi, (Nint,Nint))
 
@@ -201,11 +200,17 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
-		vm = van_moment(wavename)
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
-		const left = cat(3, FourDaubScaling(samplesx, vm, J, 'L')', FourDaubScaling(samplesy, vm, J, 'L')' )
-		const right = cat(3, FourDaubScaling(samplesx, vm, J, 'R')', FourDaubScaling(samplesy, vm, J, 'R')' )
+
+		vm = van_moment(wavename)
+		leftX = FourDaubScaling(samplesx, vm, J, 'L')
+		leftY = FourDaubScaling(samplesy, vm, J, 'L')
+		const left = cat(3, leftX', leftY' )
+
+		rightX = FourDaubScaling(samplesx, vm, J, 'R')
+		rightY = FourDaubScaling(samplesy, vm, J, 'R')
+		const right = cat(3, rightX', rightY' )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -221,7 +226,7 @@ function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWa
 		had!(y, T.diag[:,d])
 	end
 
-	!isuniform(T) && had!(y, get(T.weights))
+	isuniform(T) || had!(y, get(T.weights))
 
 	return y
 end
@@ -238,11 +243,10 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 	had!(y, T.diag)
 
 	# Update y with boundary contributions
-	const Cone = one(Complex{Float64})
-	BLAS.gemv!('N', Cone, T.left, xleft, Cone, y)
-	BLAS.gemv!('N', Cone, T.right, xright, Cone, y)
+	BLAS.gemv!('N', ComplexOne, T.left, xleft, ComplexOne, y)
+	BLAS.gemv!('N', ComplexOne, T.right, xright, ComplexOne, y)
 
-	!isuniform(T) && had!(y, get(T.weights))
+	isuniform(T) || had!(y, get(T.weights))
 
 	return y
 end
@@ -303,7 +307,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 		yphad!(y, T.right[:,k,2], innery)
 	end
 
-	!isuniform(T) && had!(y, get(T.weights))
+	isuniform(T) || had!(y, get(T.weights))
 
 	return y
 end
@@ -335,7 +339,7 @@ function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundary
 
 	Tdiag = vec(prod(T.diag, 2))
 	conj!(Tdiag)
-	!isuniform(T) && had!(Tdiag, get(T.weights))
+	isuniform(T) || had!(Tdiag, get(T.weights))
 	had!(Tdiag, v)
 
 	NFFT.nfft_adjoint!(T.NFFT, Tdiag, Z)
@@ -492,10 +496,7 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 		y .*= get(T.weights)
 	end
 
-	# TODO: Exact solution for 2D uniform samples?
-
 	print("Solution via conjugate gradients... ")
-	# TODO: Better initial guess?
 	x0 = zeros(Complex{Float64}, wsize(T))
 	x = cgnr(T, y, x0)
 end
@@ -521,20 +522,11 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 	# TODO: Check if the matrix fits in memory
 	F = Array(Complex{Float64}, M, size(T,2))
 
-	#= xsample = T.samples[:,1]/Nx =#
-	#= ysample = T.samples[:,2]/Ny =#
-
-	#= translx = [0:Nx-1;] - Nx/2 =#
-	#= transly = [0:Ny-1;] - Ny/2 =#
 	idx = 0
 	for ny = 1:Ny
-		#= yidx = transly[ny] =#
 		for nx = 1:Nx
-			#= xidx = translx[nx] =#
 			idx += 1
 			for m = 1:M
-				#= @inbounds F[m,idx] = T.diag[m]*cis( -2*pi*(xidx*xsample[m] + yidx*ysample[m]) ) =#
-				#= @inbounds F[m,idx] = T.internal[m,1]*T.internal[m,2]*cis( -2*pi*((nx-1)*T.samples[m,1]/Nx + (ny-1)*T.samples[m,2]/Ny) ) =#
 				# TODO: T.internal -> T.internal'
 				@inbounds F[m,idx] = T.internal[m,1]*T.internal[m,2]*cis( -2*pi*((nx-1)*T.NFFT.x[1,m] + (ny-1)*T.NFFT.x[2,m]) )
 			end
