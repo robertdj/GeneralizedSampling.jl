@@ -1,16 +1,15 @@
-.. GeneralizedSampling.jl documentation master file, created by
-   sphinx-quickstart on Thu Apr 28 14:33:42 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+GeneralizedSampling package
+===========================
 
-Welcome to GeneralizedSampling.jl's documentation!
-==================================================
+The *GeneralizedSampling* package provide numerically robust methods for 
 
-Contents:
+**Contents:**
 
 .. toctree::
    :maxdepth: 2
 
+   starting.rst
+   functions.rst
 
 
 Indices and tables
