@@ -10,12 +10,13 @@ The *GeneralizedSampling* package provide numerically robust methods for
 
    starting.rst
    functions.rst
+   references.rst
 
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. Indices and tables
+.. ==================
+.. 
+.. * :ref:`genindex`
+.. * :ref:`modindex`
+.. * :ref:`search`
 

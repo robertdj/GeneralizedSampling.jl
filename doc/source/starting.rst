@@ -1,3 +1,5 @@
+.. _starting:
+
 Getting Started
 ===============
 
@@ -13,7 +15,7 @@ Background
 When sampling a function/signal, one often has to use a basis that is inferior for reconstruction, i.e., a basis requires a large number of elements to give a decent approximation.
 Think e.g. of the `Gibbs phenomenon <https://en.wikipedia.org/wiki/Gibbs_phenomenon>`_ that occurs when using the Fourier basis for reconstructing discontinuous functions.
 
-Generalized sampling is a general technique for transforming samples of a function wrt. one basis into samples wrt. another basis, i.e., essentially performing a change of basis.
+Generalized sampling is a general technique for transforming samples of a function w.r.t. one basis into samples w.r.t. another basis, i.e., essentially performing a change of basis.
 
 The *GeneralizedSampling* package currently implements transformations from the Fourier to the Wavelet basis on :math:`L^2([0,1])`.
 
