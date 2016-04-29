@@ -84,10 +84,19 @@ Change of basis
 Types
 -----
 
+The abstract change of basis supertype is denoted ``CoB``.
+
+The specific change of basis types implemented are from Fourier to wavelet bases. 
+They are collectively denoted ``Freq2Wave`` and are a subtype of ``CoB``:
+
 .. code-block:: julia
 
-    CoB
     Freq2Wave <: CoB
+
+The computations for wavelets with boundary correction are more involved than for those without and therefore two subtypes of ``Freq2Wave`` are introduced 
+
+.. code-block:: julia
+
     Freq2NoBoundaryWave <: Freq2Wave
     Freq2BoundaryWave <: Freq2Wave
 
