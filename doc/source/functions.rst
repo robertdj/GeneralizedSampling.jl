@@ -10,7 +10,7 @@ Furthermore, the type hierarchy of change of basis objects is introduced.
 .. _allowedwavelets:
 
 Wavelets
-~~~~~~~~
+--------
 
 Currently *GeneralizedSampling* supports reconstruction in Daubechies wavelets/scaling functions.
 As the reconstruction happens on :math:`[0,1]` the functions near the boundaries needs to be modified -- which can happen in multiple ways.
@@ -18,6 +18,8 @@ We have chosen the boundary wavelets from :cite:`Cohen:Daubechies:Vial:1993`, wh
 
 The allowed wavelets are named "haar", "db1", "db2", ..., "db8".
 
+
+.. _CoB:
 
 Change of basis
 ---------------
@@ -80,7 +82,7 @@ Change of basis
 
 
 Types
-~~~~~
+-----
 
 .. code-block:: julia
 
@@ -120,7 +122,7 @@ The ``J`` and ``k`` arguments are the scale and translation, respectively, as ab
 
 .. function:: FourDaubScaling(xi, C, J, k; ...)
 
-    Fourier transform of the Daubechies scaling function defined by the filter vector ``C``..
+    Fourier transform of the Daubechies scaling function defined by the filter vector ``C``.
     The filter ``C`` must sum to 1.
 
 .. function:: FourDaubScaling(xi, N, J, k; ...)
@@ -135,4 +137,42 @@ The ``J`` and ``k`` arguments are the scale and translation, respectively, as ab
 Miscellaneous
 -------------
 
+Functions that are used for internal documentation are not documented here; they all have documentation available from within Julia.
+
+To generate sampling locations from a uniformly spaced grid there are functions in 1D and 2D.
+
+.. function:: grid(M, D)
+
+    Return a vector of ``M`` locations evenly distributed around the origin with distance `D`.
+    By default, ``D = 1``.
+
+.. function:: grid( (M,N), D )
+
+    Return a matrix with 2 columns containing the ``x``- and ``y``-values of a uniformly distributed grid of locations around the origin with distance ``D``. 
+    There are ``M`` different locations in the 1st dimension and ``N`` different locations in the 2nd dimension.
+
+.. function:: isuniform(points)
+
+    Returns ``true`` if ``points`` are located on a uniform grid such as the output from ``grid`` and ``false`` otherwise.
+
+
+For a configuration of sampling locations ``xi`` the density correcting weights and its density are available as
+
+.. function:: weights(xi, K)
+
+.. function:: density(xi, K)
+
+The bandwidth ``K`` is explained in :ref:`CoB` and must be at least ``maxabs(xi)(xi)``.
+
+When dealing with wavelets with boundary corrections, computations differs for the internal and boundary parts.
+To this end, the ``split`` function is available to help divide a vector or matrix of coefficients into the parts related to internal/boundary functions.
+
+.. function:: split(x, B)
+
+    Returns three vector *slices* of the ``B`` leftmost, the internal and the ``B`` rightmost entries of ``x``, respectively.
+
+.. function:: split(A, B)
+
+    Returns slices of the outer parts of ``A`` and its internal parts. 
+    The outer parts are each of the four :math:`B\times B` corners and each of the four non-corner sides (with one dimension equal to ``B``).
 
