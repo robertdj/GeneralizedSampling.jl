@@ -73,7 +73,7 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=SMALL_PREC, maxcoun
 end
 
 function FourDaubScaling( xi::AbstractArray{Float64}, C::Vector{Float64}; args... )
-	Y = Array(Complex{Float64}, size(xi))
+	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
 		@inbounds Y[idx] = FourDaubScaling( xi[idx], C; args... )
 	end
@@ -176,12 +176,12 @@ function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char
 	# ----------------------------------------
 
 	const Nxi = length(xi)
-	Y = Array(Complex{Float64}, N, Nxi)
+	Y = Array{Complex{Float64}}(N, Nxi)
 
 	# Arrays with temporary results
-	F = Array(Complex{Float64}, N)
+	F = Array{Complex{Float64}}(N)
 	const Vcol = size(V,2) - 1
-	phihat = Array(Complex{Float64}, Vcol+1)
+	phihat = Array{Complex{Float64}}(Vcol+1)
 
 	for nxi in 1:Nxi
 		fill!(F, zero(Complex{Float64}))
@@ -225,7 +225,7 @@ end
 
 function FourHaarScaling{T<:Real}( xi::AbstractArray{T}, J::Integer)
 	# TODO: Save 2^-J and do above calculations explicitly?
-	Y = Array(Complex{Float64}, size(xi))
+	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
 		@inbounds Y[idx] = FourHaarScaling( xi[idx], J )
 	end
@@ -234,7 +234,7 @@ function FourHaarScaling{T<:Real}( xi::AbstractArray{T}, J::Integer)
 end
 
 function FourHaarScaling{T<:Real}( xi::AbstractArray{T}, J::Integer, k::Integer)
-	Y = Array(Complex{Float64}, size(xi))
+	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
 		@inbounds Y[idx] = FourHaarScaling( xi[idx], J, k )
 	end
@@ -253,7 +253,7 @@ end
 
 function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}, J::Integer; args... )
 	# TODO: Save 2^-J and do above calculations explicitly?
-	Y = Array(Complex{Float64}, size(xi))
+	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
 		@inbounds Y[idx] = FourDaubScaling( xi[idx], C, J; args... )
 	end
@@ -262,7 +262,7 @@ function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}, J::
 end
 
 function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}, J::Integer, k::Integer; args... )
-	Y = Array(Complex{Float64}, size(xi))
+	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
 		@inbounds Y[idx] = FourDaubScaling( xi[idx], C, J, k; args... )
 	end
@@ -271,7 +271,7 @@ function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}, J::
 end
 
 
-function FourDaubScaling( xi, N::Integer, J::Integer, side::Char; args... )
+function FourDaubScaling( xi, N::Integer, side::Char, J::Integer; args... )
 	@assert J >= 0
 
 	xi *= 2.0^(-J)

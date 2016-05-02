@@ -49,8 +49,9 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
 		const vm = van_moment(wavename)
-		const left = FourDaubScaling(samples, vm, J, 'L'; args...)'
-		const right = FourDaubScaling(samples, vm, J, 'R'; args...)'
+		# TODO: Extend FourScalingFunc
+		const left = FourDaubScaling(samples, vm, 'L', J; args...)'
+		const right = FourDaubScaling(samples, vm, 'R', J; args...)'
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -81,7 +82,7 @@ end
 function Base.collect(T::Freq2NoBoundaryWave{1})
 	M, N = size(T)
 
-	F = Array(Complex{Float64}, M, N)
+	F = Array{Complex{Float64}}(M, N)
 	for n = 1:N
 		for m = 1:M
 			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
@@ -98,7 +99,7 @@ end
 
 function Base.collect(T::Freq2BoundaryWave{1})
 	M, N = size(T)
-	F = Array(Complex{Float64}, M, N)
+	F = Array{Complex{Float64}}(M, N)
 
 	vm = van_moment(T)
 
@@ -204,12 +205,12 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		samplesy = slice(samples, :, 2)
 
 		vm = van_moment(wavename)
-		leftX = FourDaubScaling(samplesx, vm, J, 'L')
-		leftY = FourDaubScaling(samplesy, vm, J, 'L')
+		leftX = FourDaubScaling(samplesx, vm, 'L', J)
+		leftY = FourDaubScaling(samplesy, vm, 'L', J)
 		const left = cat(3, leftX', leftY' )
 
-		rightX = FourDaubScaling(samplesx, vm, J, 'R')
-		rightY = FourDaubScaling(samplesy, vm, J, 'R')
+		rightX = FourDaubScaling(samplesx, vm, 'R', J)
+		rightY = FourDaubScaling(samplesy, vm, 'R', J)
 		const right = cat(3, rightX', rightY' )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
@@ -326,7 +327,7 @@ function Base.(:(*))(T::Freq2Wave, x::DenseArray)
 		x = map(Complex{Float64}, x)
 	end
 
-	y = Array(Complex{Float64}, size(T,1))
+	y = Array{Complex{Float64}}(size(T,1))
 	A_mul_B!(y, T, x)
 
 	return y
@@ -395,9 +396,9 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 	# Temporary arrays for holding results of the "inner" multiplication.
 	# Assuming that T.NFFT.N[1] == T.NFFT.N[2] only one cornercol and
 	# sidecol is needed
-	cornercol = Array(Complex{Float64}, vm)
+	cornercol = Array{Complex{Float64}}(vm)
 	const Nint = size(S.IL,1)
-	sidecol = Array(Complex{Float64}, Nint)
+	sidecol = Array{Complex{Float64}}(Nint)
 
 	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
 	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
@@ -473,7 +474,7 @@ function Base.Ac_mul_B(T::Freq2Wave, v::AbstractVector)
 		v = map(Complex{Float64}, v)
 	end
 
-	z = Array(Complex{Float64}, size(T,2))
+	z = Array{Complex{Float64}}(size(T,2))
 	Ac_mul_B!(z, T, v)
 
 	return z
@@ -520,7 +521,7 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 	const M = size(T,1)
 	const Nx, Ny = wsize(T)
 	# TODO: Check if the matrix fits in memory
-	F = Array(Complex{Float64}, M, size(T,2))
+	F = Array{Complex{Float64}}(M, size(T,2))
 
 	idx = 0
 	for ny = 1:Ny
@@ -544,7 +545,7 @@ function Base.collect(T::Freq2BoundaryWave{2})
 	const M = size(T,1)
 	const Nx, Ny = wsize(T)
 	# TODO: Check if the matrix fits in memory
-	F = Array(Complex{Float64}, M, size(T,2))
+	F = Array{Complex{Float64}}(M, size(T,2))
 
 	idx = 0
 	for ny = 1:Ny

@@ -142,7 +142,7 @@ function weights(xi::AbstractVector{Float64}, bandwidth::Real)
 		xi = xi[sort_idx]
 	end
 
-	mu = Array(Float64, Nx)
+	mu = Array{Float64}(Nx)
 
 	# Boundary cases
 	L = xi[Nx] - 2*bandwidth

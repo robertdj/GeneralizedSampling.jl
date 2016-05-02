@@ -35,6 +35,8 @@ macro common_freq2wave()
 		# In 2D, diagonals for each dimension is needed
 		diag::Array{Complex{Float64}, D}
 		NFFT::NFFT.NFFTPlan{D,Float64}
+
+		# TODO: Include arrays for temporary results in multiplication like NFFT.tmpVec?
 	end)
 end
 
