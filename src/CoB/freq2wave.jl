@@ -50,8 +50,10 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	else
 		const vm = van_moment(wavename)
 		# TODO: Extend FourScalingFunc
-		const left = FourDaubScaling(samples, vm, 'L', J; args...)'
-		const right = FourDaubScaling(samples, vm, 'R', J; args...)'
+		left = FourDaubScaling(samples, vm, 'L', J; args...)'
+		right = FourDaubScaling(samples, vm, 'R', J; args...)'
+		phase_shift = cis( -twoπ*xi )
+		broadcast!(*, right, right, phase_shift)
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -167,7 +169,7 @@ end
 function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN)
 	M = size(samples, 1)
 	@assert size(samples,2) == 2
-	# TODO: Warning if J is too big
+	# TODO: Warning if J is too big compared to M and B
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
@@ -209,9 +211,15 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		leftY = FourDaubScaling(samplesy, vm, 'L', J)
 		const left = cat(3, leftX', leftY' )
 
-		rightX = FourDaubScaling(samplesx, vm, 'R', J)
-		rightY = FourDaubScaling(samplesy, vm, 'R', J)
-		const right = cat(3, rightX', rightY' )
+		# TODO: In loop?
+		rightX = FourDaubScaling(samplesx, vm, 'R', J)'
+		phase_shift = cis( -twoπ*samplesx )
+		broadcast!(*, rightX, rightX, phase_shift)
+
+		rightY = FourDaubScaling(samplesy, vm, 'R', J)'
+		phase_shift = cis( -twoπ*samplesy )
+		broadcast!(*, rightY, rightY, phase_shift)
+		const right = cat(3, rightX, rightY )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -426,6 +434,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 		# The LI and RI component should be transposed in order to copy
 		# sidecol results in-place. 
 		# TODO: Can ReshapedArrays help with this (when they are ready)?
+		# TODO: Try home-made unsafe_copy!
 		#= BLAS.blascopy!( Nint, sidecol, 1, S.LI, vm ) =#
 		#= copy!( S.LI, 1+(k-1)*vm, sidecol, 1, vm ) =#
 		for n in 1:Nint
