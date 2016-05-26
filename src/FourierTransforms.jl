@@ -20,24 +20,25 @@ end
 # Fourier transform of Daubechies scaling functions
 
 @doc """
-	feval(xi::Float64, C::Vector{Float64})
+	feval(xi::Float64, C::Vector{Float64}, offset)
 
 *F*ilter *eval*uation at `xi` of the filter `C`, i.e., compute
 
-	sum( C[n]*exp(-2*pi*n*xi) )
+	sum( C[n]*exp(-2*pi*(offset+n)*xi) )
 """->
-function feval(xi::Float64, C::Vector{Float64})
-	y = zero(Complex{Float64})
+function feval(xi::Float64, C::Vector{Float64}, offset::Integer)
+	y = ComplexZero
 	for n in 1:length(C)
-		@inbounds y += C[n]*cis(-2.0*pi*(n-1)*xi)
+		@inbounds y += C[n]*cis(-twoπ*(offset+n)*xi)
 	end
 	return y
 end
 
 @doc """
-	FourDaubScaling(xi, C; ...)
+	FourDaubScaling(xi, C [, p]; ...)
 
 The Fourier transform of the Daubechies scaling function with filter `C` evaluated at `xi`. 
+`p` is the lower bound of `C`'s support minus 1, which by default is 0.
 
 The function is computed as an 'infinite' product;
 to control this there are optional arguments:
@@ -45,7 +46,7 @@ to control this there are optional arguments:
 - `prec`: Include factors that are numerically smaller than 1-prec.
 - `maxcount`: The maximum number of factors.
 """->
-function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=SMALL_PREC, maxcount=100)
+function FourDaubScaling( xi::Real, C::Vector{Float64}, p::Integer=0; prec=SMALL_PREC, maxcount=100)
 	# TODO: Move these checks to vector version?
 	# TODO: Assertions in macro?
 	@assert isapprox(sum(C), 1.0)
@@ -53,12 +54,12 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=SMALL_PREC, maxcoun
 	@assert maxcount >= 1
 
 	const almost1 = 1.0 - prec
-	const half = 0.5*one(xi)
+	const half = 0.5
 	Y = ComplexOne
 	count = 1
 	while count <= maxcount
 		xi *= 0.5
-		y = feval(xi, C)
+		y = feval(xi, C, p)
 		Y *= y
 
 		# Convergence check: |y(xi) - 1| is small for small xi. But y is
@@ -72,20 +73,11 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}; prec=SMALL_PREC, maxcoun
 	return Y
 end
 
-function FourDaubScaling( xi::AbstractArray{Float64}, C::Vector{Float64}; args... )
-	Y = Array{Complex{Float64}}(size(xi))
-	for idx in eachindex(xi)
-		@inbounds Y[idx] = FourDaubScaling( xi[idx], C; args... )
-	end
-
-	return Y
-end
-
 # TODO: method w/o J and k?
-function FourDaubScaling( xi, N::Int, J::Integer=0, k::Integer=0; args... )
-	C = ifilter(N)
+function FourDaubScaling( xi, p::Integer, J::Integer=0, k::Integer=0; offset::Integer=-p, args... )
+	C = coef( ifilter(p) )
 	scale!(C, 1/sum(C))
-	FourDaubScaling( xi, C, J, k; args... )
+	FourDaubScaling( xi, C, J, k; offset=offset, args... )
 end
 
 
@@ -103,6 +95,7 @@ function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer
 	if ishaar(wavename)
 		return FourHaarScaling(xi, J, k)
 	elseif isdaubechies(wavename)
+		# TODO: offset as an argument to this function?
 		return FourDaubScaling(xi, van_moment(wavename), J, k; args...)
 	else
 		error("Fourier transform for this wavelet is not implemented")
@@ -111,7 +104,7 @@ function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer
 end
 
 
-# ------------------------------------------------------------
+# ------------------------------------------------------------------------
 # Fourier transform of Daubechies boundary wavelets
 
 @doc """
@@ -120,7 +113,7 @@ end
 Return the matrices `U` and `V` used in `FourDaubScaling` for boundary scaling functions.
 """->
 function UVmat(B::BoundaryFilter)
-	const vm = length(B)
+	const vm = van_moment(B)
 
 	UV = zeros(Complex{Float64}, vm, 3*vm-1)
 
@@ -132,17 +125,19 @@ function UVmat(B::BoundaryFilter)
 end
 
 @doc """
-	FourDaubScaling( xi, N[, J], side::Char; args... ) -> Matrix
+	FourDaubScaling( xi, p [, J], side::Char; args... ) -> Matrix
 
-The Fourier transform at `xi` of the Daubechies boundary scaling function with `N` vanishing moments at scale `J` at the left or right `side` ('L' or 'R').
+The Fourier transform at `xi` of the Daubechies boundary scaling function with `p` vanishing moments at scale `J` at the left or right `side` ('L' or 'R').
 
-The output is an `N`-by-`length(xi)` matrix where column `j` holds the Fourier transform of the `N` boundary functions at `xi[j]`.
+The output is an `p`-by-`length(xi)` matrix where column `j` holds the Fourier transform of the `p` boundary functions at `xi[j]`.
 """->
-function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char; maxcount=40 )
+function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, p::Integer, side::Char; maxcount=40 )
+	# TODO: Check the phaseshifts of the interior functions
+	# TODO: Filters of the interior functions
 	@assert 1 <= maxcount <= 100
 	#=
 	- F is a vector with the Fourier transforms of the boundary scaling
-	function at the current xi
+	functions at the current xi
 	- F0 is F at the zero vector
 	- phihat is the Fourier transform of the internal scaling function
 	at the current xi (with different phaseshifts)
@@ -152,8 +147,9 @@ function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char
 	where U & V are from UVmat
 	=#
 
-	const U, V = UVmat(bfilter(N, side))
-	const C = ifilter(N) / sum(ifilter(N))
+	const U, V = UVmat(bfilter(p, side))
+	C = coef(ifilter(p, true))
+	scale!(C, 1/sum(C))
 
 	const F0 = complex( (eye(U) - U) \ vec(sum(V,2)) )
 
@@ -176,29 +172,31 @@ function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, N::Integer, side::Char
 	# ----------------------------------------
 
 	const Nxi = length(xi)
-	Y = Array{Complex{Float64}}(N, Nxi)
+	Y = Array{Complex{Float64}}(p, Nxi)
 
 	# Arrays with temporary results
-	F = Array{Complex{Float64}}(N)
-	const Vcol = size(V,2) - 1
-	phihat = Array{Complex{Float64}}(Vcol+1)
+	F = Array{Complex{Float64}}(p)
+	phi_phase = collect(( side == 'L' ? -(p:1.0:3*p-2) : 1+(p:1.0:3*p-2) ))
+	scale!(phi_phase, twoπ)
+	Nphihat = length(phi_phase)
+	phihat = Array{Complex{Float64}}(Nphihat)
 
 	for nxi in 1:Nxi
-		fill!(F, zero(Complex{Float64}))
+		fill!(F, ComplexZero)
 
 		current_xi = xi[nxi]
 		for l in 0:maxcount-1
 			current_xi *= 0.5
-			internal = FourDaubScaling(current_xi, C)
-			for k in 0:Vcol
-				# TODO: 2pi as a const?
-				phihat[k+1] = internal*cis( -2.0*pi*(N+k)*current_xi )
+			internal = FourDaubScaling(current_xi, C, -p)
+			for m in 1:Nphihat
+				@inbounds phihat[m] = internal*cis( phi_phase[m]*current_xi )
 			end
 
-			# F = F + U^l*V*z
+			# F = F + U^l*V*phihat
 			BLAS.gemv!('N', ComplexOne, UpowerV[l], phihat, ComplexOne, F)
 
 			# TODO: Test for convergence after each pass through the loop?
+			# http://julialang.org/blog/2013/09/fast-numeric for |F-Fold|^2
 		end
 		# F = F + U^maxcount*F0
 		BLAS.gemv!('N', ComplexOne, Upower[maxcount], F0, ComplexOne, F)
@@ -220,7 +218,7 @@ function FourHaarScaling(xi::Real, J::Integer)
 end
 
 function FourHaarScaling(xi::Real, J::Integer, k::Integer)
-	cis( -2.0*pi*2.0^(-J)*k*xi ) * FourHaarScaling(xi, J)
+	cis( -twoπ*2.0^(-J)*k*xi ) * FourHaarScaling(xi, J)
 end
 
 function FourHaarScaling{T<:Real}( xi::AbstractArray{T}, J::Integer)
@@ -243,6 +241,7 @@ function FourHaarScaling{T<:Real}( xi::AbstractArray{T}, J::Integer, k::Integer)
 end
 
 
+#=
 function FourDaubScaling(xi::Real, C::Vector{Float64}, J::Integer; args...)
 	sqrt(2.0^(-J)) * FourDaubScaling(2.0^(-J)*xi, C; args...)
 end
@@ -250,32 +249,45 @@ end
 function FourDaubScaling(xi::Real, C::Vector{Float64}, J::Integer, k::Integer; args...)
 	cis( -2.0*pi*2.0^(-J)*k*xi ) * FourDaubScaling(xi, C, J; args...)
 end
+=#
 
-function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}, J::Integer; args... )
-	# TODO: Save 2^-J and do above calculations explicitly?
+function FourDaubScaling( xi::AbstractArray{Float64}, C::Vector{Float64}; offset::Integer=-div(length(C),2), args... )
 	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
-		@inbounds Y[idx] = FourDaubScaling( xi[idx], C, J; args... )
+		@inbounds Y[idx] = FourDaubScaling( xi[idx], C, offset; args... )
 	end
 
 	return Y
 end
 
-function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}, J::Integer, k::Integer; args... )
+function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}, J::Integer; offset::Integer=-div(length(C),2), args... )
+	dilation = 2.0^(-J)
+	scale_factor = sqrt(dilation)
 	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
-		@inbounds Y[idx] = FourDaubScaling( xi[idx], C, J, k; args... )
+		@inbounds Y[idx] = scale_factor*FourDaubScaling( dilation*xi[idx], C, offset; args... )
+	end
+
+	return Y
+end
+
+function FourDaubScaling{T<:Real}( xi::AbstractArray{T}, C::Vector{Float64}, J::Integer, k::Integer; offset::Integer=-div(length(C),2), args... )
+	dilation = 2.0^(-J)
+	scale_factor = sqrt(dilation)
+	Y = Array{Complex{Float64}}(size(xi))
+	for idx in eachindex(xi)
+		@inbounds Y[idx] = cis(-twoπ*dilation*k*xi[idx]) * scale_factor * FourDaubScaling( dilation*xi[idx], C, offset; args... )
 	end
 
 	return Y
 end
 
 
-function FourDaubScaling( xi, N::Integer, side::Char, J::Integer; args... )
+function FourDaubScaling( xi, p::Integer, side::Char, J::Integer; args... )
 	@assert J >= 0
 
 	xi *= 2.0^(-J)
-	y = FourDaubScaling(xi, N, side; args...)
+	y = FourDaubScaling(xi, p, side; args...)
 	scale!( y, sqrt(2.0^(-J)) )
 
 	return y
