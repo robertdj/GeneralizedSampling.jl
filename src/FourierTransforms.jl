@@ -73,13 +73,6 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}, p::Integer=0; prec=SMALL
 	return Y
 end
 
-# TODO: method w/o J and k?
-function FourDaubScaling( xi, p::Integer, J::Integer=0, k::Integer=0; offset::Integer=-p, args... )
-	C = coef( ifilter(p) )
-	scale!(C, 1/sum(C))
-	FourDaubScaling( xi, C, J, k; offset=offset, args... )
-end
-
 
 @doc """
 	FourScalingFunc( xi, wavename, J=0, k=0; ... )
@@ -98,7 +91,7 @@ function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer
 		# TODO: offset as an argument to this function?
 		return FourDaubScaling(xi, van_moment(wavename), J, k; args...)
 	else
-		error("Fourier transform for this wavelet is not implemented")
+		error(string("Fourier transform for ", wavename, " is not implemented"))
 	end
 
 end
@@ -250,6 +243,13 @@ function FourDaubScaling(xi::Real, C::Vector{Float64}, J::Integer, k::Integer; a
 	cis( -2.0*pi*2.0^(-J)*k*xi ) * FourDaubScaling(xi, C, J; args...)
 end
 =#
+
+# TODO: method w/o J and k?
+function FourDaubScaling( xi, p::Integer, J::Integer=0, k::Integer=0; offset::Integer=-p, args... )
+	C = coef( ifilter(p) )
+	scale!(C, 1/sum(C))
+	FourDaubScaling( xi, C, J, k; offset=offset, args... )
+end
 
 function FourDaubScaling( xi::AbstractArray{Float64}, C::Vector{Float64}; offset::Integer=-div(length(C),2), args... )
 	Y = Array{Complex{Float64}}(size(xi))
