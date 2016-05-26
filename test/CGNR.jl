@@ -1,19 +1,58 @@
-using GeneralizedSampling
+#= using GeneralizedSampling =#
 using Base.Test
 
 println("Testing least squares solver...")
 
 #=
-Test the least squares solvers for Freq2wave types and their collected matrices.
+Test the least squares solvers:
+- Solution with Freq2Wave and the collected version should be identical.
+- When sampling from a scaling function used in the Freq2Wave type, the solution should be a unit vector.
 =#
 
+
+# ------------------------------------------------------------
+# Reconstruct unit vector
+
+function unit(length::Integer, entry::Integer)
+	u = zeros(Complex{Float64}, length)
+	u[entry] = one(Complex{Float64})
+	return u
+end
+
+J = 3
+M = 2^(J+1)
+N = 2^J
+xi = grid(M, 0.5)
+wavename = "db2"
+vm = van_moment(wavename)
+T = freq2wave(xi, wavename, J)
+
+for k = 1:N
+	if k <= vm
+		F = FourDaubScaling(xi, vm, 'L', J)
+		f = F[k,:]'
+	elseif k > N-vm
+		F = FourDaubScaling(xi, vm, 'R', J)
+		f = F[N+1-k,:]'
+	else
+		f = FourDaubScaling(xi, vm, J, k-1)
+	end
+	y = T \ f
+
+	@show norm( y - unit(length(y),k) )
+	#@test_approx_eq_eps y unit(length(y),k+1) 1e-5
+end
+
+# ------------------------------------------------------------
+
+#=
 begin
 	J = 10
 	M = 2^(J+2)
 	N = 2^J
 
 	# Uniform samples
-	xi = float( [-M/2:M/2-1;] )
+	xi = grid(M, 0.5)
 	TU = freq2wave(xi, "Haar", J)
 	AU = collect(TU)
 
@@ -36,7 +75,7 @@ begin
 	b = rand(M) + rand(M)*im
 
 	# Avoid weighing b for ANU with "\"
-	z0 = zeros(Complex{Float64}, N)
+	z0 = zeros{Complex{Float64}}(N)
 	z1 = cgnr( ANU, b, z0 )
 	z2 = cgnr( TNU, b, z0 )
 
@@ -61,8 +100,13 @@ begin
 	#@show norm(x1 - vec(x2), Inf)
 	@test_approx_eq_eps x1 x2 1e-5
 
+	# Avoid weighing b for ANU with "\"
+	z0 = zeros{Complex{Float64}}(N)
+	z1 = cgnr( ANU, b, z0 )
+	z2 = cgnr( TNU, b, z0 )
 
 	# Non-uniform samples: Solutions are far from identical. Collected
 	# matrix has *high* condition number
 end
+=#
 

@@ -59,7 +59,7 @@ end
 Conjugate gradient for normal equations residual method for `Freq2Wave`.
 The initial point `x0` must be of the same dimension as `T`.
 """->
-function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=LARGE_PREC, maxiter=length(x0))
+function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=LARGE_PREC, maxiter=max(length(x0),50))
 	# TODO: Assertions in macro?
 	@assert size(T,1) == length(b)
 	@assert wsize(T) == size(x0)
