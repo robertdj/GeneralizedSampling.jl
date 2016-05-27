@@ -1,5 +1,5 @@
 using GeneralizedSampling
-import WaveletPlot: inner, ifilter
+import WaveletPlot: coef, inner, l2norm, ifilter
 using Base.Test
 
 println("Testing Fourier transforms...")
@@ -21,25 +21,24 @@ xi = randn(10)
 # ------------------------------------------------------------
 # Internal scaling functions
 
-# For N == 2 and k == 1 the inner product is only accurate within 3
-# decimals. For all other N/k combinations it is better.
+# For p == 2 and k == 1 the inner product is only accurate within 3
+# decimals. For all other p/k combinations it is better (as expected due
+# to the low regularity of that scaling function)
 EPS = 1e-3
 
-for N in 2:8
-	C = ifilter(N)
+for p in 2:8
+	C = coef(ifilter(p))
 	scale!(C, 1/sum(C))
 
 	x = linspace(-7,7,1001)
 	y = FourDaubScaling(x, C)
+	#@show l2norm(x, y)
+	@test_approx_eq_eps l2norm(x,y) 1.0 EPS
 
-	for k in 0:N+1
+	for k in 1:p+1
 		z = FourDaubScaling(x, C, 0, k)
-		I = inner(x, y, z)
-		if k == 0
-			@test_approx_eq_eps I 1.0 EPS
-		else
-			@test_approx_eq_eps I 0.0 EPS
-		end
+		#@show inner(x, y, z)
+		@test_approx_eq_eps inner(x, y, z) 0.0 EPS
 	end
 end
 
@@ -47,34 +46,32 @@ end
 # ------------------------------------------------------------
 # Boundary scaling functions
 
-# Large integration intervals are needed; instead a low precision is accepted.
+# In some cases a low precision is needed
 EPS = 1e-1
-# TODO: Right side boundary scaling functions seem to require a *huge* interval
-#= for side = ['L'; 'R'] =#
-	side = 'L'
-	for N = 3:8
-		if N == 3
-			x = linspace(-50,50,2001)
-		else 
-			x = linspace(-30,30,2001)
-		end
+for side = ['L'; 'R']
+	for p = 2:8
+		x = linspace(-15,15,3001)
 
-		Y = FourDaubScaling(x, N, side)
+		Y = FourDaubScaling(x, p, side)
+		for l in 1:p
+			#@show p, l, l2norm(x, vec(Y[l,:]))
+			@test_approx_eq_eps l2norm(x, vec(Y[l,:])) 1.0 EPS
 
-		for k in 1:N
 			# Boundary-boundary
-			I = inner(x, Y[:,1], Y[:,k])
-			if k == 1
-				@test_approx_eq_eps I 1.0 EPS
-			else
-				@test_approx_eq_eps I 0.0 EPS
+			for k in l+1:p
+				IP = inner(x, vec(Y[l,:]), vec(Y[k,:]))
+				#@show p, k, IP
+				@test_approx_eq_eps IP 0.0 EPS
 			end
 
-			# Boundary-internal
-			C = ifilter(N)
+			# Boundary-internal for appropriate translation of internal
+			C = coef(ifilter(p))
 			scale!(C, 1/sum(C))
-			@test_approx_eq_eps inner(x, Y[:,k], FourDaubScaling(x, C)) 0.0 EPS
+			transl = (side == 'L' ? p : -p-1 )
+			IP = inner(x, vec(Y[l,:]), FourDaubScaling(x, p, 0, transl))
+			#@show p, l, IP
+			@test_approx_eq_eps IP 0.0 EPS
 		end
 	end
-#= end =#
+end
 

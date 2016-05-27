@@ -54,13 +54,13 @@ begin
 
 	# Select the indices of the internal scaling functions
 	vm = van_moment(Tb)
-	I = zeros(Bool, wsize(T))
-	S = split(I,vm)
+	J = zeros(Bool, wsize(T))
+	S = split(J,vm)
 	for idx in eachindex(S.II)
 		S.II[idx] = true
 	end
 
-	# @show norm( A[:,vec(I)] - Ab[:,vec(I)] )
-	@test_approx_eq A[:,vec(I)] Ab[:,vec(I)]
+	#@show norm( A[:,vec(J)] - Ab[:,vec(J)] )
+	@test_approx_eq A[:,vec(J)] Ab[:,vec(J)]
 end
 

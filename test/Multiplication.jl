@@ -144,7 +144,6 @@ begin
 	# Non-uniform points
 	K = N/2 # bandwidth
 	NUsamples = N*rand(M^2,2) - K
-	#= sort!(NUsamples) =#
 
 	# Non-Uniform points, No Boundary
 	TNUNB = freq2wave(NUsamples, "haar", J, K)

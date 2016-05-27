@@ -1,4 +1,4 @@
-#= using GeneralizedSampling =#
+using GeneralizedSampling
 using Base.Test
 
 println("Testing NFFT...")
