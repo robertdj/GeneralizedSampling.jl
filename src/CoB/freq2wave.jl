@@ -51,8 +51,11 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 		const vm = van_moment(wavename)
 		# TODO: Extend FourScalingFunc
 		left = FourDaubScaling(samples, vm, 'L', J; args...)'
+		# TODO: The right scaling functions are indexed "opposite": The
+		# function closest to the boundary is first and the function
+		# furthest from the boundary is last.
 		right = FourDaubScaling(samples, vm, 'R', J; args...)'
-		phase_shift = cis( -twoπ*xi )
+		phase_shift = cis( -twoπ*samples )
 		broadcast!(*, right, right, phase_shift)
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
@@ -506,7 +509,7 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 		y .*= get(T.weights)
 	end
 
-	print("Solution via conjugate gradients... ")
+	#print("Solution via conjugate gradients... ")
 	x0 = zeros(Complex{Float64}, wsize(T))
 	x = cgnr(T, y, x0)
 end
