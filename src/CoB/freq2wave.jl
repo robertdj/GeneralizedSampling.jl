@@ -54,14 +54,8 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
-		# TODO: Extend FourScalingFunc
-		left = FourDaubScaling(samples, vm, 'L', J; args...)'
-		# TODO: The right scaling functions are indexed "opposite": The
-		# function closest to the boundary is first and the function
-		# furthest from the boundary is last.
-		right = FourDaubScaling(samples, vm, 'R', J; args...)'
-		phase_shift = cis( -twoπ*samples )
-		broadcast!(*, right, right, phase_shift)
+		left = FourScalingFunc( samples, wavename, 'L', J; args... )
+		right = FourScalingFunc( samples, wavename, 'R', J; args... )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end
@@ -225,20 +219,13 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
 
-		vm = van_moment(wavename)
-		leftX = FourDaubScaling(samplesx, vm, 'L', J)
-		leftY = FourDaubScaling(samplesy, vm, 'L', J)
-		const left = cat(3, leftX', leftY' )
+		leftX = FourScalingFunc( samplesx, wavename, 'L', J; args... )
+		leftY = FourScalingFunc( samplesy, wavename, 'L', J; args... )
+		left = cat(3, leftX, leftY )
 
-		# TODO: In loop?
-		rightX = FourDaubScaling(samplesx, vm, 'R', J)'
-		phase_shift = cis( -twoπ*samplesx )
-		broadcast!(*, rightX, rightX, phase_shift)
-
-		rightY = FourDaubScaling(samplesy, vm, 'R', J)'
-		phase_shift = cis( -twoπ*samplesy )
-		broadcast!(*, rightY, rightY, phase_shift)
-		const right = cat(3, rightX, rightY )
+		rightX = FourDaubScaling(samplesx, vm, 'R', J)
+		rightY = FourDaubScaling(samplesy, vm, 'R', J)
+		right = cat(3, rightX, rightY )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
 	end

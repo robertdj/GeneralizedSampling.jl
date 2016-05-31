@@ -96,6 +96,38 @@ function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer
 
 end
 
+@doc """
+	FourScalingFunc( xi, wavename, side, J=0; ... )
+
+Compute the Fourier transform at `xi` of the boundary scaling function `wavename` with scale `J`.
+Optional arguments are passed to the Fourier transform of `wavename` (if relevant).
+
+For a vector `xi` of length `M`, the output is a matrix of size `M`-by-`p`, where `p` is the number of vanishing moments for wavename.
+
+**Note**: 
+For `side == 'L'` the *first* column of the output is related to the function closest to the left boundary, 
+but for `side == 'R'` the *last* column is related to the function closest to the right boundary.
+Furthermore, the right side functions are translated such that the right endpoint of their support is 1.
+
+This behavior is not shared with the lower lever functions for Fourier transforms.
+"""->
+function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0; args... )
+	@assert J >= 0 "Scale must be a non-negative integer"
+
+	if !isdaubechies(wavename)
+		error(string("Fourier transform for ", wavename, " is not implemented"))
+	end
+
+	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...)'
+
+	if side == 'R'
+		phase_shift = cis( -twoπ*xi )
+		broadcast!(*, Y, Y, phase_shift)
+	end
+
+	return Y
+end
+
 
 # ------------------------------------------------------------------------
 # Fourier transform of Daubechies boundary wavelets
