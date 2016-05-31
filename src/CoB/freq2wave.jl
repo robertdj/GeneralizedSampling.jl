@@ -279,6 +279,8 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 	# dimension of X
 	innery = similar(y)
 
+	# TODO: Am I using the correct order for the right boundary?
+
 	# Update y with border and side contributions
 	# Fourier transform of the internal functions using 1D NFFT
 	# TODO: Include these "1D" NFFT's in NFFT package?
@@ -554,17 +556,23 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 end
 
 function Base.collect(T::Freq2BoundaryWave{2})
-	const M = size(T,1)
-	const Nx, Ny = wsize(T)
+	M = size(T,1)
+	Nx, Ny = wsize(T)
 	# TODO: Check if the matrix fits in memory
 	F = Array{Complex{Float64}}(M, size(T,2))
 
+	phix = ComplexZero
+	phiy = ComplexZero
+
+	p = van_moment(T)
 	idx = 0
-	for ny = 1:Ny
-		for nx = 1:Nx
+	for ny in 1:Ny
+		for nx in 1:Nx
 			idx += 1
-			for m = 1:M
-				@inbounds F[m,idx] = FourScaling(T, m, (nx,ny))
+			for m in 1:M
+				unsafe_FourScaling!(phix, T, m, nx, Nx, 1, p)
+				unsafe_FourScaling!(phiy, T, m, ny, Ny, 2, p)
+				@inbounds F[m,idx] = phix * phiy
 			end
 		end
 	end
@@ -581,28 +589,15 @@ end
 
 Fourier transform of the `n`'th basis function at the `d`'th coordinate at the `m`'th frequency.
 """->
-function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Integer, d::Integer)
-	# TODO: Prefix this function with unsafe_ and skip all checks
-	# TODO: The majority of the time is spent in the following 4 lines
-	#= const M = size(T,1) =#
-	#= @assert 1 <= m <= M =#
-	const N = wsize(T)[d]
-	#= @assert 1 <= n <= N =#
-	const vm = van_moment(T)
+function unsafe_FourScaling!(y, T::Freq2BoundaryWave{2}, m::Integer, n::Integer, N::Integer, d::Integer, p::Integer)
 
-	if vm < n <= N-vm
-		@inbounds y = T.internal[m,d]*cis( -2*pi*(n-1)*T.samples[m,d]/N )
-	elseif 1 <= n <= vm
+	if p < n <= N-p
+		@inbounds y = T.internal[m,d]*cis( -twoπ*(n-1)*T.samples[m,d]/N )
+	elseif 1 <= n <= p
 		@inbounds y = T.left[m, n, d]
-	elseif N-vm < n <= N
-		@inbounds y = T.right[m, n-N+vm, d]
+	else
+		@inbounds y = T.right[m, N-n+1, d]
 	end
-
-	return y
-end
-
-function FourScaling(T::Freq2BoundaryWave{2}, m::Integer, n::Tuple{Integer,Integer})
-	FourScaling(T,m,n[1],1) * FourScaling(T,m,n[2],2)
 end
 
 

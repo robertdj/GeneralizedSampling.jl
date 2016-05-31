@@ -1,8 +1,8 @@
 module GeneralizedSampling
 
 using NFFT
-using WaveletPlot
-import WaveletPlot: isuniform, van_moment
+using IntervalWavelets
+import IntervalWavelets: isuniform, van_moment
 
 import Deldir: deldir, voronoiarea
 import Wavelets: wavelet, WT
@@ -16,8 +16,8 @@ export
 	Freq2NoBoundaryWave,
 
 	# Fourier transforms
+	FourScalingFunc,
 	FourHaarScaling,
-	FourHaarWavelet,
 	FourDaubScaling,
 
 	# Linear equation solvers
@@ -51,8 +51,11 @@ const sqrt2 = sqrt(2)
 const SMALL_PREC = eps()
 const LARGE_PREC = sqrt(eps())
 const ComplexOne = one(Complex{Float64})
-const DoublePi = 2.0*pi
+const ComplexZero = zero(Complex{Float64})
+# TODO: Import from StatsFun?
+const twoπ = 2.0*pi
 
+# TODO: Case conflict with types.jl
 include("Types.jl")
 include("Misc.jl")
 include("FourierTransforms.jl")

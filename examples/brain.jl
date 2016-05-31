@@ -31,7 +31,7 @@ w = fftshift(wcoef)
 # ------------------------------------------------------------
 # Plot reconstruction
 
-using WaveletPlot, Winston
+using IntervalWavelets, Winston
 
 y = weval( abs(w), 10 )
 

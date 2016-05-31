@@ -1,5 +1,5 @@
 using GeneralizedSampling
-import WaveletPlot: coef, inner, l2norm, ifilter
+import IntervalWavelets: coef, inner, l2norm, ifilter
 using Base.Test
 
 println("Testing Fourier transforms...")
