@@ -159,10 +159,14 @@ The size of the reconstructed wavelet coefficients.
 - When `D` == 1, the output is (Int,)
 - When `D` == 2, the output is (Int,Int)
 """->
-function wsize(T::Freq2Wave)
+function wsize(T::Freq2Wave{1})
+	hasboundary(T) ? (2^wscale(T),) : (T.NFFT.N,)
+end
+
+function wsize(T::Freq2Wave{2})
 	if hasboundary(T)
 		N = 2^wscale(T)
-		return dim(T) == 1 ? (N,) : (N, N)
+		return (N, N)
 	else
 		return T.NFFT.N
 	end
@@ -556,24 +560,21 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 end
 
 function Base.collect(T::Freq2BoundaryWave{2})
-	M = size(T,1)
-	Nx, Ny = wsize(T)
+	const M = size(T,1)
+	const Nx, Ny = wsize(T)
 	# TODO: Check if the matrix fits in memory
 	F = Array{Complex{Float64}}(M, size(T,2))
 
-	phix = ComplexZero
-	phiy = ComplexZero
+	phix = Array{Complex{Float64}}(M)
+	phiy = similar(phix)
 
-	p = van_moment(T)
 	idx = 0
-	for ny in 1:Ny
-		for nx in 1:Nx
-			idx += 1
-			for m in 1:M
-				unsafe_FourScaling!(phix, T, m, nx, Nx, 1, p)
-				unsafe_FourScaling!(phiy, T, m, ny, Ny, 2, p)
-				@inbounds F[m,idx] = phix * phiy
-			end
+	for ny = 0:Ny-1
+		unsafe_FourScaling!(phiy, T, ny, 2)
+		for nx = 0:Nx-1
+			unsafe_FourScaling!(phix, T, nx, 1)
+			had!(phix, phiy)
+			F[:,idx+=1] = phix
 		end
 	end
 
@@ -584,19 +585,22 @@ function Base.collect(T::Freq2BoundaryWave{2})
 	return F
 end
 
-@doc """
-	FourScaling(T::Freq2Wave{2}, d::Integer, m::Integer, n::Integer) -> Number
+function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave{2}, n::Integer, d::Integer)
+	M = length(phi)
+	N = wsize(T)[d]
+	p = van_moment(T)
 
-Fourier transform of the `n`'th basis function at the `d`'th coordinate at the `m`'th frequency.
-"""->
-function unsafe_FourScaling!(y, T::Freq2BoundaryWave{2}, m::Integer, n::Integer, N::Integer, d::Integer, p::Integer)
-
-	if p < n <= N-p
-		@inbounds y = T.internal[m,d]*cis( -twoπ*(n-1)*T.samples[m,d]/N )
-	elseif 1 <= n <= p
-		@inbounds y = T.left[m, n, d]
+	if p <= n < N-p
+		for m in 1:M
+			@inbounds phi[m] = T.internal[m,d]*cis( -twoπ*n*T.samples[m,d]/N )
+		end
+	elseif 0 <= n < p
+		# Total offset = dimension offset + column offset
+		so = (d-1)*M*p + n*M + 1
+		unsafe_copy!( phi, 1, T.left, so, M ) 
 	else
-		@inbounds y = T.right[m, N-n+1, d]
+		so = (d-1)*M*p + (n-N+p)*M + 1
+		unsafe_copy!( phi, 1, T.right, so, M ) 
 	end
 end
 
