@@ -46,11 +46,11 @@ to control this there are optional arguments:
 - `prec`: Include factors that are numerically smaller than 1-prec.
 - `maxcount`: The maximum number of factors.
 """->
-function FourDaubScaling( xi::Real, C::Vector{Float64}, p::Integer=0; prec=SMALL_PREC, maxcount=100)
+function FourDaubScaling( xi::Real, C::Vector{Float64}, p::Integer=0; prec=SMALL_EPS, maxcount=100)
 	# TODO: Move these checks to vector version?
 	# TODO: Assertions in macro?
 	@assert isapprox(sum(C), 1.0)
-	@assert prec >= SMALL_PREC
+	@assert prec >= SMALL_EPS
 	@assert maxcount >= 1
 
 	const almost1 = 1.0 - prec

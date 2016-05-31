@@ -47,9 +47,8 @@ export
 	frac!
 
 const sqrt2 = sqrt(2)
-# TODO: Rename: SMALL_EPS, LARGE_EPS
-const SMALL_PREC = eps()
-const LARGE_PREC = sqrt(eps())
+const SMALL_EPS = eps()
+const LARGE_EPS= sqrt(eps())
 const ComplexOne = one(Complex{Float64})
 const ComplexZero = zero(Complex{Float64})
 # TODO: Import from StatsFun?

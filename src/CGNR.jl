@@ -9,10 +9,10 @@ Conjugate gradient for normal equations residual method for solving the least sq
 
 The iteration stops when `norm(xnew - xold) < prec` or after at most `maxiter` iterations.
 """->
-function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::AbstractVector{T}; prec=LARGE_PREC, maxiter=length(x0))
+function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::AbstractVector{T}; prec=LARGE_EPS, maxiter=length(x0))
 	@assert size(A,1) == length(b)
 	@assert size(A,2) == length(x0)
-	@assert prec >= SMALL_PREC
+	@assert prec >= SMALL_EPS
 	@assert maxiter >= 1
 
 	# Initialize
@@ -40,7 +40,6 @@ function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::Abstrac
 
 		# Check for convergence: |xnew - xold|
 		if xdiff < prec
-			println(iter, " iterations")
 			break
 		end
 	end
@@ -49,6 +48,7 @@ function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::Abstrac
 end
 
 function cgnr{D}(T::Freq2Wave{D}, B::AbstractArray{Complex{Float64},D}, x0::AbstractArray{Complex{Float64},D}; args...)
+	# TODO: flatten_view?
 	b = reshape_view(B, size(T,1))
 	cgnr(T, b, x0; args...)
 end
@@ -59,11 +59,11 @@ end
 Conjugate gradient for normal equations residual method for `Freq2Wave`.
 The initial point `x0` must be of the same dimension as `T`.
 """->
-function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=LARGE_PREC, maxiter=max(length(x0),50))
+function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=LARGE_EPS, maxiter=max(length(x0),50))
 	# TODO: Assertions in macro?
 	@assert size(T,1) == length(b)
 	@assert wsize(T) == size(x0)
-	@assert prec >= SMALL_PREC
+	@assert prec >= SMALL_EPS
 	@assert maxiter >= 1
 
 	# Initialize
@@ -91,7 +91,6 @@ function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::Abstr
 
 		# Check for convergence: |xnew - xold|
 		if xdiff < prec
-			println(iter, " iterations")
 			break
 		end
 	end
