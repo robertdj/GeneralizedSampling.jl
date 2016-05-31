@@ -13,13 +13,21 @@ Make change of basis for switching between frequency responses and wavelets.
 - Optional arguments (if needed) are passed to the functions computing Fourier transforms.
 """->
 function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
-	# TODO: Warning if J is too small
+	vm = van_moment(wavename)
+	Nint = 2^J
+	@assert Nint >= 2*vm-1 "Scale it not large enough for this wavelet"
+	
+	# TODO: Good condition?
+	if Nint >= length(samples)
+		warn("The scale is high compared to the number of samples")
+	end
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
 		const W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
+		Nint > 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
 		const W = Nullable(complex( W ))
 	end
@@ -28,11 +36,9 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	const FT = FourScalingFunc( samples, wavename, J; args... )
 
 	# Diagonal matrix used in 'multiplication' with NFFT
-	# TODO: Multiply with weights (in the 1D case only)?
 	const diag = FT .* cis(-pi*samples)
 
 	# The number of internal wavelets in reconstruction
-	Nint = 2^J
 	if hasboundary(wavename)
 		Nint -= 2*van_moment(wavename)
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
@@ -48,7 +54,6 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	if !hasboundary(wavename)
 		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
 	else
-		const vm = van_moment(wavename)
 		# TODO: Extend FourScalingFunc
 		left = FourDaubScaling(samples, vm, 'L', J; args...)'
 		# TODO: The right scaling functions are indexed "opposite": The
@@ -174,15 +179,23 @@ end
 
 
 function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN)
+	vm = van_moment(wavename)
+	Nint = 2^J
+	@assert Nint >= 2*vm-1 "Scale it not large enough for this wavelet"
 	M = size(samples, 1)
 	@assert size(samples,2) == 2
-	# TODO: Warning if J is too big compared to M and B
+
+	# TODO: Good condition?
+	if Nint >= M
+		warn("The scale is high compared to the number of samples")
+	end
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
 		const W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
+		Nint > 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
 		const W = Nullable(complex( W ))
 	end
@@ -194,7 +207,6 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 	const diag = FT .* cis( -pi*samples )
 
 	# The number of internal wavelets in reconstruction
-	Nint = 2^J
 	if hasboundary(wavename)
 		Nint -= 2*van_moment(wavename)
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
@@ -541,13 +553,14 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 	# TODO: Check if the matrix fits in memory
 	F = Array{Complex{Float64}}(M, size(T,2))
 
+	phi = prod(T.internal, 2)
+
 	idx = 0
-	for ny = 1:Ny
-		for nx = 1:Nx
+	for ny = 0:Ny-1
+		for nx = 0:Nx-1
 			idx += 1
 			for m = 1:M
-				# TODO: T.internal -> T.internal'
-				@inbounds F[m,idx] = T.internal[m,1]*T.internal[m,2]*cis( -2*pi*((nx-1)*T.NFFT.x[1,m] + (ny-1)*T.NFFT.x[2,m]) )
+				@inbounds F[m,idx] = phi[m]*cis( -twoπ*(nx*T.NFFT.x[1,m] + ny*T.NFFT.x[2,m]) )
 			end
 		end
 	end
@@ -585,6 +598,11 @@ function Base.collect(T::Freq2BoundaryWave{2})
 	return F
 end
 
+@doc """
+	unsafe_FourScaling!(phi, T::Freq2BoundaryWave{2}, n::Int, d::Int)
+
+Replace `phi` with the `n`'th "column" from dimension `d` of `T`.
+"""->
 function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave{2}, n::Integer, d::Integer)
 	M = length(phi)
 	N = wsize(T)[d]
@@ -595,7 +613,7 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 			@inbounds phi[m] = T.internal[m,d]*cis( -twoπ*n*T.samples[m,d]/N )
 		end
 	elseif 0 <= n < p
-		# Total offset = dimension offset + column offset
+		# source offset = dimension offset + column offset
 		so = (d-1)*M*p + n*M + 1
 		unsafe_copy!( phi, 1, T.left, so, M ) 
 	else
