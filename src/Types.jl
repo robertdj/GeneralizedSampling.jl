@@ -22,8 +22,6 @@ abstract Freq2Wave{D} <: CoB
 macro common_freq2wave()
 	esc(quote
 		# Sampling
-		# TODO: Are the parts of samples saved in NFFT sufficient for collect?
-		samples::Array{Float64, D}
 		internal::Array{Complex{Float64}, D}
 		weights::Nullable{Vector{Complex{Float64}}}
 

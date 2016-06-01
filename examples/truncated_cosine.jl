@@ -2,18 +2,22 @@
 # Truncated cosine and its Fourier transform
 
 function tcos(x)
-	@assert 0.0 <= x <= 1.0
-	x <= 0.5 ? 0.0 : cos(2.0*pi*x)
+	if 0.5 <= x <= 1.0
+		return cos(2.0*pi*x)
+	else
+		return 0.0
+	end
 end
 
 function ftcos(xi)
 	if abs(xi) == 1.0
 		return complex(0.25)
 	else
-		return im*xi*( exp(-2.0*pi*xi*im) + exp(-pi*xi*im) ) / (2.0*pi*(xi^2-1.0))
+		return im*xi*( exp(-2.0*pi*xi*im) + exp(-pi*xi*im) ) / (2.0*pi*(xi^2 - 1.0))
 	end
 end
 
+# Overload tcos and ftcos to vector input
 @vectorize_1arg Float64 tcos
 @vectorize_1arg Float64 ftcos
 
@@ -23,12 +27,13 @@ end
 
 using GeneralizedSampling
 
-JJ = 6
-M = 2^(JJ+1)
+J = 6
+M = 2^(J+1)
+# Both GeneralizedSampling and Winston (below) has a grid function
 xi = GeneralizedSampling.grid(M)
 f = ftcos(xi)
 
-T = freq2wave(xi, "haar", JJ)
+T = freq2wave(xi, "db2", J)
 wcoef = T \ f
 
 
@@ -38,7 +43,8 @@ wcoef = T \ f
 using IntervalWavelets
 using Winston
 
-x, yw = weval( real(wcoef), 10 )
+#= x, yw = weval( real(wcoef), 10 ) =#
+x, yw = weval( real(wcoef), 2, 10 )
 plot(x,yw)
 
 oplot(x, tcos(x), "r-")

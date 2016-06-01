@@ -27,7 +27,7 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 		const W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
-		Nint > 2*B || warn("The scale is high compared to the bandwidth")
+		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
 		const W = Nullable(complex( W ))
 	end
@@ -89,8 +89,7 @@ function Base.collect(T::Freq2NoBoundaryWave{1})
 	F = Array{Complex{Float64}}(M, N)
 	for n = 1:N
 		for m = 1:M
-			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
-			#= @inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
+			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) )
 		end
 	end
 
@@ -113,8 +112,7 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	# Internal function
 	for n = vm+1:N-vm
 		for m = 1:M
-			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
-			#= @inbounds F[m,n] = W[m]*T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
+			@inbounds F[m,n] = W[m]*T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) )
 		end
 	end
 
@@ -159,7 +157,7 @@ The size of the reconstructed wavelet coefficients.
 - When `D` == 2, the output is (Int,Int)
 """->
 function wsize(T::Freq2Wave{1})
-	hasboundary(T) ? (2^wscale(T),) : (T.NFFT.N,)
+	hasboundary(T) ? (2^wscale(T),) : T.NFFT.N
 end
 
 function wsize(T::Freq2Wave{2})
@@ -172,7 +170,7 @@ function wsize(T::Freq2Wave{2})
 end
 
 
-function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN)
+function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
 	Nint = 2^J
 	@assert Nint >= 2*vm-1 "Scale it not large enough for this wavelet"
@@ -189,7 +187,7 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		const W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
-		Nint > 2*B || warn("The scale is high compared to the bandwidth")
+		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
 		const W = Nullable(complex( W ))
 	end
@@ -223,8 +221,8 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		leftY = FourScalingFunc( samplesy, wavename, 'L', J; args... )
 		left = cat(3, leftX, leftY )
 
-		rightX = FourDaubScaling(samplesx, vm, 'R', J)
-		rightY = FourDaubScaling(samplesy, vm, 'R', J)
+		rightX = FourScalingFunc( samplesx, wavename, 'R', J; args... )
+		rightY = FourScalingFunc( samplesy, wavename, 'R', J; args... )
 		right = cat(3, rightX, rightY )
 
 		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
@@ -514,7 +512,6 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 		y .*= get(T.weights)
 	end
 
-	#print("Solution via conjugate gradients... ")
 	x0 = zeros(Complex{Float64}, wsize(T))
 	x = cgnr(T, y, x0)
 end
@@ -597,7 +594,7 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 
 	if p <= n < N-p
 		for m in 1:M
-			@inbounds phi[m] = T.internal[m,d]*cis( -twoπ*n*T.samples[m,d]/N )
+			@inbounds phi[m] = T.internal[m,d]*cis( -twoπ*n*T.NFFT.x[d,m]/N )
 		end
 	elseif 0 <= n < p
 		# source offset = dimension offset + column offset
@@ -614,7 +611,7 @@ end
 # Common
 
 function Base.size(T::Freq2Wave, ::Type{Val{1}})
-	size(T.samples, 1)
+	size(T.internal, 1)
 end
 
 function Base.size{D}(T::Freq2Wave{D}, ::Type{Val{2}})
