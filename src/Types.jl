@@ -33,8 +33,6 @@ macro common_freq2wave()
 		# In 2D, diagonals for each dimension is needed
 		diag::Array{Complex{Float64}, D}
 		NFFT::NFFT.NFFTPlan{D,Float64}
-
-		# TODO: Include arrays for temporary results in multiplication like NFFT.tmpVec?
 	end)
 end
 
@@ -43,11 +41,37 @@ immutable Freq2NoBoundaryWave{D} <: Freq2Wave{D}
 	@common_freq2wave()
 end
 
+macro bound(D)
+	if D == 1
+		left::DenseMatrix{Complex{Float64}}
+		right::DenseMatrix{Complex{Float64}}
+	else
+		left::DenseArray{Complex{Float64}, 3}
+		right::DenseArray{Complex{Float64}, 3}
+	end
+end
+
 # Uniform samples, boundary correction
 immutable Freq2BoundaryWave{D} <: Freq2Wave{D}
 	@common_freq2wave()
-	left::Array{Complex{Float64}}
-	right::Array{Complex{Float64}}
+	left::DenseArray{Complex{Float64}}
+	right::DenseArray{Complex{Float64}}
+	#= if D == 1 =#
+	#= 	left::DenseMatrix{Complex{Float64}} =#
+	#= 	right::DenseMatrix{Complex{Float64}} =#
+	#= else =#
+	#= 	left::DenseArray{Complex{Float64}, 3} =#
+	#= 	right::DenseArray{Complex{Float64}, 3} =#
+	#= end =#
+
+	# TODO: Include arrays for temporary results in multiplication like NFFT.tmpVec?
+	innery::Vector{Complex{Float64}}
+end
+
+function Freq2BoundaryWave{D}(internal::Array{Complex{Float64},D}, weights, J, wavename, diag, NFFT, left, right)
+	innery = Array{Complex{Float64}}( size(internal,1) )
+
+	Freq2BoundaryWave( internal, weights, J, wavename, diag, NFFT, left, right, innery )
 end
 
 

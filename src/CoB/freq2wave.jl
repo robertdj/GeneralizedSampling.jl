@@ -52,12 +52,12 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave(FT, W, J, wavename, diag, p)
 	else
 		left = FourScalingFunc( samples, wavename, 'L', J; args... )
 		right = FourScalingFunc( samples, wavename, 'R', J; args... )
 
-		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave(FT, W, J, wavename, diag, p, left, right)
 	end
 end
 
@@ -212,7 +212,7 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave(FT, W, J, wavename, diag, p)
 	else
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
@@ -225,7 +225,7 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		rightY = FourScalingFunc( samplesy, wavename, 'R', J; args... )
 		right = cat(3, rightX, rightY )
 
-		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave(FT, W, J, wavename, diag, p, left, right)
 	end
 end
 
@@ -247,7 +247,7 @@ end
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::DenseVector{Complex{Float64}})
 	@assert size(T,1) == length(y)
-	@assert (Nx = size(T,2)) == length(x)
+	@assert size(T,2) == length(x)
 
 	xleft, xint, xright = split(x, van_moment(T))
 
@@ -268,8 +268,9 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 	@assert size(T,1) == length(y)
 	@assert wsize(T) == size(X)
 	
-	const vm = van_moment(T)
-	const S = split(X, vm)
+	# TODO: Remove once T.left is type stable
+	vm = van_moment(T)::Int64
+	S = split(X, vm)
 
 	# Internal scaling function
 	NFFT.nfft!(T.NFFT, S.II, y)
@@ -278,7 +279,6 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 
 	# The non-internal contribution have a multiplication from each
 	# dimension of X
-	innery = similar(y)
 
 	# TODO: Am I using the correct order for the right boundary?
 
@@ -289,37 +289,37 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
 		# LL
-		A_mul_B!( innery, T.left[:,:,1], S.LL[:,k] )
-		yphad!(y, T.left[:,k,2], innery)
+		A_mul_B!( T.innery, T.left[:,:,1], S.LL[:,k] )
+		yphad!(y, T.left[:,k,2], T.innery)
 		# LR
-		A_mul_B!( innery, T.left[:,:,1], S.LR[:,k] )
-		yphad!(y, T.right[:,k,2], innery)
+		A_mul_B!( T.innery, T.left[:,:,1], S.LR[:,k] )
+		yphad!(y, T.right[:,k,2], T.innery)
 		# RL
-		A_mul_B!( innery, T.right[:,:,1], S.RL[:,k] )
-		yphad!(y, T.left[:,k,2], innery)
+		A_mul_B!( T.innery, T.right[:,:,1], S.RL[:,k] )
+		yphad!(y, T.left[:,k,2], T.innery)
 		# RR
-		A_mul_B!( innery, T.right[:,:,1], S.RR[:,k] )
-		yphad!(y, T.right[:,k,2], innery)
+		A_mul_B!( T.innery, T.right[:,:,1], S.RR[:,k] )
+		yphad!(y, T.right[:,k,2], T.innery)
 
 		# LI
-		NFFT.nfft!(p2, vec(S.LI[k,:]), innery) # DFT part of internal
-		had!(innery, T.diag[:,2]) # Fourier transform of internal
-		yphad!(y, T.left[:,k,1], innery) # Contribution from left
+		NFFT.nfft!(p2, vec(S.LI[k,:]), T.innery) # DFT part of internal
+		had!(T.innery, T.diag[:,2]) # Fourier transform of internal
+		yphad!(y, T.left[:,k,1], T.innery) # Contribution from left
 
 		# IL
-		NFFT.nfft!(p1, S.IL[:,k], innery)
-		had!(innery, T.diag[:,1])
-		yphad!(y, T.left[:,k,2], innery)
+		NFFT.nfft!(p1, S.IL[:,k], T.innery)
+		had!(T.innery, T.diag[:,1])
+		yphad!(y, T.left[:,k,2], T.innery)
 
 		# RI
-		NFFT.nfft!(p2, vec(S.RI[k,:]), innery)
-		had!(innery, T.diag[:,2])
-		yphad!(y, T.right[:,k,1], innery)
+		NFFT.nfft!(p2, vec(S.RI[k,:]), T.innery)
+		had!(T.innery, T.diag[:,2])
+		yphad!(y, T.right[:,k,1], T.innery)
 
 		# IR
-		NFFT.nfft!(p1, S.IR[:,k], innery)
-		had!(innery, T.diag[:,1])
-		yphad!(y, T.right[:,k,2], innery)
+		NFFT.nfft!(p1, S.IR[:,k], T.innery)
+		had!(T.innery, T.diag[:,1])
+		yphad!(y, T.right[:,k,2], T.innery)
 	end
 
 	isuniform(T) || had!(y, get(T.weights))
