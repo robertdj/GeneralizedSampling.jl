@@ -284,11 +284,9 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 
 	# Update y with border and side contributions
 	# Fourier transform of the internal functions using 1D NFFT
-	# TODO: Include these "1D" NFFT's in NFFT package?
-	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
-	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
 		# LL
+		# S.LL[:,k] is not a slice
 		A_mul_B!( T.innery, T.left[:,:,1], S.LL[:,k] )
 		yphad!(y, T.left[:,k,2], T.innery)
 		# LR
@@ -302,22 +300,26 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 		yphad!(y, T.right[:,k,2], T.innery)
 
 		# LI
-		NFFT.nfft!(p2, vec(S.LI[k,:]), T.innery) # DFT part of internal
+		#= NFFT.nfft!(p2, vec(S.LI[k,:]), T.innery) # DFT part of internal =#
+		NFFT.nfft!(T.NFFT, vec(S.LI[k,:]), T.innery, 2) # DFT part of internal
 		had!(T.innery, T.diag[:,2]) # Fourier transform of internal
 		yphad!(y, T.left[:,k,1], T.innery) # Contribution from left
 
 		# IL
-		NFFT.nfft!(p1, S.IL[:,k], T.innery)
+		#= NFFT.nfft!(p1, S.IL[:,k], T.innery) =#
+		NFFT.nfft!(T.NFFT, S.IL[:,k], T.innery, 1)
 		had!(T.innery, T.diag[:,1])
 		yphad!(y, T.left[:,k,2], T.innery)
 
 		# RI
-		NFFT.nfft!(p2, vec(S.RI[k,:]), T.innery)
+		#= NFFT.nfft!(p2, vec(S.RI[k,:]), T.innery) =#
+		NFFT.nfft!(T.NFFT, vec(S.RI[k,:]), T.innery, 2)
 		had!(T.innery, T.diag[:,2])
 		yphad!(y, T.right[:,k,1], T.innery)
 
 		# IR
-		NFFT.nfft!(p1, S.IR[:,k], T.innery)
+		#= NFFT.nfft!(p1, S.IR[:,k], T.innery) =#
+		NFFT.nfft!(T.NFFT, S.IR[:,k], T.innery, 1)
 		had!(T.innery, T.diag[:,1])
 		yphad!(y, T.right[:,k,2], T.innery)
 	end
@@ -640,4 +642,5 @@ function Base.show{D}(io::IO, T::Freq2Wave{D})
 	D == 1 ? N = size(T,2) : N = wsize(T)
 	print(io, "To: ", N, " ", T.wavename, " wavelets")
 end
+
 

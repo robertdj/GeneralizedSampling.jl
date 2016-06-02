@@ -7,6 +7,7 @@ import IntervalWavelets: isuniform, van_moment
 import Deldir: deldir, voronoiarea
 import Wavelets: wavelet, WT
 import ArrayViews: reshape_view, flatten_view
+import Base: A_mul_B!, Ac_mul_B!
 
 export
 	# Types
@@ -57,6 +58,7 @@ const twoπ = 2.0*pi
 # TODO: Case conflict with types.jl
 include("Types.jl")
 include("Misc.jl")
+include("NFFT.jl")
 include("FourierTransforms.jl")
 include("CGNR.jl")
 
