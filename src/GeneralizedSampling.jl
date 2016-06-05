@@ -25,7 +25,6 @@ export
 	cgnr,
 
 	# Special CoB functions
-	freq2wave,
 	collect,
 
 	# misc

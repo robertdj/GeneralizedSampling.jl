@@ -22,7 +22,7 @@ xi = grid(M, 0.5)
 wavename = "db2"
 vm = van_moment(wavename)
 
-T = freq2wave(xi, wavename, J)
+T = Freq2Wave(xi, wavename, J)
 
 for k = 1:N
 	if k <= vm
@@ -50,7 +50,7 @@ begin
 
 	# Uniform samples
 	xi = grid(M, 0.5)
-	TU = freq2wave(xi, "Haar", J)
+	TU = Freq2Wave(xi, "Haar", J)
 	AU = collect(TU)
 
 	b = rand(M)
@@ -67,7 +67,7 @@ begin
 	K = N/2
 	xi = 2*K*rand(M) - K
 	sort!(xi)
-	TNU = freq2wave(xi, "Haar", J, K)
+	TNU = Freq2Wave(xi, "Haar", J, K)
 	ANU = collect(TNU)
 	b = rand(M) + rand(M)*im
 
@@ -87,7 +87,7 @@ end
 
 	# Uniform samples
 	xi = grid((M,M), 0.5)
-	TU = freq2wave(xi, "Haar", J)
+	TU = Freq2Wave(xi, "Haar", J)
 	AU = collect(TU)
 	b = rand(size(TU,1))
 
@@ -101,7 +101,7 @@ end
 	# Non-uniform samples: Requires high M/N ratio 
 	K = N/2
 	xi = 2*K*rand(M^2,2) - K
-	TNU = freq2wave(xi, "Haar", J, K)
+	TNU = Freq2Wave(xi, "Haar", J, K)
 	ANU = collect(TNU)
 	b = rand(M) + rand(M)*im
 

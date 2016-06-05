@@ -2,7 +2,7 @@
 # 1D change of basis matrix
 
 @doc """
-	freq2wave(samples, wavename::String, J::Int, B; ...)
+	Freq2Wave(samples, wavename::String, J::Int, B; ...)
 
 Make change of basis for switching between frequency responses and wavelets.
 
@@ -12,7 +12,7 @@ Make change of basis for switching between frequency responses and wavelets.
 - `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
 - Optional arguments (if needed) are passed to the functions computing Fourier transforms.
 """->
-function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
 	Nint = 2^J
 	@assert Nint >= 2*vm-1 "Scale it not large enough for this wavelet"
@@ -170,7 +170,7 @@ function wsize(T::Freq2Wave{2})
 end
 
 
-function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
 	Nint = 2^J
 	@assert Nint >= 2*vm-1 "Scale it not large enough for this wavelet"
