@@ -9,7 +9,7 @@ function Base.size(T::CoB)
 end
 
 function Base.size(T::CoB, d::Int)
-	@assert d == 1 || d == 2
+	#= @assert d == 1 || d == 2 =#
 	size(T, Val{d})
 end
 

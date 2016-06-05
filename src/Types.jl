@@ -41,28 +41,11 @@ immutable Freq2NoBoundaryWave{D} <: Freq2Wave{D}
 	@common_freq2wave()
 end
 
-macro bound(D)
-	if D == 1
-		left::DenseMatrix{Complex{Float64}}
-		right::DenseMatrix{Complex{Float64}}
-	else
-		left::DenseArray{Complex{Float64}, 3}
-		right::DenseArray{Complex{Float64}, 3}
-	end
-end
-
 # Uniform samples, boundary correction
 immutable Freq2BoundaryWave{D} <: Freq2Wave{D}
 	@common_freq2wave()
 	left::DenseArray{Complex{Float64}}
 	right::DenseArray{Complex{Float64}}
-	#= if D == 1 =#
-	#= 	left::DenseMatrix{Complex{Float64}} =#
-	#= 	right::DenseMatrix{Complex{Float64}} =#
-	#= else =#
-	#= 	left::DenseArray{Complex{Float64}, 3} =#
-	#= 	right::DenseArray{Complex{Float64}, 3} =#
-	#= end =#
 
 	# TODO: Include arrays for temporary results in multiplication like NFFT.tmpVec?
 	innery::Vector{Complex{Float64}}

@@ -53,8 +53,7 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}, p::Integer=0; prec=SMALL
 	@assert prec >= SMALL_EPS
 	@assert maxcount >= 1
 
-	const almost1 = 1.0 - prec
-	const half = 0.5
+	almost1 = 1.0 - prec
 	Y = ComplexOne
 	count = 1
 	while count <= maxcount
@@ -64,7 +63,7 @@ function FourDaubScaling( xi::Real, C::Vector{Float64}, p::Integer=0; prec=SMALL
 
 		# Convergence check: |y(xi) - 1| is small for small xi. But y is
 		# exactly 1 in all even integers, so prevent premature exit
-		if abs(xi) <= half
+		if abs(xi) <= 0.5
 			abs(y) >= almost1 && break
 			count += 1
 		end
@@ -107,7 +106,7 @@ For a vector `xi` of length `M`, the output is a matrix of size `M`-by-`p`, wher
 **Note**: 
 For `side == 'L'` the *first* column of the output is related to the function closest to the left boundary, 
 but for `side == 'R'` the *last* column is related to the function closest to the right boundary.
-Furthermore, the right side functions are translated such that the right endpoint of their support is 1.
+Furthermore, the right side functions are translated (in the time domain) such that the right endpoint of their support is 1.
 
 This behavior is not shared with the lower lever functions for Fourier transforms.
 """->
@@ -138,7 +137,7 @@ end
 Return the matrices `U` and `V` used in `FourDaubScaling` for boundary scaling functions.
 """->
 function UVmat(B::BoundaryFilter)
-	const vm = van_moment(B)
+	vm = van_moment(B)
 
 	UV = zeros(Complex{Float64}, vm, 3*vm-1)
 
@@ -172,11 +171,11 @@ function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, p::Integer, side::Char
 	where U & V are from UVmat
 	=#
 
-	const U, V = UVmat(bfilter(p, side))
+	U, V = UVmat(bfilter(p, side))
 	C = coef(ifilter(p, true))
 	scale!(C, 1/sum(C))
 
-	const F0 = complex( (eye(U) - U) \ vec(sum(V,2)) )
+	F0 = complex( (eye(U) - U) \ vec(sum(V,2)) )
 
 	# ----------------------------------------
 	# Precompute U^l and U^l*V
@@ -196,7 +195,7 @@ function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, p::Integer, side::Char
 
 	# ----------------------------------------
 
-	const Nxi = length(xi)
+	Nxi = length(xi)
 	Y = Array{Complex{Float64}}(p, Nxi)
 
 	# Arrays with temporary results

@@ -52,7 +52,6 @@ const SMALL_EPS = eps()
 const LARGE_EPS= sqrt(eps())
 const ComplexOne = one(Complex{Float64})
 const ComplexZero = zero(Complex{Float64})
-# TODO: Import from StatsFun?
 const twoπ = 2.0*pi
 
 # TODO: Case conflict with types.jl

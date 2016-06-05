@@ -24,19 +24,19 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
-		const W = Nullable{ Vector{Complex{Float64}} }()
+		W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
 		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
-		const W = Nullable(complex( W ))
+		W = Nullable(complex( W ))
 	end
 
 	# Fourier transform of the internal scaling function
-	const FT = FourScalingFunc( samples, wavename, J; args... )
+	FT = FourScalingFunc( samples, wavename, J; args... )
 
 	# Diagonal matrix used in 'multiplication' with NFFT
-	const diag = FT .* cis(-pi*samples)
+	diag = FT .* cis(-pi*samples)
 
 	# The number of internal wavelets in reconstruction
 	if hasboundary(wavename)
@@ -48,7 +48,7 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
 	xi = samples*2.0^(-J)
 	frac!(xi)
-	const p = NFFTPlan(xi, Nint)
+	p = NFFTPlan(xi, Nint)
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
@@ -112,7 +112,7 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	# Internal function
 	for n = vm+1:N-vm
 		for m = 1:M
-			@inbounds F[m,n] = W[m]*T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) )
+			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) )
 		end
 	end
 
@@ -184,19 +184,19 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
-		const W = Nullable{ Vector{Complex{Float64}} }()
+		W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
 		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
-		const W = Nullable(complex( W ))
+		W = Nullable(complex( W ))
 	end
 
 	# Fourier transform of the internal scaling function
-	const FT = FourScalingFunc( samples, wavename, J )
+	FT = FourScalingFunc( samples, wavename, J )
 
 	# Diagonal matrix for multiplication with internal scaling function
-	const diag = FT .* cis( -pi*samples )
+	diag = FT .* cis( -pi*samples )
 
 	# The number of internal wavelets in reconstruction
 	if hasboundary(wavename)
@@ -208,7 +208,7 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 	xi = samples'
 	scale!(xi, 2.0^(-J))
 	frac!(xi)
-	const p = NFFTPlan(xi, (Nint,Nint))
+	p = NFFTPlan(xi, (Nint,Nint))
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
@@ -393,7 +393,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 	@assert size(T,1) == length(v)
 	@assert wsize(T) == size(Z)
 	
-	const vm = van_moment(T)
+	vm = van_moment(T)
 	S = split(Z, vm)
 
 	# TODO: Is this copying better than had!(*, get(T.weights)) for every part of S?
@@ -413,11 +413,11 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 	# Assuming that T.NFFT.N[1] == T.NFFT.N[2] only one cornercol and
 	# sidecol is needed
 	cornercol = Array{Complex{Float64}}(vm)
-	const Nint = size(S.IL,1)
+	Nint = size(S.IL,1)
 	sidecol = Array{Complex{Float64}}(Nint)
 
-	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
-	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
+	p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
+	p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
 		# LL
 		conj!(innerv, T.left[:,k,2])
@@ -534,10 +534,10 @@ In 2D, the reconstruction grid is sorted by the `y` coordinate, i.e., the order 
 etc
 """->
 function Base.collect(T::Freq2NoBoundaryWave{2})
-	const M = size(T,1)
-	const Nx, Ny = wsize(T)
+	M = size(T,1)
+	Nx, Ny = wsize(T)
 	# TODO: Check if the matrix fits in memory
-	F = Array{Complex{Float64}}(M, size(T,2))
+	F = Array{Complex{Float64}}(M, Nx*Ny)
 
 	phi = prod(T.internal, 2)
 
@@ -559,8 +559,8 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 end
 
 function Base.collect(T::Freq2BoundaryWave{2})
-	const M = size(T,1)
-	const Nx, Ny = wsize(T)
+	M = size(T,1)
+	Nx, Ny = wsize(T)
 	# TODO: Check if the matrix fits in memory
 	F = Array{Complex{Float64}}(M, size(T,2))
 
@@ -601,9 +601,11 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 	elseif 0 <= n < p
 		# source offset = dimension offset + column offset
 		so = (d-1)*M*p + n*M + 1
+		#= so = n*M + 1 =#
 		unsafe_copy!( phi, 1, T.left, so, M ) 
 	else
 		so = (d-1)*M*p + (n-N+p)*M + 1
+		#= so = (n-N+p)*M + 1 =#
 		unsafe_copy!( phi, 1, T.right, so, M ) 
 	end
 end
