@@ -11,7 +11,7 @@ function FourHaarScaling(xi::Real)
 	if xi == zero(xi)
 		return ComplexOne
 	else
-		return (1.0 - cis(-2.0*pi*xi)) / (2.0*pi*im*xi)
+		return (1.0 - cis(-twoπ*xi)) / (twoπ*im*xi)
 	end
 end
 
@@ -20,11 +20,13 @@ end
 # Fourier transform of Daubechies scaling functions
 
 @doc """
-	feval(xi::Float64, C::Vector{Float64}, offset)
+	feval(xi::Float64, C::Vector, offset::Int) -> Complex[{Float64}
 
 *F*ilter *eval*uation at `xi` of the filter `C`, i.e., compute
 
 	sum( C[n]*exp(-2*pi*(offset+n)*xi) )
+
+The sum starts at `offset+1`.
 """->
 function feval(xi::Float64, C::Vector{Float64}, offset::Integer)
 	y = ComplexZero
