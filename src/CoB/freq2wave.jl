@@ -545,10 +545,10 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 	phi = prod(T.internal, 2)
 
 	idx = 0
-	for ny = 0:Ny-1
-		for nx = 0:Nx-1
+	for ny in 0:Ny-1
+		for nx in 0:Nx-1
 			idx += 1
-			for m = 1:M
+			for m in 1:M
 				@inbounds F[m,idx] = phi[m]*cis( -twoπ*(nx*T.NFFT.x[1,m] + ny*T.NFFT.x[2,m]) )
 			end
 		end
@@ -559,6 +559,26 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 	end
 
 	return F
+end
+
+function ucollect(T::Freq2NoBoundaryWave{2})
+	isuniform(T) || throw(AssertionError())
+
+	M1, M2 = T.NFFT.n
+	N1, N2 = T.NFFT.N
+
+	F1 = Array{Complex{Float64}}(M1, N1)
+	for n in 1:N1, for m in 1:M2:M1
+		@inbounds F1[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
+	end
+
+	F2 = Array{Complex{Float64}}(M2, N2)
+	for n in 1:N1, for m in 1:M2
+		@inbounds F1[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
+	end
+
+	#kron(F1, F2)
+	return F1, F2
 end
 
 function Base.collect(T::Freq2BoundaryWave{2})
