@@ -51,9 +51,9 @@ to control this there are optional arguments:
 function FourDaubScaling( xi::Real, C::Vector{Float64}, p::Integer=0; prec=SMALL_EPS, maxcount=100)
 	# TODO: Move these checks to vector version?
 	# TODO: Assertions in macro?
-	@assert isapprox(sum(C), 1.0)
-	@assert prec >= SMALL_EPS
-	@assert maxcount >= 1
+	isapprox(sum(C), 1.0) || throw(AssertionError("Filter must sum to one"))
+	prec >= SMALL_EPS || throw(DomainError())
+	maxcount >= 1 || throw(DomainError())
 
 	almost1 = 1.0 - prec
 	Y = ComplexOne
@@ -84,7 +84,7 @@ scale `J` and translation `k`.
 Optional arguments are passed to the Fourier transform of `wavename` (if relevant).
 """->
 function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer=0; args... )
-	@assert J >= 0 "Scale must be a non-negative integer"
+	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))
 
 	if ishaar(wavename)
 		return FourHaarScaling(xi, J, k)
@@ -113,7 +113,7 @@ Furthermore, the right side functions are translated (in the time domain) such t
 This behavior is not shared with the lower lever functions for Fourier transforms.
 """->
 function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0; args... )
-	@assert J >= 0 "Scale must be a non-negative integer"
+	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))
 
 	if !isdaubechies(wavename)
 		error(string("Fourier transform for ", wavename, " is not implemented"))
@@ -160,7 +160,7 @@ The output is an `p`-by-`length(xi)` matrix where column `j` holds the Fourier t
 function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, p::Integer, side::Char; maxcount=40 )
 	# TODO: Check the phaseshifts of the interior functions
 	# TODO: Filters of the interior functions
-	@assert 1 <= maxcount <= 100
+	1 <= maxcount <= 100 || throw(DomainError())
 	#=
 	- F is a vector with the Fourier transforms of the boundary scaling
 	functions at the current xi
@@ -317,7 +317,7 @@ end
 
 
 function FourDaubScaling( xi, p::Integer, side::Char, J::Integer; args... )
-	@assert J >= 0
+	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))
 
 	xi *= 2.0^(-J)
 	y = FourDaubScaling(xi, p, side; args...)

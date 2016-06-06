@@ -18,7 +18,7 @@ Make change of basis for switching between frequency responses and wavelets.
 function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
 	Nint = 2^J
-	@assert Nint >= 2*vm-1 "Scale it not large enough for this wavelet"
+	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	
 	# TODO: Good condition?
 	if Nint >= length(samples)
@@ -176,9 +176,9 @@ end
 function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
 	Nint = 2^J
-	@assert Nint >= 2*vm-1 "Scale it not large enough for this wavelet"
+	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	M = size(samples, 1)
-	@assert size(samples,2) == 2
+	size(samples,2) == 2 || throw(DimensionMismatch("Samples must have two columns"))
 
 	# TODO: Good condition?
 	if Nint >= M
@@ -234,8 +234,9 @@ end
 
 
 function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave{D}, X::DenseArray{Complex{Float64},D})
-	@assert size(T,1) == length(y)
-	@assert wsize(T) == size(X)
+	size(T,1) == length(y) || throw(DimensionMismatch())
+	wsize(T) == size(X) || throw(DimensionMismatch())
+
 
 	NFFT.nfft!(T.NFFT, X, y)
 	for d in 1:D
@@ -249,8 +250,8 @@ end
 
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::DenseVector{Complex{Float64}})
-	@assert size(T,1) == length(y)
-	@assert size(T,2) == length(x)
+	size(T,1) == length(y) || throw(DimensionMismatch())
+	size(T,2) == length(x) || throw(DimensionMismatch())
 
 	xleft, xint, xright = split(x, van_moment(T))
 
@@ -268,8 +269,8 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 end
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}})
-	@assert size(T,1) == length(y)
-	@assert wsize(T) == size(X)
+	size(T,1) == length(y) || throw(DimensionMismatch())
+	wsize(T) == size(X) || throw(DimensionMismatch())
 	
 	# TODO: Remove once T.left is type stable
 	vm = van_moment(T)::Int64
@@ -333,7 +334,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 end
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, x::DenseVector{Complex{Float64}})
-	@assert size(T,2) == length(x)
+	size(T,2) == length(x) || throw(DimensionMismatch())
 
 	X = reshape_view(x, wsize(T))
 	A_mul_B!(y, T, X)
@@ -354,8 +355,8 @@ end
 
 
 function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundaryWave{D}, v::DenseVector{Complex{Float64}})
-	@assert size(T,1) == length(v)
-	@assert wsize(T) == size(Z)
+	size(T,1) == length(v) || throw(DimensionMismatch())
+	wsize(T) == size(Z) || throw(DimensionMismatch())
 
 	Tdiag = vec(prod(T.diag, 2))
 	conj!(Tdiag)
@@ -368,8 +369,8 @@ function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundary
 end
 
 function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, v::DenseVector{Complex{Float64}})
-	@assert size(T,1) == length(v)
-	@assert (Nz = size(T,2)) == length(z)
+	size(T,1) == length(v) || throw(DimensionMismatch())
+	(Nz = size(T,2)) == length(z) || throw(DimensionMismatch())
 
 	zleft, zint, zright = split(z, van_moment(T))
 
@@ -393,8 +394,8 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1
 end
 
 function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2}, v::DenseVector{Complex{Float64}})
-	@assert size(T,1) == length(v)
-	@assert wsize(T) == size(Z)
+	size(T,1) == length(v) || throw(DimensionMismatch())
+	wsize(T) == size(Z) || throw(DimensionMismatch())
 	
 	vm = van_moment(T)
 	S = split(Z, vm)
@@ -481,7 +482,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 end
 
 function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, v::DenseVector{Complex{Float64}})
-	@assert size(T,2) == length(z)
+	size(T,2) == length(z) || throw(DimensionMismatch())
 
 	Z = reshape_view(z, wsize(T))
 	Ac_mul_B!(Z, T, v)
@@ -501,7 +502,7 @@ function Base.Ac_mul_B(T::Freq2Wave, v::AbstractVector)
 end
 
 function Base.(:(\))(T::Freq2Wave, Y::AbstractMatrix)
-	@assert length(Y) == (M = size(T,1))
+	length(Y) == (M = size(T,1)) || throw(DimensionMismatch())
 
 	y = flatten_view(Y)
 	x = T \ y
