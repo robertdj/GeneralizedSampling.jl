@@ -554,12 +554,12 @@ function ucollect(T::Freq2NoBoundaryWave{2})
 	N1, N2 = T.NFFT.N
 
 	F1 = Array{Complex{Float64}}(M1, N1)
-	for n in 1:N1, for m in 1:M2:M1
+	for n in 1:N1, m in 1:M2:M1
 		@inbounds F1[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
 	end
 
 	F2 = Array{Complex{Float64}}(M2, N2)
-	for n in 1:N1, for m in 1:M2
+	for n in 1:N1, m in 1:M2
 		@inbounds F1[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
 	end
 
