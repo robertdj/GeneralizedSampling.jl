@@ -1,38 +1,33 @@
 # ------------------------------------------------------------
 # 1D change of basis matrix
 
-@doc """
-	freq2wave(samples, wavename::String, J::Int, B; ...)
-
-Make change of basis for switching between frequency responses and wavelets.
-
-- `samples` are the sampling locations as a vector for 1D and 2-by-M / M-by-2 matrix for 2D.
-- `wave` is the name of the wavelet; see documentation for possibilities.
-- `J` is the scale of the wavelet transform to reconstruct.
-- `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
-- Optional arguments (if needed) are passed to the functions computing Fourier transforms.
-"""->
-function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
-	# TODO: Warning if J is too small
+function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+	vm = van_moment(wavename)
+	Nint = 2^J
+	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
+	
+	# TODO: Good condition?
+	if Nint >= length(samples)
+		warn("The scale is high compared to the number of samples")
+	end
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
-		const W = Nullable{ Vector{Complex{Float64}} }()
+		W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
+		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
-		const W = Nullable(complex( W ))
+		W = Nullable(complex( W ))
 	end
 
 	# Fourier transform of the internal scaling function
-	const FT = FourScalingFunc( samples, wavename, J; args... )
+	FT = FourScalingFunc( samples, wavename, J; args... )
 
 	# Diagonal matrix used in 'multiplication' with NFFT
-	# TODO: Multiply with weights (in the 1D case only)?
-	const diag = FT .* cis(-pi*samples)
+	diag = FT .* cis(-pi*samples)
 
 	# The number of internal wavelets in reconstruction
-	Nint = 2^J
 	if hasboundary(wavename)
 		Nint -= 2*van_moment(wavename)
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
@@ -42,23 +37,16 @@ function freq2wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
 	xi = samples*2.0^(-J)
 	frac!(xi)
-	const p = NFFTPlan(xi, Nint)
+	p = NFFTPlan(xi, Nint)
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave(FT, W, J, wavename, diag, p)
 	else
-		const vm = van_moment(wavename)
-		# TODO: Extend FourScalingFunc
-		left = FourDaubScaling(samples, vm, 'L', J; args...)'
-		# TODO: The right scaling functions are indexed "opposite": The
-		# function closest to the boundary is first and the function
-		# furthest from the boundary is last.
-		right = FourDaubScaling(samples, vm, 'R', J; args...)'
-		phase_shift = cis( -twoπ*samples )
-		broadcast!(*, right, right, phase_shift)
+		left = FourScalingFunc( samples, wavename, 'L', J; args... )
+		right = FourScalingFunc( samples, wavename, 'R', J; args... )
 
-		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave(FT, W, J, wavename, diag, p, left, right)
 	end
 end
 
@@ -90,8 +78,7 @@ function Base.collect(T::Freq2NoBoundaryWave{1})
 	F = Array{Complex{Float64}}(M, N)
 	for n = 1:N
 		for m = 1:M
-			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
-			#= @inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
+			@inbounds F[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
 		end
 	end
 
@@ -114,8 +101,7 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	# Internal function
 	for n = vm+1:N-vm
 		for m = 1:M
-			@inbounds F[m,n] = T.internal[m]*cis( -2*pi*T.samples[m]*(n-1)/N )
-			#= @inbounds F[m,n] = W[m]*T.internal[m]*cis( -2*pi*T.NFFT.x[m]*(n-1) ) =#
+			@inbounds F[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
 		end
 	end
 
@@ -159,38 +145,49 @@ The size of the reconstructed wavelet coefficients.
 - When `D` == 1, the output is (Int,)
 - When `D` == 2, the output is (Int,Int)
 """->
-function wsize(T::Freq2Wave)
+function wsize(T::Freq2Wave{1})
+	hasboundary(T) ? (2^wscale(T),) : T.NFFT.N
+end
+
+function wsize(T::Freq2Wave{2})
 	if hasboundary(T)
 		N = 2^wscale(T)
-		return dim(T) == 1 ? (N,) : (N, N)
+		return (N, N)
 	else
 		return T.NFFT.N
 	end
 end
 
 
-function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN)
+function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+	vm = van_moment(wavename)
+	Nint = 2^J
+	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	M = size(samples, 1)
-	@assert size(samples,2) == 2
-	# TODO: Warning if J is too big compared to M and B
+	size(samples,2) == 2 || throw(DimensionMismatch("Samples must have two columns"))
+
+	# TODO: Good condition?
+	if Nint >= M
+		warn("The scale is high compared to the number of samples")
+	end
 
 	# Weights for non-uniform samples
 	if isuniform(samples)
-		const W = Nullable{ Vector{Complex{Float64}} }()
+		W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
+		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
-		const W = Nullable(complex( W ))
+		W = Nullable(complex( W ))
 	end
 
 	# Fourier transform of the internal scaling function
-	const FT = FourScalingFunc( samples, wavename, J )
+	FT = FourScalingFunc( samples, wavename, J )
 
 	# Diagonal matrix for multiplication with internal scaling function
-	const diag = FT .* cis( -pi*samples )
+	diag = FT .* cis( -pi*samples )
 
 	# The number of internal wavelets in reconstruction
-	Nint = 2^J
 	if hasboundary(wavename)
 		Nint -= 2*van_moment(wavename)
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
@@ -200,38 +197,32 @@ function freq2wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 	xi = samples'
 	scale!(xi, 2.0^(-J))
 	frac!(xi)
-	const p = NFFTPlan(xi, (Nint,Nint))
+	p = NFFTPlan(xi, (Nint,Nint))
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave(samples, FT, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave(FT, W, J, wavename, diag, p)
 	else
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
 
-		vm = van_moment(wavename)
-		leftX = FourDaubScaling(samplesx, vm, 'L', J)
-		leftY = FourDaubScaling(samplesy, vm, 'L', J)
-		const left = cat(3, leftX', leftY' )
+		leftX = FourScalingFunc( samplesx, wavename, 'L', J; args... )
+		leftY = FourScalingFunc( samplesy, wavename, 'L', J; args... )
+		left = cat(3, leftX, leftY )
 
-		# TODO: In loop?
-		rightX = FourDaubScaling(samplesx, vm, 'R', J)'
-		phase_shift = cis( -twoπ*samplesx )
-		broadcast!(*, rightX, rightX, phase_shift)
+		rightX = FourScalingFunc( samplesx, wavename, 'R', J; args... )
+		rightY = FourScalingFunc( samplesy, wavename, 'R', J; args... )
+		right = cat(3, rightX, rightY )
 
-		rightY = FourDaubScaling(samplesy, vm, 'R', J)'
-		phase_shift = cis( -twoπ*samplesy )
-		broadcast!(*, rightY, rightY, phase_shift)
-		const right = cat(3, rightX, rightY )
-
-		return Freq2BoundaryWave(samples, FT, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave(FT, W, J, wavename, diag, p, left, right)
 	end
 end
 
 
 function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave{D}, X::DenseArray{Complex{Float64},D})
-	@assert size(T,1) == length(y)
-	@assert wsize(T) == size(X)
+	size(T,1) == length(y) || throw(DimensionMismatch())
+	wsize(T) == size(X) || throw(DimensionMismatch())
+
 
 	NFFT.nfft!(T.NFFT, X, y)
 	for d in 1:D
@@ -245,8 +236,8 @@ end
 
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::DenseVector{Complex{Float64}})
-	@assert size(T,1) == length(y)
-	@assert (Nx = size(T,2)) == length(x)
+	size(T,1) == length(y) || throw(DimensionMismatch())
+	size(T,2) == length(x) || throw(DimensionMismatch())
 
 	xleft, xint, xright = split(x, van_moment(T))
 
@@ -264,11 +255,12 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 end
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}})
-	@assert size(T,1) == length(y)
-	@assert wsize(T) == size(X)
+	size(T,1) == length(y) || throw(DimensionMismatch())
+	wsize(T) == size(X) || throw(DimensionMismatch())
 	
-	const vm = van_moment(T)
-	const S = split(X, vm)
+	# TODO: Remove once T.left is type stable
+	vm = van_moment(T)::Int64
+	S = split(X, vm)
 
 	# Internal scaling function
 	NFFT.nfft!(T.NFFT, S.II, y)
@@ -277,48 +269,49 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 
 	# The non-internal contribution have a multiplication from each
 	# dimension of X
-	innery = similar(y)
 
 	# TODO: Am I using the correct order for the right boundary?
 
 	# Update y with border and side contributions
 	# Fourier transform of the internal functions using 1D NFFT
-	# TODO: Include these "1D" NFFT's in NFFT package?
-	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
-	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
 		# LL
-		A_mul_B!( innery, T.left[:,:,1], S.LL[:,k] )
-		yphad!(y, T.left[:,k,2], innery)
+		# S.LL[:,k] is not a slice
+		A_mul_B!( T.innery, T.left[:,:,1], S.LL[:,k] )
+		yphad!(y, T.left[:,k,2], T.innery)
 		# LR
-		A_mul_B!( innery, T.left[:,:,1], S.LR[:,k] )
-		yphad!(y, T.right[:,k,2], innery)
+		A_mul_B!( T.innery, T.left[:,:,1], S.LR[:,k] )
+		yphad!(y, T.right[:,k,2], T.innery)
 		# RL
-		A_mul_B!( innery, T.right[:,:,1], S.RL[:,k] )
-		yphad!(y, T.left[:,k,2], innery)
+		A_mul_B!( T.innery, T.right[:,:,1], S.RL[:,k] )
+		yphad!(y, T.left[:,k,2], T.innery)
 		# RR
-		A_mul_B!( innery, T.right[:,:,1], S.RR[:,k] )
-		yphad!(y, T.right[:,k,2], innery)
+		A_mul_B!( T.innery, T.right[:,:,1], S.RR[:,k] )
+		yphad!(y, T.right[:,k,2], T.innery)
 
 		# LI
-		NFFT.nfft!(p2, vec(S.LI[k,:]), innery) # DFT part of internal
-		had!(innery, T.diag[:,2]) # Fourier transform of internal
-		yphad!(y, T.left[:,k,1], innery) # Contribution from left
+		#= NFFT.nfft!(p2, vec(S.LI[k,:]), T.innery) # DFT part of internal =#
+		NFFT.nfft!(T.NFFT, vec(S.LI[k,:]), T.innery, 2) # DFT part of internal
+		had!(T.innery, T.diag[:,2]) # Fourier transform of internal
+		yphad!(y, T.left[:,k,1], T.innery) # Contribution from left
 
 		# IL
-		NFFT.nfft!(p1, S.IL[:,k], innery)
-		had!(innery, T.diag[:,1])
-		yphad!(y, T.left[:,k,2], innery)
+		#= NFFT.nfft!(p1, S.IL[:,k], T.innery) =#
+		NFFT.nfft!(T.NFFT, S.IL[:,k], T.innery, 1)
+		had!(T.innery, T.diag[:,1])
+		yphad!(y, T.left[:,k,2], T.innery)
 
 		# RI
-		NFFT.nfft!(p2, vec(S.RI[k,:]), innery)
-		had!(innery, T.diag[:,2])
-		yphad!(y, T.right[:,k,1], innery)
+		#= NFFT.nfft!(p2, vec(S.RI[k,:]), T.innery) =#
+		NFFT.nfft!(T.NFFT, vec(S.RI[k,:]), T.innery, 2)
+		had!(T.innery, T.diag[:,2])
+		yphad!(y, T.right[:,k,1], T.innery)
 
 		# IR
-		NFFT.nfft!(p1, S.IR[:,k], innery)
-		had!(innery, T.diag[:,1])
-		yphad!(y, T.right[:,k,2], innery)
+		#= NFFT.nfft!(p1, S.IR[:,k], T.innery) =#
+		NFFT.nfft!(T.NFFT, S.IR[:,k], T.innery, 1)
+		had!(T.innery, T.diag[:,1])
+		yphad!(y, T.right[:,k,2], T.innery)
 	end
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -327,7 +320,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 end
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, x::DenseVector{Complex{Float64}})
-	@assert size(T,2) == length(x)
+	size(T,2) == length(x) || throw(DimensionMismatch())
 
 	X = reshape_view(x, wsize(T))
 	A_mul_B!(y, T, X)
@@ -348,8 +341,8 @@ end
 
 
 function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundaryWave{D}, v::DenseVector{Complex{Float64}})
-	@assert size(T,1) == length(v)
-	@assert wsize(T) == size(Z)
+	size(T,1) == length(v) || throw(DimensionMismatch())
+	wsize(T) == size(Z) || throw(DimensionMismatch())
 
 	Tdiag = vec(prod(T.diag, 2))
 	conj!(Tdiag)
@@ -362,8 +355,8 @@ function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundary
 end
 
 function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, v::DenseVector{Complex{Float64}})
-	@assert size(T,1) == length(v)
-	@assert (Nz = size(T,2)) == length(z)
+	size(T,1) == length(v) || throw(DimensionMismatch())
+	(Nz = size(T,2)) == length(z) || throw(DimensionMismatch())
 
 	zleft, zint, zright = split(z, van_moment(T))
 
@@ -387,10 +380,10 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1
 end
 
 function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2}, v::DenseVector{Complex{Float64}})
-	@assert size(T,1) == length(v)
-	@assert wsize(T) == size(Z)
+	size(T,1) == length(v) || throw(DimensionMismatch())
+	wsize(T) == size(Z) || throw(DimensionMismatch())
 	
-	const vm = van_moment(T)
+	vm = van_moment(T)
 	S = split(Z, vm)
 
 	# TODO: Is this copying better than had!(*, get(T.weights)) for every part of S?
@@ -410,11 +403,11 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 	# Assuming that T.NFFT.N[1] == T.NFFT.N[2] only one cornercol and
 	# sidecol is needed
 	cornercol = Array{Complex{Float64}}(vm)
-	const Nint = size(S.IL,1)
+	Nint = size(S.IL,1)
 	sidecol = Array{Complex{Float64}}(Nint)
 
-	const p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
-	const p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
+	p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
+	p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
 	for k in 1:vm
 		# LL
 		conj!(innerv, T.left[:,k,2])
@@ -475,7 +468,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2
 end
 
 function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, v::DenseVector{Complex{Float64}})
-	@assert size(T,2) == length(z)
+	size(T,2) == length(z) || throw(DimensionMismatch())
 
 	Z = reshape_view(z, wsize(T))
 	Ac_mul_B!(Z, T, v)
@@ -495,7 +488,7 @@ function Base.Ac_mul_B(T::Freq2Wave, v::AbstractVector)
 end
 
 function Base.(:(\))(T::Freq2Wave, Y::AbstractMatrix)
-	@assert length(Y) == (M = size(T,1))
+	length(Y) == (M = size(T,1)) || throw(DimensionMismatch())
 
 	y = flatten_view(Y)
 	x = T \ y
@@ -511,7 +504,6 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 		y .*= get(T.weights)
 	end
 
-	#print("Solution via conjugate gradients... ")
 	x0 = zeros(Complex{Float64}, wsize(T))
 	x = cgnr(T, y, x0)
 end
@@ -532,18 +524,18 @@ In 2D, the reconstruction grid is sorted by the `y` coordinate, i.e., the order 
 etc
 """->
 function Base.collect(T::Freq2NoBoundaryWave{2})
-	const M = size(T,1)
-	const Nx, Ny = wsize(T)
-	# TODO: Check if the matrix fits in memory
-	F = Array{Complex{Float64}}(M, size(T,2))
+	M = size(T,1)
+	Nx, Ny = wsize(T)
+	F = Array{Complex{Float64}}(M, Nx*Ny)
+
+	phi = prod(T.internal, 2)
 
 	idx = 0
-	for ny = 1:Ny
-		for nx = 1:Nx
+	for ny in 0:Ny-1
+		for nx in 0:Nx-1
 			idx += 1
-			for m = 1:M
-				# TODO: T.internal -> T.internal'
-				@inbounds F[m,idx] = T.internal[m,1]*T.internal[m,2]*cis( -2*pi*((nx-1)*T.NFFT.x[1,m] + (ny-1)*T.NFFT.x[2,m]) )
+			for m in 1:M
+				@inbounds F[m,idx] = phi[m]*cis( -twoπ*(nx*T.NFFT.x[1,m] + ny*T.NFFT.x[2,m]) )
 			end
 		end
 	end
@@ -555,25 +547,41 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 	return F
 end
 
+function ucollect(T::Freq2NoBoundaryWave{2})
+	isuniform(T) || throw(AssertionError())
+
+	M1, M2 = T.NFFT.n
+	N1, N2 = T.NFFT.N
+
+	F1 = Array{Complex{Float64}}(M1, N1)
+	for n in 1:N1, for m in 1:M2:M1
+		@inbounds F1[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
+	end
+
+	F2 = Array{Complex{Float64}}(M2, N2)
+	for n in 1:N1, for m in 1:M2
+		@inbounds F1[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
+	end
+
+	#kron(F1, F2)
+	return F1, F2
+end
+
 function Base.collect(T::Freq2BoundaryWave{2})
 	M = size(T,1)
 	Nx, Ny = wsize(T)
-	# TODO: Check if the matrix fits in memory
 	F = Array{Complex{Float64}}(M, size(T,2))
 
-	phix = ComplexZero
-	phiy = ComplexZero
+	phix = Array{Complex{Float64}}(M)
+	phiy = similar(phix)
 
-	p = van_moment(T)
 	idx = 0
-	for ny in 1:Ny
-		for nx in 1:Nx
-			idx += 1
-			for m in 1:M
-				unsafe_FourScaling!(phix, T, m, nx, Nx, 1, p)
-				unsafe_FourScaling!(phiy, T, m, ny, Ny, 2, p)
-				@inbounds F[m,idx] = phix * phiy
-			end
+	for ny = 0:Ny-1
+		unsafe_FourScaling!(phiy, T, ny, 2)
+		for nx = 0:Nx-1
+			unsafe_FourScaling!(phix, T, nx, 1)
+			had!(phix, phiy)
+			F[:,idx+=1] = phix
 		end
 	end
 
@@ -585,18 +593,28 @@ function Base.collect(T::Freq2BoundaryWave{2})
 end
 
 @doc """
-	FourScaling(T::Freq2Wave{2}, d::Integer, m::Integer, n::Integer) -> Number
+	unsafe_FourScaling!(phi, T::Freq2BoundaryWave{2}, n::Int, d::Int)
 
-Fourier transform of the `n`'th basis function at the `d`'th coordinate at the `m`'th frequency.
+Replace `phi` with the `n`'th "column" from dimension `d` of `T`.
 """->
-function unsafe_FourScaling!(y, T::Freq2BoundaryWave{2}, m::Integer, n::Integer, N::Integer, d::Integer, p::Integer)
+function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave{2}, n::Integer, d::Integer)
+	M = length(phi)
+	N = wsize(T)[d]
+	p = van_moment(T)
 
-	if p < n <= N-p
-		@inbounds y = T.internal[m,d]*cis( -twoπ*(n-1)*T.samples[m,d]/N )
-	elseif 1 <= n <= p
-		@inbounds y = T.left[m, n, d]
+	if p <= n < N-p
+		for m in 1:M
+			@inbounds phi[m] = T.internal[m,d]*cis( -twoπ*n*T.NFFT.x[d,m] )
+		end
+	elseif 0 <= n < p
+		# source offset = dimension offset + column offset
+		so = (d-1)*M*p + n*M + 1
+		#= so = n*M + 1 =#
+		unsafe_copy!( phi, 1, T.left, so, M ) 
 	else
-		@inbounds y = T.right[m, N-n+1, d]
+		so = (d-1)*M*p + (n-N+p)*M + 1
+		#= so = (n-N+p)*M + 1 =#
+		unsafe_copy!( phi, 1, T.right, so, M ) 
 	end
 end
 
@@ -605,7 +623,7 @@ end
 # Common
 
 function Base.size(T::Freq2Wave, ::Type{Val{1}})
-	size(T.samples, 1)
+	size(T.internal, 1)
 end
 
 function Base.size{D}(T::Freq2Wave{D}, ::Type{Val{2}})
@@ -634,4 +652,5 @@ function Base.show{D}(io::IO, T::Freq2Wave{D})
 	D == 1 ? N = size(T,2) : N = wsize(T)
 	print(io, "To: ", N, " ", T.wavename, " wavelets")
 end
+
 

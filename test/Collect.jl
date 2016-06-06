@@ -19,11 +19,11 @@ begin
 	samples = grid(M, 0.5)
 
 	# No boundary
-	T = freq2wave(samples, "haar", J)
+	T = Freq2Wave(samples, "haar", J)
 	A = collect(T)
 
 	# With boundary (using the same internal Fourier transform as above)
-	TMP = freq2wave(samples, "db2", J)
+	TMP = Freq2Wave(samples, "db2", J)
 	Tb = Freq2BoundaryWave(TMP.samples, T.internal, TMP.weights, TMP.J, TMP.wavename, T.diag, TMP.NFFT, TMP.left, TMP.right)
 	Ab = collect(Tb)
 
@@ -44,11 +44,11 @@ begin
 	samples = grid((M,M), 0.5)
 
 	# No boundary
-	T = freq2wave(samples, "haar", J)
+	T = Freq2Wave(samples, "haar", J)
 	A = collect(T)
 
 	# With boundary (using the same internal Fourier transform as above)
-	TMP = freq2wave(samples, "db2", J)
+	TMP = Freq2Wave(samples, "db2", J)
 	Tb = Freq2BoundaryWave(TMP.samples, T.internal, TMP.weights, TMP.J, TMP.wavename, T.diag, TMP.NFFT, TMP.left, TMP.right)
 	Ab = collect(Tb)
 

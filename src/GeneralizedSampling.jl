@@ -7,6 +7,7 @@ import IntervalWavelets: isuniform, van_moment
 import Deldir: deldir, voronoiarea
 import Wavelets: wavelet, WT
 import ArrayViews: reshape_view, flatten_view
+import Base: A_mul_B!, Ac_mul_B!
 
 export
 	# Types
@@ -24,7 +25,6 @@ export
 	cgnr,
 
 	# Special CoB functions
-	freq2wave,
 	collect,
 
 	# misc
@@ -47,17 +47,16 @@ export
 	frac!
 
 const sqrt2 = sqrt(2)
-# TODO: Rename: SMALL_EPS, LARGE_EPS
-const SMALL_PREC = eps()
-const LARGE_PREC = sqrt(eps())
+const SMALL_EPS = eps()
+const LARGE_EPS= sqrt(eps())
 const ComplexOne = one(Complex{Float64})
 const ComplexZero = zero(Complex{Float64})
-# TODO: Import from StatsFun?
 const twoπ = 2.0*pi
 
 # TODO: Case conflict with types.jl
 include("Types.jl")
 include("Misc.jl")
+include("NFFT.jl")
 include("FourierTransforms.jl")
 include("CGNR.jl")
 

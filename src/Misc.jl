@@ -4,7 +4,7 @@
 In-place Hadamard product: Replace `A` with `A.*B`.
 """->
 function had!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
-	@assert size(A) == size(B)
+	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] *= B[idx]
 	end
@@ -17,7 +17,7 @@ In-place Hadamard product with complex conjugation: Replace `A` with
 `A.*conj(B)`.
 """->
 function hadc!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
-	@assert size(A) == size(B)
+	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] *= conj(B[idx])
 	end
@@ -29,7 +29,7 @@ end
 Replace `y` with `y + a.*b`.
 """->
 function yphad!{T<:Number}(y::DenseVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
-	@assert (Ny = length(y)) == length(a) == length(b)
+	(Ny = length(y)) == length(a) == length(b) || throw(DimensionMismatch())
 	for ny in 1:Ny
 		@inbounds y[ny] += a[ny] * b[ny]
 	end
@@ -41,7 +41,7 @@ end
 Replace `A` with `conj(B)`.
 """->
 function Base.conj!(A::DenseArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
-	@assert size(A) == size(B)
+	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] = conj(B[idx])
 	end
@@ -55,7 +55,7 @@ Test if the rows in the `M`-by-2 matrix `points` are on a uniform 2D grid.
 """->
 function isuniform{T<:Real}( points::DenseMatrix{T} )
 	M, D = size(points)
-	@assert D == 2
+	D == 2 || throw(DimensionMismatch())
 
 	M <= 2 && return true
 
@@ -84,8 +84,8 @@ With even `M` the grid has one extra point on the negative values.
 The points are scaled by `scale` which by default is 1.
 """->
 function grid(M::Int, grid_dist::Real=1.0)
-	@assert M >= 2
-	@assert grid_dist > 0
+	M >= 2 || throw(AssertionError())
+	grid_dist > 0 || throw(DomainError())
 
 	startx = -div(M,2)
 	endx = (isodd(M) ? -startx : -startx-1)
@@ -107,8 +107,8 @@ end
 The points are scaled by `scale` which by default is 1.
 """->
 function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1.0)
-	@assert minimum(M) >= 2
-	@assert grid_dist > 0
+	minimum(M) >= 2 || throw(AssertionError())
+	grid_dist > 0 || throw(DomainError())
 
 	# The points are sorted by the x coordinate
 	gridx = grid(M[1], grid_dist)
@@ -131,9 +131,9 @@ Compute weights for sampling points `xi`.
 """->
 function weights(xi::AbstractVector{Float64}, bandwidth::Real)
 	# TODO: Make this function return 1D Voronoi areas?
-	@assert bandwidth > 0
-	@assert maxabs(xi) <= bandwidth
-	@assert (Nx = length(xi)) >= 2
+	bandwidth > 0 || throw(DomainError())
+	maxabs(xi) <= bandwidth || throw(AssertionError())
+	(Nx = length(xi)) >= 2 || throw(AssertionError())
 
 	is_xi_sorted = issorted(xi)
 	if !is_xi_sorted
@@ -161,12 +161,11 @@ function weights(xi::AbstractVector{Float64}, bandwidth::Real)
 	return mu 
 end
 
-# TODO: Default bandwidth = maxabs(xi)?
 function weights(xi::DenseMatrix{Float64}, bandwidth::Real)
-	@assert bandwidth > 0
-	@assert size(xi,2) == 2
-	@assert size(xi,1) >= 2
-	@assert maxabs(xi) <= bandwidth
+	bandwidth > 0 || throw(DomainError())
+	size(xi,2) == 2 || throw(DimensionMismatch())
+	size(xi,1) >= 2 || throw(DimensionMismatch())
+	maxabs(xi) <= bandwidth || throw(AssertionError())
 
 	voronoiarea(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
 end
@@ -184,9 +183,9 @@ Currently, the "bandwidth area" is a square centered at the origin and with side
 To ensure numerical stability in computations with the associated change of basis matrix, `xi` must contain both negative and positive elements. 
 """->
 function density(xi::AbstractVector{Float64}, bandwidth::Real)
-	@assert (minx = minimum(xi)) < 0
-	@assert 0 < (maxx = maximum(xi)) <= bandwidth
-	@assert (N = length(xi)) >= 2
+	(minx = minimum(xi)) < 0 || throw(AssertionError())
+	0 < (maxx = maximum(xi)) <= bandwidth || throw(AssertionError())
+	(N = length(xi)) >= 2 || throw(DimensionMismatch())
 
 	# Boundary cases
 	lower_boundary = maxx - 2*bandwidth
@@ -204,11 +203,11 @@ function density(xi::AbstractVector{Float64}, bandwidth::Real)
 end
 
 function density(xi::DenseMatrix{Float64}, bandwidth::Real)
-	@assert bandwidth > 0
-	@assert maxabs(xi) <= bandwidth
+	bandwidth > 0 || throw(DomainError())
+	maxabs(xi) <= bandwidth || throw(AssertionError())
 	M, dim = size(xi)
-	@assert M >= 2
-	@assert dim == 2
+	M >= 2 || throw(DimensionMismatch())
+	dim == 2 || throw(DimensionMismatch())
 
 	# Compute Voronoi tesselation
 	D = deldir(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
@@ -307,8 +306,8 @@ Split `x` into 3 parts:
 Left, internal and right, where left and right are `border` outmost entries.
 """->
 function Base.split(x::DenseVector, border::Int)
-	@assert border >= 1
-	@assert (N = length(x)) > 2*border
+	border >= 1 || throw(DomainError())
+	(N = length(x)) > 2*border || throw(AssertionError())
 
 	L = slice(x, 1:border)
 	I = slice(x, border+1:N-border)
@@ -349,9 +348,9 @@ With both the horizontal and the vertical part divided in `L`eft,
 	|____|______|____|
 """->
 function Base.split(A::DenseMatrix, border::Int)
-	@assert border >= 1
+	border >= 1 || throw(DomainError())
 	N = size(A)
-	@assert minimum(N) > 2*border
+	minimum(N) > 2*border || throw(AssertionError())
 
 	Lidx = 1:border
 	I1idx = border+1:N[1]-border

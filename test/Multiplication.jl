@@ -31,7 +31,7 @@ begin
 
 	# Uniform points, No Boundary
 	Usamples = grid(M, 0.5)
-	TUNB = freq2wave(Usamples, "haar", J)
+	TUNB = Freq2Wave(Usamples, "haar", J)
 	AUNB = collect(TUNB)
 
 	y1UNB = TUNB*x
@@ -46,7 +46,7 @@ begin
 
 
 	# Uniform points, with Boundary
-	TUB = freq2wave(Usamples, "db2", J)
+	TUB = Freq2Wave(Usamples, "db2", J)
 	AUB = collect(TUB)
 
 	y1UB = TUB*x
@@ -66,7 +66,7 @@ begin
 	#= sort!(NUsamples) =#
 
 	# Non-Uniform points, No Boundary
-	TNUNB = freq2wave(NUsamples, "haar", J, K)
+	TNUNB = Freq2Wave(NUsamples, "haar", J, K)
 	ANUNB = collect(TNUNB)
 
 	y1NUNB = TNUNB*x
@@ -81,7 +81,7 @@ begin
 
 
 	# Non-Uniform points, with Boundary
-	TNUB = freq2wave(NUsamples, "db2", J, K)
+	TNUB = Freq2Wave(NUsamples, "db2", J, K)
 	ANUB = collect(TNUB)
 
 	y1NUB = TNUB*x
@@ -113,7 +113,7 @@ begin
 
 	# Uniform points, No Boundary
 	Usamples = grid((M,M), 0.5)
-	TUNB = freq2wave(Usamples, "haar", J)
+	TUNB = Freq2Wave(Usamples, "haar", J)
 	AUNB = collect(TUNB)
 
 	y1UNB = TUNB*x
@@ -128,7 +128,7 @@ begin
 
 
 	# Uniform points, with Boundary
-	TUB = freq2wave(Usamples, "db2", J)
+	TUB = Freq2Wave(Usamples, "db2", J)
 	AUB = collect(TUB)
 
 	y1UB = TUB*x
@@ -146,7 +146,7 @@ begin
 	NUsamples = N*rand(M^2,2) - K
 
 	# Non-Uniform points, No Boundary
-	TNUNB = freq2wave(NUsamples, "haar", J, K)
+	TNUNB = Freq2Wave(NUsamples, "haar", J, K)
 	ANUNB = collect(TNUNB)
 
 	y1NUNB = TNUNB*x
@@ -161,7 +161,7 @@ begin
 
 
 	# Non-Uniform points, with Boundary
-	TNUB = freq2wave(NUsamples, "db2", J, K)
+	TNUB = Freq2Wave(NUsamples, "db2", J, K)
 	ANUB = collect(TNUB)
 
 	y1NUB = TNUB*x
