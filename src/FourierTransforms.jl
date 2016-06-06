@@ -49,8 +49,6 @@ to control this there are optional arguments:
 - `maxcount`: The maximum number of factors.
 """->
 function FourDaubScaling( xi::Real, C::Vector{Float64}, p::Integer=0; prec=SMALL_EPS, maxcount=100)
-	# TODO: Move these checks to vector version?
-	# TODO: Assertions in macro?
 	isapprox(sum(C), 1.0) || throw(AssertionError("Filter must sum to one"))
 	prec >= SMALL_EPS || throw(DomainError())
 	maxcount >= 1 || throw(DomainError())
@@ -89,7 +87,6 @@ function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer
 	if ishaar(wavename)
 		return FourHaarScaling(xi, J, k)
 	elseif isdaubechies(wavename)
-		# TODO: offset as an argument to this function?
 		return FourDaubScaling(xi, van_moment(wavename), J, k; args...)
 	else
 		error(string("Fourier transform for ", wavename, " is not implemented"))
@@ -158,8 +155,6 @@ The Fourier transform at `xi` of the Daubechies boundary scaling function with `
 The output is an `p`-by-`length(xi)` matrix where column `j` holds the Fourier transform of the `p` boundary functions at `xi[j]`.
 """->
 function FourDaubScaling{T<:Real}( xi::AbstractVector{T}, p::Integer, side::Char; maxcount=40 )
-	# TODO: Check the phaseshifts of the interior functions
-	# TODO: Filters of the interior functions
 	1 <= maxcount <= 100 || throw(DomainError())
 	#=
 	- F is a vector with the Fourier transforms of the boundary scaling
@@ -248,36 +243,34 @@ function FourHaarScaling(xi::Real, J::Integer, k::Integer)
 end
 
 function FourHaarScaling{T<:Real}( xi::AbstractArray{T}, J::Integer)
-	# TODO: Save 2^-J and do above calculations explicitly?
+	dilation = 2.0^(-J)
+	scale_factor = sqrt(dilation)
 	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
-		@inbounds Y[idx] = FourHaarScaling( xi[idx], J )
+		@inbounds Y[idx] = scale_factor * FourHaarScaling( dilation*xi[idx] )
 	end
 
 	return Y
 end
 
 function FourHaarScaling{T<:Real}( xi::AbstractArray{T}, J::Integer, k::Integer)
+	dilation = 2.0^(-J)
+	scale_factor = sqrt(dilation)
 	Y = Array{Complex{Float64}}(size(xi))
 	for idx in eachindex(xi)
-		@inbounds Y[idx] = FourHaarScaling( xi[idx], J, k )
+		@inbounds Y[idx] = cis(-twoπ*dilation*k*xi[idx]) * scale_factor * FourHaarScaling( dilation*xi[idx] )
 	end
 
 	return Y
 end
 
 
-#=
-function FourDaubScaling(xi::Real, C::Vector{Float64}, J::Integer; args...)
-	sqrt(2.0^(-J)) * FourDaubScaling(2.0^(-J)*xi, C; args...)
+function FourDaubScaling( xi, p::Integer, J::Integer=0; offset::Integer=-p, args... )
+	C = coef( ifilter(p) )
+	scale!(C, 1/sum(C))
+	FourDaubScaling( xi, C, J; offset=offset, args... )
 end
 
-function FourDaubScaling(xi::Real, C::Vector{Float64}, J::Integer, k::Integer; args...)
-	cis( -2.0*pi*2.0^(-J)*k*xi ) * FourDaubScaling(xi, C, J; args...)
-end
-=#
-
-# TODO: method w/o J and k?
 function FourDaubScaling( xi, p::Integer, J::Integer=0, k::Integer=0; offset::Integer=-p, args... )
 	C = coef( ifilter(p) )
 	scale!(C, 1/sum(C))

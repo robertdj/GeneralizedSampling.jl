@@ -1,20 +1,6 @@
 # ------------------------------------------------------------
 # 1D change of basis matrix
 
-#=
-TODO: Move doc to Types.jl
-@doc """
-	Freq2Wave(samples, wavename::String, J::Int, B; ...)
-
-Make change of basis for switching between frequency responses and wavelets.
-
-- `samples` are the sampling locations as a vector for 1D and 2-by-M / M-by-2 matrix for 2D.
-- `wave` is the name of the wavelet; see documentation for possibilities.
-- `J` is the scale of the wavelet transform to reconstruct.
-- `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
-- Optional arguments (if needed) are passed to the functions computing Fourier transforms.
-"""->
-=#
 function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
 	Nint = 2^J
@@ -540,7 +526,6 @@ etc
 function Base.collect(T::Freq2NoBoundaryWave{2})
 	M = size(T,1)
 	Nx, Ny = wsize(T)
-	# TODO: Check if the matrix fits in memory
 	F = Array{Complex{Float64}}(M, Nx*Ny)
 
 	phi = prod(T.internal, 2)
@@ -585,7 +570,6 @@ end
 function Base.collect(T::Freq2BoundaryWave{2})
 	M = size(T,1)
 	Nx, Ny = wsize(T)
-	# TODO: Check if the matrix fits in memory
 	F = Array{Complex{Float64}}(M, size(T,2))
 
 	phix = Array{Complex{Float64}}(M)

@@ -11,11 +11,15 @@ abstract CoB
 `Freq2Wave` is a change of basis type between frequency samples and wavelets. 
 
 There are sub types for wavelets with and without boundary correction.
+To initialize a `Freq2Wave` type, run
 
-The `weights` entry is a `Nullable` type and
+	Freq2Wave(samples, wavename::String, J::Int, B; ...)
 
-- If the samples *are* uniform, `weights` is `Null`.
-- If the samples are *not* uniform, `weights` contains the weights as a `Nullable` vector and `diag` are scaled with `weights`.
+- `samples` are the sampling locations as a vector for 1D and M-by-2 matrix for 2D.
+- `wave` is the name of the wavelet; see documentation for possibilities.
+- `J` is the scale of the wavelet transform to reconstruct.
+- `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
+- Optional arguments (if needed) are passed to the functions computing Fourier transforms.
 """->
 abstract Freq2Wave{D} <: CoB
 
