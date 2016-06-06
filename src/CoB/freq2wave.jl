@@ -7,7 +7,8 @@ function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	
 	# TODO: Good condition?
-	if Nint >= length(samples)
+	M = length(samples)
+	if Nint >= M
 		warn("The scale is high compared to the number of samples")
 	end
 
@@ -22,10 +23,13 @@ function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 	end
 
 	# Fourier transform of the internal scaling function
-	FT = FourScalingFunc( samples, wavename, J; args... )
+	internal = FourScalingFunc( samples, wavename, J; args... )
 
 	# Diagonal matrix used in 'multiplication' with NFFT
-	diag = FT .* cis(-pi*samples)
+	diag = Array{Complex{Float64}}(1, M)
+	for m = 1:M
+		diag[m] = internal[m] * cis(-pi*samples[m])
+	end
 
 	# The number of internal wavelets in reconstruction
 	if hasboundary(wavename)
@@ -41,12 +45,12 @@ function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave(FT, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave(internal, W, J, wavename, diag, p)
 	else
 		left = FourScalingFunc( samples, wavename, 'L', J; args... )
 		right = FourScalingFunc( samples, wavename, 'R', J; args... )
 
-		return Freq2BoundaryWave(FT, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave(internal, W, J, wavename, diag, p, left, right)
 	end
 end
 
@@ -182,10 +186,14 @@ function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 	end
 
 	# Fourier transform of the internal scaling function
-	FT = FourScalingFunc( samples, wavename, J )
+	internal = FourScalingFunc( samples, wavename, J )
 
 	# Diagonal matrix for multiplication with internal scaling function
-	diag = FT .* cis( -pi*samples )
+	diag = internal'
+	xi = samples'
+	for m = 1:M, d in 1:2
+		diag[d,m] *= internal[m] * cis(-pi*xi[d,m])
+	end
 
 	# The number of internal wavelets in reconstruction
 	if hasboundary(wavename)
@@ -194,14 +202,13 @@ function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 	end
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
-	xi = samples'
 	scale!(xi, 2.0^(-J))
 	frac!(xi)
 	p = NFFTPlan(xi, (Nint,Nint))
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave(FT, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave(internal, W, J, wavename, diag, p)
 	else
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
@@ -214,19 +221,18 @@ function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		rightY = FourScalingFunc( samplesy, wavename, 'R', J; args... )
 		right = cat(3, rightX, rightY )
 
-		return Freq2BoundaryWave(FT, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave(internal, W, J, wavename, diag, p, left, right)
 	end
 end
 
 
 function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave{D}, X::DenseArray{Complex{Float64},D})
-	size(T,1) == length(y) || throw(DimensionMismatch())
+	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
 	wsize(T) == size(X) || throw(DimensionMismatch())
 
-
 	NFFT.nfft!(T.NFFT, X, y)
-	for d in 1:D
-		had!(y, T.diag[:,d])
+	for m in 1:M, d in 1:D
+		y[m] *= T.diag[d,m]
 	end
 
 	isuniform(T) || had!(y, get(T.weights))

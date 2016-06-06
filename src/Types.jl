@@ -35,7 +35,8 @@ macro common_freq2wave()
 
 		# In 1D: T = [left diag*NFFT right]
 		# In 2D, diagonals for each dimension is needed
-		diag::Array{Complex{Float64}, D}
+		#= diag::Array{Complex{Float64}, D} =#
+		diag::Matrix{Complex{Float64}}
 		NFFT::NFFT.NFFTPlan{D,Float64}
 	end)
 end
