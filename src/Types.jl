@@ -35,8 +35,8 @@ macro common_freq2wave()
 
 		# In 1D: T = [left diag*NFFT right]
 		# In 2D, diagonals for each dimension is needed
-		#= diag::Array{Complex{Float64}, D} =#
 		diag::Matrix{Complex{Float64}}
+		#= diag::Array{Complex{Float64}, D} =#
 		NFFT::NFFT.NFFTPlan{D,Float64}
 	end)
 end
@@ -49,8 +49,10 @@ end
 # Uniform samples, boundary correction
 immutable Freq2BoundaryWave{D} <: Freq2Wave{D}
 	@common_freq2wave()
-	left::DenseArray{Complex{Float64}}
-	right::DenseArray{Complex{Float64}}
+	#= left::DenseArray{Complex{Float64}} =#
+	#= right::DenseArray{Complex{Float64}} =#
+	left::Vector{Any}
+	right::Vector{Any}
 
 	# TODO: Include arrays for temporary results in multiplication like NFFT.tmpVec?
 	innery::Vector{Complex{Float64}}
@@ -66,6 +68,6 @@ end
 # ------------------------------------------------------------
 # Load methods for types
 
-include("CoB/common.jl")
+#= include("CoB/common.jl") =#
 include("CoB/freq2wave.jl")
 

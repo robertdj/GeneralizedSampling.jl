@@ -50,7 +50,7 @@ function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 		left = FourScalingFunc( samples, wavename, 'L', J; args... )
 		right = FourScalingFunc( samples, wavename, 'R', J; args... )
 
-		return Freq2BoundaryWave(internal, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave(internal, W, J, wavename, diag, p, Any[left], Any[right])
 	end
 end
 
@@ -100,7 +100,7 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	vm = van_moment(T)
 
 	# Left boundary
-	F[:,1:vm] = T.left
+	F[:,1:vm] = T.left[1]
 
 	# Internal function
 	for n = vm+1:N-vm
@@ -110,7 +110,7 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	end
 
 	# Right boundary
-	F[:,N-vm+1:N] = T.right
+	F[:,N-vm+1:N] = T.right[1]
 
 	if !isuniform(T)
 		broadcast!(*, F, F, get(T.weights))
@@ -213,13 +213,13 @@ function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
 
-		leftX = FourScalingFunc( samplesx, wavename, 'L', J; args... )
-		leftY = FourScalingFunc( samplesy, wavename, 'L', J; args... )
-		left = cat(3, leftX, leftY )
+		left = cell(2)
+		left[1] = FourScalingFunc( samplesx, wavename, 'L', J; args... )
+		left[2] = FourScalingFunc( samplesy, wavename, 'L', J; args... )
 
-		rightX = FourScalingFunc( samplesx, wavename, 'R', J; args... )
-		rightY = FourScalingFunc( samplesy, wavename, 'R', J; args... )
-		right = cat(3, rightX, rightY )
+		right = cell(2)
+		right[1] = FourScalingFunc( samplesx, wavename, 'R', J; args... )
+		right[2] = FourScalingFunc( samplesy, wavename, 'R', J; args... )
 
 		return Freq2BoundaryWave(internal, W, J, wavename, diag, p, left, right)
 	end
@@ -232,7 +232,7 @@ function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWa
 
 	NFFT.nfft!(T.NFFT, X, y)
 	for m in 1:M, d in 1:D
-		y[m] *= T.diag[d,m]
+		@inbounds y[m] *= T.diag[d,m]
 	end
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -242,18 +242,22 @@ end
 
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, x::DenseVector{Complex{Float64}})
-	size(T,1) == length(y) || throw(DimensionMismatch())
+	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
 	size(T,2) == length(x) || throw(DimensionMismatch())
 
 	xleft, xint, xright = split(x, van_moment(T))
 
+	# Contribution from the left boundary
+	BLAS.gemv!('N', ComplexOne, T.left[1], xleft, ComplexOne, y)
+
 	# Internal scaling function
 	NFFT.nfft!(T.NFFT, xint, y)
-	had!(y, T.diag)
+	for m in 1:M
+		@inbounds y[m] *= T.diag[m]
+	end
 
-	# Update y with boundary contributions
-	BLAS.gemv!('N', ComplexOne, T.left, xleft, ComplexOne, y)
-	BLAS.gemv!('N', ComplexOne, T.right, xright, ComplexOne, y)
+	# Contribution from the right boundary
+	BLAS.gemv!('N', ComplexOne, T.right[1], xright, ComplexOne, y)
 
 	isuniform(T) || had!(y, get(T.weights))
 
@@ -270,8 +274,9 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 
 	# Internal scaling function
 	NFFT.nfft!(T.NFFT, S.II, y)
-	had!(y, T.diag[:,1])
-	had!(y, T.diag[:,2])
+	for m in 1:M, d in 1:2
+		@inbounds y[m] *= T.diag[d,m]
+	end
 
 	# The non-internal contribution have a multiplication from each
 	# dimension of X
@@ -614,13 +619,13 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 		end
 	elseif 0 <= n < p
 		# source offset = dimension offset + column offset
-		so = (d-1)*M*p + n*M + 1
-		#= so = n*M + 1 =#
-		unsafe_copy!( phi, 1, T.left, so, M ) 
+		#= so = (d-1)*M*p + n*M + 1 =#
+		so = n*M + 1
+		unsafe_copy!( phi, 1, T.left[d], so, M ) 
 	else
-		so = (d-1)*M*p + (n-N+p)*M + 1
-		#= so = (n-N+p)*M + 1 =#
-		unsafe_copy!( phi, 1, T.right, so, M ) 
+		#= so = (d-1)*M*p + (n-N+p)*M + 1 =#
+		so = (n-N+p)*M + 1
+		unsafe_copy!( phi, 1, T.right[d], so, M ) 
 	end
 end
 
@@ -628,17 +633,23 @@ end
 # ------------------------------------------------------------
 # Common
 
-function Base.size(T::Freq2Wave, ::Type{Val{1}})
-	size(T.internal, 1)
+function Base.size{D}(T::Freq2Wave{D})
+	( size(T,1), size(T,2) )
 end
 
-function Base.size{D}(T::Freq2Wave{D}, ::Type{Val{2}})
-	2^(D*wscale(T))
+function Base.size{D}(T::Freq2Wave{D}, d::Integer)
+	if d == 1
+		size(T.internal, 1)
+	elseif d == 2
+		2^(D*wscale(T))
+	else
+		throw(AssertionError())
+	end
 end
 
 function van_moment(T::Freq2Wave)
 	if hasboundary(T)
-		return size(T.left,2)
+		return size(T.left[1], 2)
 	else
 		return van_moment(T.wavename)
 	end
