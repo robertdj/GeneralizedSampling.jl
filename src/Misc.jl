@@ -305,7 +305,7 @@ end
 Split `x` into 3 parts:
 Left, internal and right, where left and right are `border` outmost entries.
 """->
-function Base.split(x::DenseVector, border::Int)
+function Base.split(x::DenseVector, border::Integer)
 	border >= 1 || throw(DomainError())
 	(N = length(x)) > 2*border || throw(AssertionError())
 
@@ -316,17 +316,24 @@ function Base.split(x::DenseVector, border::Int)
 	return L, I, R
 end
 
-type SplitMatrix
-	LL::AbstractMatrix
-	IL::AbstractMatrix
-	RL::AbstractMatrix
-	LI::AbstractMatrix
-	II::AbstractMatrix
-	RI::AbstractMatrix
-	LR::AbstractMatrix
-	IR::AbstractMatrix
-	RR::AbstractMatrix
+type SplitMatrix{T, A<:AbstractMatrix}
+	LL::A
+	IL::A
+	RL::A
+	LI::A
+	II::A
+	RI::A
+	LR::A
+	IR::A
+	RR::A
+
+	SplitMatrix(LL::AbstractMatrix{T}, IL::AbstractMatrix{T},
+	RL::AbstractMatrix{T}, LI::AbstractMatrix{T}, II::AbstractMatrix{T},
+	RI::AbstractMatrix{T}, LR::AbstractMatrix{T}, IR::AbstractMatrix{T},
+	RR::AbstractMatrix{T}) = new(LL, IL, RL, LI, II, RI, LR, IR, RR)
 end
+SplitMatrix(LL, IL, RL, LI, II, RI, LR, IR, RR) =
+SplitMatrix{eltype(LL), typeof(LL)}(LL, IL, RL, LI, II, RI, LR, IR, RR)
 
 @doc """
 	split(A::Matrix, border) -> SplitMatrix
@@ -347,8 +354,8 @@ With both the horizontal and the vertical part divided in `L`eft,
 	| RL |  RI  | RR |
 	|____|______|____|
 """->
-function Base.split(A::DenseMatrix, border::Int)
-	border >= 1 || throw(DomainError())
+function Base.split{T}(A::DenseMatrix{T}, border::Integer)
+	border >= 2 || throw(DomainError())
 	N = size(A)
 	minimum(N) > 2*border || throw(AssertionError())
 
@@ -370,6 +377,6 @@ function Base.split(A::DenseMatrix, border::Int)
 	IR = slice(A, I1idx, R2idx)
 	RR = slice(A, R1idx, R2idx)
 
-	SplitMatrix( LL, IL, RL, LI, II, RI, LR, IR, RR )
+	SplitMatrix{T, typeof(LL)}( LL, IL, RL, LI, II, RI, LR, IR, RR )
 end
 

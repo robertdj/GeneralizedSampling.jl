@@ -265,11 +265,11 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 end
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}})
-	size(T,1) == length(y) || throw(DimensionMismatch())
+	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
 	wsize(T) == size(X) || throw(DimensionMismatch())
 	
 	# TODO: Remove once T.left is type stable
-	vm = van_moment(T)::Int64
+	vm = van_moment(T)
 	S = split(X, vm)
 
 	# Internal scaling function
@@ -286,6 +286,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 	# Update y with border and side contributions
 	# Fourier transform of the internal functions using 1D NFFT
 	for k in 1:vm
+		#=
 		# LL
 		# S.LL[:,k] is not a slice
 		A_mul_B!( T.innery, T.left[:,:,1], S.LL[:,k] )
@@ -323,6 +324,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}
 		NFFT.nfft!(T.NFFT, S.IR[:,k], T.innery, 1)
 		had!(T.innery, T.diag[:,1])
 		yphad!(y, T.right[:,k,2], T.innery)
+		=#
 	end
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -649,7 +651,7 @@ end
 
 function van_moment(T::Freq2Wave)
 	if hasboundary(T)
-		return size(T.left[1], 2)
+		return size(T.left[1], 2)::Int64
 	else
 		return van_moment(T.wavename)
 	end
