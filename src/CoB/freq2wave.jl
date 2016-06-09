@@ -97,20 +97,20 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	M, N = size(T)
 	F = Array{Complex{Float64}}(M, N)
 
-	vm = van_moment(T)
+	p = van_moment(T)
 
 	# Left boundary
-	F[:,1:vm] = T.left[1]
+	F[:,1:p] = T.left[1]
 
 	# Internal function
-	for n in vm+1:N-vm
+	for n in p:N-p-1
 		for m in 1:M
-			@inbounds F[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
+			@inbounds F[m,n+1] = T.internal[m]*cis( -twoπ*n*T.NFFT.x[m] )
 		end
 	end
 
 	# Right boundary
-	F[:,N-vm+1:N] = T.right[1]
+	F[:,N-p+1:N] = T.right[1]
 
 	if !isuniform(T)
 		broadcast!(*, F, F, get(T.weights))
@@ -247,16 +247,14 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 
 	xleft, xint, xright = split(x, van_moment(T))
 
-	# Contribution from the left boundary
-	BLAS.gemv!('N', ComplexOne, T.left[1], xleft, ComplexOne, y)
-
 	# Internal scaling function
 	NFFT.nfft!(T.NFFT, xint, y)
 	for m in 1:M
 		@inbounds y[m] *= T.diag[m]
 	end
 
-	# Contribution from the right boundary
+	# Contribution from the boundaries
+	BLAS.gemv!('N', ComplexOne, T.left[1], xleft, ComplexOne, y)
 	BLAS.gemv!('N', ComplexOne, T.right[1], xright, ComplexOne, y)
 
 	isuniform(T) || had!(y, get(T.weights))

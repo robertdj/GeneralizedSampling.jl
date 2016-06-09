@@ -100,7 +100,8 @@ end
 Compute the Fourier transform at `xi` of the boundary scaling function `wavename` with scale `J`.
 Optional arguments are passed to the Fourier transform of `wavename` (if relevant).
 
-For a vector `xi` of length `M`, the output is a matrix of size `M`-by-`p`, where `p` is the number of vanishing moments for wavename.
+For a vector `xi` of length `M`, the output is a matrix of size
+`M`-by-`p`, where `p` is the number of vanishing moments for `wavename`.
 
 **Note**: 
 For `side == 'L'` the *first* column of the output is related to the function closest to the left boundary, 
@@ -119,7 +120,7 @@ function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0
 	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...)'
 
 	if side == 'R'
-		phase_shift = cis( -twoπ*xi )
+		phase_shift = cis( -twoπ*xi*2.0^-J )
 		broadcast!(*, Y, Y, phase_shift)
 	end
 
