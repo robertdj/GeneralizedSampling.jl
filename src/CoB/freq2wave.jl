@@ -27,7 +27,7 @@ function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 
 	# Diagonal matrix used in 'multiplication' with NFFT
 	diag = Array{Complex{Float64}}(1, M)
-	for m = 1:M
+	for m in 1:M
 		diag[m] = internal[m] * cis(-pi*samples[m])
 	end
 
@@ -80,9 +80,9 @@ function Base.collect(T::Freq2NoBoundaryWave{1})
 	M, N = size(T)
 
 	F = Array{Complex{Float64}}(M, N)
-	for n = 1:N
+	for n = 0:N-1
 		for m = 1:M
-			@inbounds F[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
+			@inbounds F[m,n+1] = T.internal[m]*cis( -twoπ*n*T.NFFT.x[m] )
 		end
 	end
 
@@ -103,8 +103,8 @@ function Base.collect(T::Freq2BoundaryWave{1})
 	F[:,1:vm] = T.left[1]
 
 	# Internal function
-	for n = vm+1:N-vm
-		for m = 1:M
+	for n in vm+1:N-vm
+		for m in 1:M
 			@inbounds F[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
 		end
 	end
@@ -189,10 +189,10 @@ function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 	internal = FourScalingFunc( samples, wavename, J )
 
 	# Diagonal matrix for multiplication with internal scaling function
-	diag = internal'
 	xi = samples'
-	for m = 1:M, d in 1:2
-		diag[d,m] *= internal[m] * cis(-pi*xi[d,m])
+	diag = internal.'
+	for m in 1:M, d in 1:2
+		diag[d,m] *= cis( -pi*xi[d,m] )
 	end
 
 	# The number of internal wavelets in reconstruction
@@ -544,12 +544,10 @@ function Base.collect(T::Freq2NoBoundaryWave{2})
 	phi = prod(T.internal, 2)
 
 	idx = 0
-	for ny in 0:Ny-1
-		for nx in 0:Nx-1
-			idx += 1
-			for m in 1:M
-				@inbounds F[m,idx] = phi[m]*cis( -twoπ*(nx*T.NFFT.x[1,m] + ny*T.NFFT.x[2,m]) )
-			end
+	for ny in 0:Ny-1, nx in 0:Nx-1
+		idx += 1
+		for m in 1:M
+			@inbounds F[m,idx] = phi[m]*cis( -twoπ*(nx*T.NFFT.x[1,m] + ny*T.NFFT.x[2,m]) )
 		end
 	end
 
@@ -589,9 +587,9 @@ function Base.collect(T::Freq2BoundaryWave{2})
 	phiy = similar(phix)
 
 	idx = 0
-	for ny = 0:Ny-1
+	for ny in 0:Ny-1
 		unsafe_FourScaling!(phiy, T, ny, 2)
-		for nx = 0:Nx-1
+		for nx in 0:Nx-1
 			unsafe_FourScaling!(phix, T, nx, 1)
 			had!(phix, phiy)
 			F[:,idx+=1] = phix
@@ -620,12 +618,9 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 			@inbounds phi[m] = T.internal[m,d]*cis( -twoπ*n*T.NFFT.x[d,m] )
 		end
 	elseif 0 <= n < p
-		# source offset = dimension offset + column offset
-		#= so = (d-1)*M*p + n*M + 1 =#
 		so = n*M + 1
 		unsafe_copy!( phi, 1, T.left[d], so, M ) 
 	else
-		#= so = (d-1)*M*p + (n-N+p)*M + 1 =#
 		so = (n-N+p)*M + 1
 		unsafe_copy!( phi, 1, T.right[d], so, M ) 
 	end
