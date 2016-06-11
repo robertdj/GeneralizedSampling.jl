@@ -213,19 +213,28 @@ function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
 
-		left = cell(2)
+		left = cell(2,vm+1)
 		left[1] = FourScalingFunc( samplesx, wavename, 'L', J; args... )
 		left[2] = FourScalingFunc( samplesy, wavename, 'L', J; args... )
 
-		right = cell(2)
+		right = cell(2,vm+1)
 		right[1] = FourScalingFunc( samplesx, wavename, 'R', J; args... )
 		right[2] = FourScalingFunc( samplesy, wavename, 'R', J; args... )
+
+		# Views of the columns in left/right
+		for k in 1:vm, d in 1:2
+			left[d,k+1]  = slice( left[d], :, k )
+			right[d,k+1] = slice( right[d], :, k )
+		end
 
 		return Freq2BoundaryWave(internal, W, J, wavename, diag, p, left, right)
 	end
 end
 
+left(T::Freq2BoundaryWave{2}, d::Integer, k::Integer) = T.left[d,k+1]
+right(T::Freq2BoundaryWave{2}, d::Integer, k::Integer) = T.right[d,k+1]
 
+# TODO: X -> AbstractMatrix
 function Base.A_mul_B!{D}(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave{D}, X::DenseArray{Complex{Float64},D})
 	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
 	wsize(T) == size(X) || throw(DimensionMismatch())
@@ -262,67 +271,72 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}
 	return y
 end
 
+function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}}, d::Integer, k::Integer)
+	p = van_moment(T)
+	N = size(X,1)
+	xint = slice(X, p+1:N-p, k)
+
+	# Internal scaling function
+	if d == 1
+		NFFT.nfft!(T.NFFTx, xint, y)
+	elseif d == 2
+		NFFT.nfft!(T.NFFTy, xint, y)
+	else
+		throw(DimensionMismatch())
+	end
+	for m in 1:length(y)
+		@inbounds y[m] *= T.diag[d,m]
+	end
+
+	# Contribution from the boundaries
+	xleft = slice(X, 1:p, k)
+	BLAS.gemv!('N', ComplexOne, T.left[d], xleft, ComplexOne, y)
+	xright = slice(X, N-p+1:N, k)
+	BLAS.gemv!('N', ComplexOne, T.right[d], xright, ComplexOne, y)
+
+	isuniform(T) || had!(y, get(T.weights))
+
+	return y
+end
+
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{2}, X::DenseMatrix{Complex{Float64}})
 	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
-	wsize(T) == size(X) || throw(DimensionMismatch())
+	(N = wsize(T)) == size(X) || throw(DimensionMismatch())
 	
-	# TODO: Remove once T.left is type stable
 	vm = van_moment(T)
 	S = split(X, vm)
 
-	# Internal scaling function
-	NFFT.nfft!(T.NFFT, S.II, y)
+	# Internal scaling functions
+	NFFT.nfft!(T.NFFT, S.internal, y)
 	for m in 1:M, d in 1:2
 		@inbounds y[m] *= T.diag[d,m]
 	end
 
-	# The non-internal contribution have a multiplication from each
-	# dimension of X
-
-	# TODO: Am I using the correct order for the right boundary?
-
-	# Update y with border and side contributions
-	# Fourier transform of the internal functions using 1D NFFT
+	# Update y with border contributions
 	for k in 1:vm
-		#=
-		# LL
-		# S.LL[:,k] is not a slice
-		A_mul_B!( T.innery, T.left[:,:,1], S.LL[:,k] )
-		yphad!(y, T.left[:,k,2], T.innery)
-		# LR
-		A_mul_B!( T.innery, T.left[:,:,1], S.LR[:,k] )
-		yphad!(y, T.right[:,k,2], T.innery)
-		# RL
-		A_mul_B!( T.innery, T.right[:,:,1], S.RL[:,k] )
-		yphad!(y, T.left[:,k,2], T.innery)
-		# RR
-		A_mul_B!( T.innery, T.right[:,:,1], S.RR[:,k] )
-		yphad!(y, T.right[:,k,2], T.innery)
+		# Left
+		A_mul_B!( T.innery, T, X, 1, k )
+		yphad!(y, left(T,2,k), T.innery)
 
-		# LI
-		#= NFFT.nfft!(p2, vec(S.LI[k,:]), T.innery) # DFT part of internal =#
-		NFFT.nfft!(T.NFFT, vec(S.LI[k,:]), T.innery, 2) # DFT part of internal
-		had!(T.innery, T.diag[:,2]) # Fourier transform of internal
-		yphad!(y, T.left[:,k,1], T.innery) # Contribution from left
+		# Right
+		A_mul_B!( T.innery, T, X, 1, N[2]-vm+k )
+		yphad!(y, right(T,2,k), T.innery)
 
-		# IL
-		#= NFFT.nfft!(p1, S.IL[:,k], T.innery) =#
-		NFFT.nfft!(T.NFFT, S.IL[:,k], T.innery, 1)
-		had!(T.innery, T.diag[:,1])
-		yphad!(y, T.left[:,k,2], T.innery)
+		# Upper
+		x = slice(X, k, vm+1:N[2]-vm)
+		NFFT.nfft!( T.NFFTy, x, T.innery )
+		for m in 1:M
+			@inbounds T.innery[m] *= T.diag[2,m]
+		end
+		yphad!(y, left(T,1,k), T.innery)
 
-		# RI
-		#= NFFT.nfft!(p2, vec(S.RI[k,:]), T.innery) =#
-		NFFT.nfft!(T.NFFT, vec(S.RI[k,:]), T.innery, 2)
-		had!(T.innery, T.diag[:,2])
-		yphad!(y, T.right[:,k,1], T.innery)
-
-		# IR
-		#= NFFT.nfft!(p1, S.IR[:,k], T.innery) =#
-		NFFT.nfft!(T.NFFT, S.IR[:,k], T.innery, 1)
-		had!(T.innery, T.diag[:,1])
-		yphad!(y, T.right[:,k,2], T.innery)
-		=#
+		# Lower
+		x = slice(X, N[1]-vm+k, vm+1:N[2]-vm)
+		NFFT.nfft!( T.NFFTy, x, T.innery )
+		for m in 1:M
+			@inbounds T.innery[m] *= T.diag[2,m]
+		end
+		yphad!(y, right(T,1,k), T.innery)
 	end
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -579,7 +593,7 @@ end
 function Base.collect(T::Freq2BoundaryWave{2})
 	M = size(T,1)
 	Nx, Ny = wsize(T)
-	F = Array{Complex{Float64}}(M, size(T,2))
+	F = Array{Complex{Float64}}(M, Nx*Ny)
 
 	phix = Array{Complex{Float64}}(M)
 	phiy = similar(phix)

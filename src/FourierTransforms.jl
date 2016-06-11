@@ -122,6 +122,7 @@ function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0
 	if side == 'R'
 		phase_shift = cis( -twoπ*xi*2.0^-J )
 		broadcast!(*, Y, Y, phase_shift)
+		Y = flipdim(Y,2)
 	end
 
 	return Y
