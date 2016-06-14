@@ -317,41 +317,37 @@ function Base.split(x::DenseVector, border::Integer)
 end
 
 type SplitMatrix{T, A<:AbstractMatrix}
-	LL::A
-	IL::A
-	RL::A
-	LI::A
-	II::A
-	RI::A
-	LR::A
-	IR::A
-	RR::A
+	left::A
+	internal::A
+	right::A
+	upper::A
+	lower::A
 
-	SplitMatrix(LL::AbstractMatrix{T}, IL::AbstractMatrix{T},
-	RL::AbstractMatrix{T}, LI::AbstractMatrix{T}, II::AbstractMatrix{T},
-	RI::AbstractMatrix{T}, LR::AbstractMatrix{T}, IR::AbstractMatrix{T},
-	RR::AbstractMatrix{T}) = new(LL, IL, RL, LI, II, RI, LR, IR, RR)
+	SplitMatrix(left::AbstractMatrix{T}, internal::AbstractMatrix{T},
+	right::AbstractMatrix{T}, upper::AbstractMatrix{T}, 
+	lower::AbstractMatrix{T}) = new(left, internal, right, upper, lower)
 end
-SplitMatrix(LL, IL, RL, LI, II, RI, LR, IR, RR) =
-SplitMatrix{eltype(LL), typeof(LL)}(LL, IL, RL, LI, II, RI, LR, IR, RR)
+SplitMatrix(left, internal, right, upper, lower) =
+SplitMatrix{eltype(left), typeof(left)}(left, internal, right, upper, lower)
 
 @doc """
 	split(A::Matrix, border) -> SplitMatrix
 
-Split `A` into 9 parts:
-4 corners, 4 sides and the internal part. `border` is the width of the
-boundary.
+Split `A` into 5 parts:
 
-With both the horizontal and the vertical part divided in `L`eft,
-`I`nternal and `R`ight, the parts are
+- Internal
+- left
+- right
+- upper
+- lower
 
 	 ________________ 
-	| LL |  LI  | LR |
-	|____|______|____|
+	|    |  up  |    |
+	|    |______|    |
 	|    |      |    |
-	| IL |  II  | IR |
-	|____|______|____|
-	| RL |  RI  | RR |
+	| le |  int | ri |
+	|    |______|    |
+	|    |  lo  |    |
 	|____|______|____|
 """->
 function Base.split{T}(A::DenseMatrix{T}, border::Integer)
@@ -359,24 +355,16 @@ function Base.split{T}(A::DenseMatrix{T}, border::Integer)
 	N = size(A)
 	minimum(N) > 2*border || throw(AssertionError())
 
-	Lidx = 1:border
 	I1idx = border+1:N[1]-border
-	R1idx = N[1]-border+1:N[1]
 	I2idx = border+1:N[2]-border
-	R2idx = N[2]-border+1:N[2]
 
-	LL = slice(A, Lidx, Lidx)
-	IL = slice(A, I1idx, Lidx)
-	RL = slice(A, R1idx, Lidx)
+	left = slice(A, 1:N[1], 1:border)
+	internal = slice(A, I1idx, I2idx)
+	right = slice(A, 1:N[1], N[2]-border+1:N[2])
 
-	LI = slice(A, Lidx, I2idx)
-	II = slice(A, I1idx, I2idx)
-	RI = slice(A, R1idx, I2idx)
+	upper = slice(A, 1:border, I1idx)
+	lower = slice(A, N[1]-border+1:N[1], I2idx)
 
-	LR = slice(A, Lidx, R2idx)
-	IR = slice(A, I1idx, R2idx)
-	RR = slice(A, R1idx, R2idx)
-
-	SplitMatrix{T, typeof(LL)}( LL, IL, RL, LI, II, RI, LR, IR, RR )
+	SplitMatrix{T, typeof(left)}(left, internal, right, upper, lower)
 end
 

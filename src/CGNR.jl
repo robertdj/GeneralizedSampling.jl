@@ -47,10 +47,13 @@ function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::Abstrac
 	return x
 end
 
-function cgnr{D}(T::Freq2Wave{D}, B::AbstractArray{Complex{Float64},D}, x0::AbstractArray{Complex{Float64},D}; args...)
+#=
+function cgnr(T::Freq2Wave, B::AbstractArray{Complex{Float64}},
+	x0::AbstractVecOrMat{Complex{Float64},D}; args...)
 	b = flatten_view(B)
 	cgnr(T, b, x0; args...)
 end
+=#
 
 @doc """
 	cgnr(T::Freq2wave, b, x0; ...) -> x
@@ -58,7 +61,7 @@ end
 Conjugate gradient for normal equations residual method for `Freq2Wave`.
 The initial point `x0` must be of the same dimension as `T`.
 """->
-function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=LARGE_EPS, maxiter=max(length(x0),50))
+function cgnr(T::Freq2Wave, b::AbstractVector{Complex{Float64}}, x0::AbstractVecOrMat{Complex{Float64}}; prec=LARGE_EPS, maxiter=max(length(x0),50))
 	size(T,1) == length(b) || throw(DimensionMismatch())
 	wsize(T) == size(x0) || throw(DimensionMismatch())
 	prec >= SMALL_EPS || throw(DomainError())

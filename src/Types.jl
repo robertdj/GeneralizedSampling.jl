@@ -21,61 +21,116 @@ To initialize a `Freq2Wave` type, run
 - `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
 - Optional arguments (if needed) are passed to the functions computing Fourier transforms.
 """->
-abstract Freq2Wave{D} <: CoB
+abstract Freq2Wave <: CoB
 
-macro common_freq2wave()
+abstract Freq2Wave1D <: Freq2Wave
+abstract Freq2Wave2D <: Freq2Wave
+# The 2D Freq2BoundaryWave's need a lot that the 1D's do not.
+# Therefore, I don't use the dimension as a TypePar.
+
+macro common_freq2wave(D)
 	esc(quote
 		# Sampling
 		internal::Array{Complex{Float64}, D}
-		weights::Nullable{Vector{Complex{Float64}}}
+		weights::Nullable{ Vector{Complex{Float64}} }
 
 		# Reconstruction
-		J::Int
+		J::Int64
 		wavename::AbstractString
 
-		# In 1D: T = [left diag*NFFT right]
-		# In 2D, diagonals for each dimension is needed
-		diag::Matrix{Complex{Float64}}
+		# Multiplication
+		diag::Vector{Complex{Float64}}
 		NFFT::NFFT.NFFTPlan{D,Float64}
-		NFFTx::NFFT.NFFTPlan{1,Float64}
-		NFFTy::NFFT.NFFTPlan{1,Float64}
 	end)
 end
 
-# Uniform samples, no boundary correction
-immutable Freq2NoBoundaryWave{D} <: Freq2Wave{D}
-	@common_freq2wave()
+# No boundary correction
+immutable Freq2NoBoundaryWave1D <: Freq2Wave1D
+	# Sampling
+	internal::Vector{Complex{Float64}}
+	weights::Nullable{ Vector{Complex{Float64}} }
+
+	# Reconstruction
+	J::Int64
+	wavename::AbstractString
+
+	# Multiplication
+	diag::Vector{Complex{Float64}}
+	NFFT::NFFT.NFFTPlan{1,Float64}
 end
 
-# Uniform samples, boundary correction
-immutable Freq2BoundaryWave{D} <: Freq2Wave{D}
-	@common_freq2wave()
+immutable Freq2NoBoundaryWave2D <: Freq2Wave2D
+	internal::Matrix{Complex{Float64}}
+	weights::Nullable{ Vector{Complex{Float64}} }
+
+	J::Int64
+	wavename::AbstractString
+
+	diag::Matrix{Complex{Float64}}
+	NFFT::NFFT.NFFTPlan{2,Float64}
+end
+
+# Boundary correction
+immutable Freq2BoundaryWave1D <: Freq2Wave1D
+	internal::Vector{Complex{Float64}}
+	weights::Nullable{Vector{Complex{Float64}}}
+
+	J::Int64
+	wavename::AbstractString
+
+	diag::Vector{Complex{Float64}}
+	NFFT::NFFT.NFFTPlan{1,Float64}
+
+	# TODO: Make type stable
+	left::Matrix{Complex{Float64}}
+	right::Matrix{Complex{Float64}}
+
+	innery::Vector{Complex{Float64}}
+end
+
+immutable Freq2BoundaryWave2D <: Freq2Wave2D
+	internal::Matrix{Complex{Float64}}
+	weights::Nullable{Vector{Complex{Float64}}}
+
+	J::Int64
+	wavename::AbstractString
+
+	diag::Matrix{Complex{Float64}}
+	NFFT::NFFT.NFFTPlan{2,Float64}
+	NFFTx::NFFT.NFFTPlan{1,Float64}
+	NFFTy::NFFT.NFFTPlan{1,Float64}
+
 	# TODO: Make type stable
 	left::Matrix{Any}
 	right::Matrix{Any}
 
-	# TODO: Include arrays for temporary results in multiplication like NFFT.tmpVec?
 	innery::Vector{Complex{Float64}}
 end
 
-function Freq2BoundaryWave{D}(internal::Array{Complex{Float64},D}, weights, J, wavename, diag, NFFT, left, right)
+
+# ------------------------------------------------------------------------
+# Constructors
+
+function Freq2BoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wavename, diag, NFFT, left, right)
+	innery = Array{Complex{Float64}}( length(internal) )
+	Freq2BoundaryWave1D( internal, weights, J, wavename, diag, NFFT, left, right, innery )
+end
+
+function Freq2BoundaryWave2D(internal::Matrix{Complex{Float64}}, weights, J, wavename, diag, NFFT, left, right)
+	#= size(internal,1) == 2 || throw(DimensionMismatch()) =#
 	innery = Array{Complex{Float64}}( size(internal,1) )
 
-	if D == 2
-		NFFTx = NFFTPlan( NFFT.x[1,:], (NFFT.N[1],) )
-		NFFTy = NFFTPlan( NFFT.x[2,:], (NFFT.N[2],) )
-	else
-		NFFTx = NFFT
-		NFFTy = NFFT
-	end
+	# TODO: Different for uniform samples
+	NFFTx = NFFTPlan( NFFT.x[1,:], (NFFT.N[1],) )
+	NFFTy = NFFTPlan( NFFT.x[2,:], (NFFT.N[2],) )
 
-	Freq2BoundaryWave( internal, weights, J, wavename, diag, NFFT, NFFTx, NFFTy, left, right, innery )
+	Freq2BoundaryWave2D( internal, weights, J, wavename, diag, NFFT, NFFTx, NFFTy, left, right, innery )
 end
 
 
-# ------------------------------------------------------------
-# Load methods for types
+# ------------------------------------------------------------------------
+# Load methods
 
-#= include("CoB/common.jl") =#
 include("CoB/freq2wave.jl")
+#= include("Freq2Wave/freq2wave.jl") =#
 
