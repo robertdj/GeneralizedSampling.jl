@@ -131,6 +131,5 @@ end
 # ------------------------------------------------------------------------
 # Load methods
 
-include("CoB/freq2wave.jl")
-#= include("Freq2Wave/freq2wave.jl") =#
+include("freq2wave.jl")
 

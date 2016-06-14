@@ -54,7 +54,7 @@ const ComplexZero = zero(Complex{Float64})
 const twoπ = 2.0*pi
 
 # TODO: Case conflict with types.jl
-include("Types.jl")
+include("Freq2Wave/Types.jl")
 include("Misc.jl")
 include("NFFT.jl")
 include("FourierTransforms.jl")
