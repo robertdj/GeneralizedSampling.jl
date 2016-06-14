@@ -25,24 +25,8 @@ abstract Freq2Wave <: CoB
 
 abstract Freq2Wave1D <: Freq2Wave
 abstract Freq2Wave2D <: Freq2Wave
-# The 2D Freq2BoundaryWave's need a lot that the 1D's do not.
-# Therefore, I don't use the dimension as a TypePar.
-
-macro common_freq2wave(D)
-	esc(quote
-		# Sampling
-		internal::Array{Complex{Float64}, D}
-		weights::Nullable{ Vector{Complex{Float64}} }
-
-		# Reconstruction
-		J::Int64
-		wavename::AbstractString
-
-		# Multiplication
-		diag::Vector{Complex{Float64}}
-		NFFT::NFFT.NFFTPlan{D,Float64}
-	end)
-end
+# The 2D Freq2BoundaryWave's need entries the 1D's do not, so I don't
+# use the dimension as a TypePar.
 
 # No boundary correction
 immutable Freq2NoBoundaryWave1D <: Freq2Wave1D
@@ -57,6 +41,8 @@ immutable Freq2NoBoundaryWave1D <: Freq2Wave1D
 	# Multiplication
 	diag::Vector{Complex{Float64}}
 	NFFT::NFFT.NFFTPlan{1,Float64}
+
+	innery::Vector{Complex{Float64}}
 end
 
 immutable Freq2NoBoundaryWave2D <: Freq2Wave2D
@@ -68,6 +54,8 @@ immutable Freq2NoBoundaryWave2D <: Freq2Wave2D
 
 	diag::Matrix{Complex{Float64}}
 	NFFT::NFFT.NFFTPlan{2,Float64}
+
+	innery::Vector{Complex{Float64}}
 end
 
 # Boundary correction
@@ -110,6 +98,11 @@ end
 
 # ------------------------------------------------------------------------
 # Constructors
+
+function Freq2NoBoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wavename, diag, NFFT)
+	innery = Array{Complex{Float64}}( length(internal) )
+	Freq2NoBoundaryWave1D( internal, weights, J, wavename, diag, NFFT, innery )
+end
 
 function Freq2BoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wavename, diag, NFFT, left, right)
 	innery = Array{Complex{Float64}}( length(internal) )

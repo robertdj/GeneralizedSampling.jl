@@ -229,7 +229,7 @@ left(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.left[d,k+1]
 right(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.right[d,k+1]
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1D, x::DenseVector{Complex{Float64}})
-	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
+	size(T,1) == length(y) || throw(DimensionMismatch())
 	size(T,2) == length(x) || throw(DimensionMismatch())
 
 	NFFT.nfft!(T.NFFT, x, y)
@@ -368,8 +368,20 @@ function Base.(:(*))(T::Freq2Wave, x::DenseArray)
 end
 
 
-#=
-function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundaryWave{D}, v::DenseVector{Complex{Float64}})
+function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1D, v::DenseVector{Complex{Float64}})
+	size(T,1) == length(v) || throw(DimensionMismatch())
+	size(T,2) == length(z) || throw(DimensionMismatch())
+
+	conj!(T.innery, T.diag)
+	isuniform(T) || had!(T.innery, get(T.weights))
+	had!(T.innery, v)
+
+	NFFT.nfft_adjoint!(T.NFFT, T.innery, z)
+
+	return z
+end
+
+function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2NoBoundaryWave2D, v::DenseVector{Complex{Float64}})
 	size(T,1) == length(v) || throw(DimensionMismatch())
 	wsize(T) == size(Z) || throw(DimensionMismatch())
 
@@ -383,6 +395,7 @@ function Base.Ac_mul_B!{D}(Z::DenseArray{Complex{Float64},D}, T::Freq2NoBoundary
 	return Z
 end
 
+#=
 function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, v::DenseVector{Complex{Float64}})
 	size(T,1) == length(v) || throw(DimensionMismatch())
 	(Nz = size(T,2)) == length(z) || throw(DimensionMismatch())
