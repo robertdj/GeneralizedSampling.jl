@@ -399,31 +399,27 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2NoBoundaryWave
 	return Z
 end
 
-#=
-function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave{1}, v::DenseVector{Complex{Float64}})
-	size(T,1) == length(v) || throw(DimensionMismatch())
-	(Nz = size(T,2)) == length(z) || throw(DimensionMismatch())
+function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D, v::DenseVector{Complex{Float64}})
+	(M = size(T,1)) == length(v) || throw(DimensionMismatch())
+	size(T,2) == length(z) || throw(DimensionMismatch())
 
 	zleft, zint, zright = split(z, van_moment(T))
 
-	# TODO: Is this copying better than had!(*, get(T.weights)) for every part of S?
-	if isuniform(T) 
-		weigthedV = v
-	else
-		weigthedV = v .* get(T.weights)
+	for m in 1:M
+		@inbounds T.innery[m] = conj(T.diag[m]) * v[m]
 	end
+	isuniform(T) || had!(T.innery, get(T.weights))
 
 	# Internal scaling function
-	Tdiag = conj(T.diag)
-	had!(Tdiag, weigthedV)
-	NFFT.nfft_adjoint!(T.NFFT, Tdiag, zint)
+	NFFT.nfft_adjoint!(T.NFFT, T.innery, zint)
 
 	# Update z with boundary contributions
-	Ac_mul_B!( zleft, T.left, weigthedV )
-	Ac_mul_B!( zright, T.right, weigthedV )
+	Ac_mul_B!( zleft, T.left, T.innery )
+	Ac_mul_B!( zright, T.right, T.innery )
 
 	return z
 end
+#=
 
 function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2}, v::DenseVector{Complex{Float64}})
 	size(T,1) == length(v) || throw(DimensionMismatch())
