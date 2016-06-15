@@ -369,12 +369,13 @@ end
 
 
 function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1D, v::DenseVector{Complex{Float64}})
-	size(T,1) == length(v) || throw(DimensionMismatch())
+	(M = size(T,1)) == length(v) || throw(DimensionMismatch())
 	size(T,2) == length(z) || throw(DimensionMismatch())
 
-	conj!(T.innery, T.diag)
+	for m in 1:M
+		@inbounds T.innery[m] = conj(T.diag[m]) * v[m]
+	end
 	isuniform(T) || had!(T.innery, get(T.weights))
-	had!(T.innery, v)
 
 	NFFT.nfft_adjoint!(T.NFFT, T.innery, z)
 
@@ -382,15 +383,18 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave
 end
 
 function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2NoBoundaryWave2D, v::DenseVector{Complex{Float64}})
-	size(T,1) == length(v) || throw(DimensionMismatch())
+	(M = size(T,1)) == length(v) || throw(DimensionMismatch())
 	wsize(T) == size(Z) || throw(DimensionMismatch())
 
-	Tdiag = vec(prod(T.diag, 2))
-	conj!(Tdiag)
-	isuniform(T) || had!(Tdiag, get(T.weights))
-	had!(Tdiag, v)
+	for m in 1:M
+		@inbounds T.innery[m] = v[m]
+		for d in 1:2
+			@inbounds T.innery[m] *= conj(T.diag[d,m])
+		end
+	end
+	isuniform(T) || had!(T.innery, get(T.weights))
 
-	NFFT.nfft_adjoint!(T.NFFT, Tdiag, Z)
+	NFFT.nfft_adjoint!(T.NFFT, T.innery, Z)
 
 	return Z
 end

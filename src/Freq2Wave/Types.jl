@@ -104,6 +104,11 @@ function Freq2NoBoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, w
 	Freq2NoBoundaryWave1D( internal, weights, J, wavename, diag, NFFT, innery )
 end
 
+function Freq2NoBoundaryWave2D(internal::Matrix{Complex{Float64}}, weights, J, wavename, diag, NFFT)
+	innery = Array{Complex{Float64}}( size(internal,1) )
+	Freq2NoBoundaryWave2D( internal, weights, J, wavename, diag, NFFT, innery )
+end
+
 function Freq2BoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wavename, diag, NFFT, left, right)
 	innery = Array{Complex{Float64}}( length(internal) )
 	Freq2BoundaryWave1D( internal, weights, J, wavename, diag, NFFT, left, right, innery )
