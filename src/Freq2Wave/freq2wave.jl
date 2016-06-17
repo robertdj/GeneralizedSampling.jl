@@ -100,7 +100,7 @@ function Base.collect(T::Freq2BoundaryWave1D)
 	p = van_moment(T)
 
 	# Left boundary
-	F[:,1:p] = T.left[1]
+	F[:,1:p] = T.left
 
 	# Internal function
 	for n in p:N-p-1
@@ -110,7 +110,7 @@ function Base.collect(T::Freq2BoundaryWave1D)
 	end
 
 	# Right boundary
-	F[:,N-p+1:N] = T.right[1]
+	F[:,N-p+1:N] = T.right
 
 	if !isuniform(T)
 		broadcast!(*, F, F, get(T.weights))
@@ -225,8 +225,23 @@ function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 	end
 end
 
+@doc """
+	left(T, d, k) -> Vector
+
+Return (a view of) the `k`'th column of `T`'s left boundary Fourier
+transform in dimension `d`.
+"""->
 left(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.left[d,k+1]
+# TODO: d -> :x/:y
+left(T::Freq2BoundaryWave2D, d::Integer) = T.left[d,1]
+@doc """
+	right(T, d, k) -> Vector
+
+Return (a view of) the `k`'th column of `T`'s right boundary Fourier
+transform in dimension `d`.
+"""->
 right(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.right[d,k+1]
+right(T::Freq2BoundaryWave2D, d::Integer) = T.right[d,1]
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1D, x::DenseVector{Complex{Float64}})
 	size(T,1) == length(y) || throw(DimensionMismatch())
@@ -274,7 +289,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D,
 	return y
 end
 
-function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D, X::DenseMatrix{Complex{Float64}}, d::Integer, k::Integer)
+function Base.A_mul_B!(y::StridedVector{Complex{Float64}}, T::Freq2BoundaryWave2D, X::DenseMatrix{Complex{Float64}}, d::Integer, k::Integer)
 	p = van_moment(T)
 	N = size(X,1)
 	xint = slice(X, p+1:N-p, k)
@@ -307,6 +322,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	(N = wsize(T)) == size(X) || throw(DimensionMismatch())
 	
 	vm = van_moment(T)
+	# TODO: Skip split
 	S = split(X, vm)
 
 	# Internal scaling functions
@@ -318,28 +334,28 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# Update y with border contributions
 	for k in 1:vm
 		# Left
-		A_mul_B!( T.innery, T, X, 1, k )
-		yphad!(y, left(T,2,k), T.innery)
+		A_mul_B!( T.tmpMulVec, T, X, 1, k )
+		yphad!(y, left(T,2,k), T.tmpMulVec)
 
 		# Right
-		A_mul_B!( T.innery, T, X, 1, N[2]-vm+k )
-		yphad!(y, right(T,2,k), T.innery)
+		A_mul_B!( T.tmpMulVec, T, X, 1, N[2]-vm+k )
+		yphad!(y, right(T,2,k), T.tmpMulVec)
 
 		# Upper
 		x = slice(X, k, vm+1:N[2]-vm)
-		NFFT.nfft!( T.NFFTy, x, T.innery )
+		NFFT.nfft!( T.NFFTy, x, T.tmpMulVec )
 		for m in 1:M
-			@inbounds T.innery[m] *= T.diag[2,m]
+			@inbounds T.tmpMulVec[m] *= T.diag[2,m]
 		end
-		yphad!(y, left(T,1,k), T.innery)
+		yphad!(y, left(T,1,k), T.tmpMulVec)
 
 		# Lower
 		x = slice(X, N[1]-vm+k, vm+1:N[2]-vm)
-		NFFT.nfft!( T.NFFTy, x, T.innery )
+		NFFT.nfft!( T.NFFTy, x, T.tmpMulVec )
 		for m in 1:M
-			@inbounds T.innery[m] *= T.diag[2,m]
+			@inbounds T.tmpMulVec[m] *= T.diag[2,m]
 		end
-		yphad!(y, right(T,1,k), T.innery)
+		yphad!(y, right(T,1,k), T.tmpMulVec)
 	end
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -373,11 +389,11 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave
 	size(T,2) == length(z) || throw(DimensionMismatch())
 
 	for m in 1:M
-		@inbounds T.innery[m] = conj(T.diag[m]) * v[m]
+		@inbounds T.tmpMulVec[m] = conj(T.diag[m]) * v[m]
 	end
-	isuniform(T) || had!(T.innery, get(T.weights))
+	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
-	NFFT.nfft_adjoint!(T.NFFT, T.innery, z)
+	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, z)
 
 	return z
 end
@@ -387,14 +403,14 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2NoBoundaryWave
 	wsize(T) == size(Z) || throw(DimensionMismatch())
 
 	for m in 1:M
-		@inbounds T.innery[m] = v[m]
+		@inbounds T.tmpMulVec[m] = v[m]
 		for d in 1:2
-			@inbounds T.innery[m] *= conj(T.diag[d,m])
+			@inbounds T.tmpMulVec[m] *= conj(T.diag[d,m])
 		end
 	end
-	isuniform(T) || had!(T.innery, get(T.weights))
+	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
-	NFFT.nfft_adjoint!(T.NFFT, T.innery, Z)
+	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, Z)
 
 	return Z
 end
@@ -405,110 +421,104 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D
 
 	zleft, zint, zright = split(z, van_moment(T))
 
-	for m in 1:M
-		@inbounds T.innery[m] = conj(T.diag[m]) * v[m]
-	end
-	isuniform(T) || had!(T.innery, get(T.weights))
+	# Boundary contributions are first as they don't use T.diag
+	copy!(T.tmpMulVec, v)
+	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
+	Ac_mul_B!( zleft, T.left, T.tmpMulVec )
+	Ac_mul_B!( zright, T.right, T.tmpMulVec )
 
 	# Internal scaling function
-	NFFT.nfft_adjoint!(T.NFFT, T.innery, zint)
-
-	# Update z with boundary contributions
-	Ac_mul_B!( zleft, T.left, T.innery )
-	Ac_mul_B!( zright, T.right, T.innery )
+	hadc!(T.tmpMulVec, T.diag)
+	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, zint)
 
 	return z
 end
-#=
 
-function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave{2}, v::DenseVector{Complex{Float64}})
-	size(T,1) == length(v) || throw(DimensionMismatch())
-	wsize(T) == size(Z) || throw(DimensionMismatch())
-	
+# Ac_mul_B! for the `k`'th column of `Z` using the `d`'th dimension of T
+function Base.Ac_mul_B!(Z::StridedMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D, v::DenseVector{Complex{Float64}}, d::Integer, k::Integer)
+	#= (M = size(T,1)) == length(v) || throw(DimensionMismatch()) =#
+	#= wsize(T) == size(Z) || throw(DimensionMismatch()) =#
+
+	copy!(T.tmpMulVec, v)
+	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
+
 	vm = van_moment(T)
-	S = split(Z, vm)
+	N = size(Z,1)
 
-	# TODO: Is this copying better than had!(*, get(T.weights)) for every part of S?
-	if isuniform(T) 
-		weigthedV = v
-	else
-		weigthedV = v .* get(T.weights)
+	zleft = slice(Z, 1:vm, k)
+	Ac_mul_B!( zleft, left(T,d), T.tmpMulVec )
+	zright = slice(Z, N-vm+1:N, k)
+	Ac_mul_B!( zright, right(T,d), T.tmpMulVec )
+
+	# Internal scaling function
+	for m in 1:length(y)
+		@inbounds T.tmpMulVec[m] *= conj(T.diag[d,m])
 	end
 
-	# Internal coefficients
-	innerv = copy(weigthedV)
-	hadc!(innerv, T.diag[:,1])
-	hadc!(innerv, T.diag[:,2])
-	NFFT.nfft_adjoint!(T.NFFT, innerv, S.II)
-
-	# Temporary arrays for holding results of the "inner" multiplication.
-	# Assuming that T.NFFT.N[1] == T.NFFT.N[2] only one cornercol and
-	# sidecol is needed
-	cornercol = Array{Complex{Float64}}(vm)
-	Nint = size(S.IL,1)
-	sidecol = Array{Complex{Float64}}(Nint)
-
-	p1 = NFFTPlan( vec(T.NFFT.x[1,:]), T.NFFT.N[1] )
-	p2 = NFFTPlan( vec(T.NFFT.x[2,:]), T.NFFT.N[2] )
-	for k in 1:vm
-		# LL
-		conj!(innerv, T.left[:,k,2])
-		had!(innerv, weigthedV)
-		Ac_mul_B!( cornercol, T.left[:,:,1], innerv )
-		copy!( S.LL, 1+(k-1)*vm, cornercol, 1, vm )
-
-		# RL: Reusing innerv
-		Ac_mul_B!( cornercol, T.right[:,:,1], innerv )
-		copy!( S.RL, 1+(k-1)*vm, cornercol, 1, vm )
-
-		# IL: Reusing innerv
-		hadc!(innerv, T.diag[:,1])
-		NFFT.nfft_adjoint!(p1, innerv, sidecol)
-		copy!( S.IL, 1+(k-1)*Nint, sidecol, 1, Nint )
-
-		# LI
-		conj!(innerv, T.left[:,k,1])
-		had!(innerv, weigthedV)
-		hadc!(innerv, T.diag[:,2])
-		NFFT.nfft_adjoint!(p2, innerv, sidecol)
-		# The LI and RI component should be transposed in order to copy
-		# sidecol results in-place. 
-		# TODO: Can ReshapedArrays help with this (when they are ready)?
-		# TODO: Try home-made unsafe_copy!
-		#= BLAS.blascopy!( Nint, sidecol, 1, S.LI, vm ) =#
-		#= copy!( S.LI, 1+(k-1)*vm, sidecol, 1, vm ) =#
-		for n in 1:Nint
-			S.LI[k,n] = sidecol[n]
-		end
-
-		# RI
-		conj!(innerv, T.right[:,k,1])
-		had!(innerv, weigthedV)
-		hadc!(innerv, T.diag[:,2])
-		NFFT.nfft_adjoint!(p2, innerv, sidecol)
-		for n in 1:Nint
-			S.RI[k,n] = sidecol[n]
-		end
-
-		# LR
-		conj!(innerv, T.right[:,k,2])
-		had!(innerv, weigthedV)
-		Ac_mul_B!( cornercol, T.left[:,:,1], innerv )
-		copy!( S.LR, 1+(k-1)*vm, cornercol, 1, vm )
-
-		# RR: Reusing innerv
-		Ac_mul_B!( cornercol, T.right[:,:,1], innerv )
-		copy!( S.RR, 1+(k-1)*vm, cornercol, 1, vm )
-
-		# IR: Reusing innerv
-		hadc!(innerv, T.diag[:,1])
-		NFFT.nfft_adjoint!(p1, innerv, sidecol)
-		copy!( S.IR, 1+(k-1)*Nint, sidecol, 1, Nint )
+	zint = slice(Z, vm+1:N-vm, k)
+	if d == 1
+		NFFT.nfft_adjoint!(T.NFFTx, T.tmpMulVec, zint)
+	elseif d == 2
+		NFFT.nfft_adjoint!(T.NFFTy, T.tmpMulVec, zint)
+	else
+		throw(DimensionMismatch())
 	end
 
 	return Z
 end
 
+function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D, v::DenseVector{Complex{Float64}})
+	(M = size(T,1)) == length(v) || throw(DimensionMismatch())
+	(N = wsize(T)) == size(Z) || throw(DimensionMismatch())
+	
+	# As in Ac_mul_B! for Freq2BoundaryWave1D
+	copy!(T.weigthedVec, v)
+	isuniform(T) || had!(T.weigthedVec, get(T.weights))
+
+	vm = van_moment(T)
+	S = split(Z, vm)
+
+	# Update borders
+	for k in 1:vm
+		# Left
+		hadc!(T.tmpMulcVec, T.weigthedVec, left(T,2,k))
+		Ac_mul_B!( Z, T, T.tmpMulcVec, 1, k )
+
+		# Right
+		# TODO: Order of T.right
+		hadc!(T.tmpMulcVec, T.weigthedVec, right(T,2,k))
+		Ac_mul_B!( Z, T, T.tmpMulcVec, 1, N[2]-vm+k )
+
+		# Upper
+		for m in 1:M
+			@inbounds T.tmpMulcVec[m] = T.weigthedVec[m] * conj(T.left[1][m,k]) * conj(T.diag[2,m])
+		end
+		z = slice(Z, k, vm+1:N[2]-vm)
+		NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
+
+		# Lower
+		for m in 1:M
+			# TODO: Order of T.right
+			@inbounds T.tmpMulcVec[m] = T.weigthedVec[m] * conj(T.right[1][m,k]) * conj(T.diag[2,m])
+		end
+		z = slice(Z, N[1]-vm+k, vm+1:N[2]-vm)
+		NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
+	end
+
+	# Internal coefficients
+	for m in 1:M
+		@inbounds T.tmpMulVec[m] = v[m]
+		for d in 1:2
+			@inbounds T.tmpMulVec[m] *= conj(T.diag[d,m])
+		end
+	end
+	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
+	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, S.internal)
+
+	return Z
+end
+
+#=
 function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, v::DenseVector{Complex{Float64}})
 	size(T,2) == length(z) || throw(DimensionMismatch())
 

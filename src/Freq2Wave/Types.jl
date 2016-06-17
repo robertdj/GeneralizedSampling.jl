@@ -42,7 +42,7 @@ immutable Freq2NoBoundaryWave1D <: Freq2Wave1D
 	diag::Vector{Complex{Float64}}
 	NFFT::NFFT.NFFTPlan{1,Float64}
 
-	innery::Vector{Complex{Float64}}
+	tmpMulVec::Vector{Complex{Float64}}
 end
 
 immutable Freq2NoBoundaryWave2D <: Freq2Wave2D
@@ -55,7 +55,7 @@ immutable Freq2NoBoundaryWave2D <: Freq2Wave2D
 	diag::Matrix{Complex{Float64}}
 	NFFT::NFFT.NFFTPlan{2,Float64}
 
-	innery::Vector{Complex{Float64}}
+	tmpMulVec::Vector{Complex{Float64}}
 end
 
 # Boundary correction
@@ -73,7 +73,7 @@ immutable Freq2BoundaryWave1D <: Freq2Wave1D
 	left::Matrix{Complex{Float64}}
 	right::Matrix{Complex{Float64}}
 
-	innery::Vector{Complex{Float64}}
+	tmpMulVec::Vector{Complex{Float64}}
 end
 
 immutable Freq2BoundaryWave2D <: Freq2Wave2D
@@ -92,7 +92,9 @@ immutable Freq2BoundaryWave2D <: Freq2Wave2D
 	left::Matrix{Any}
 	right::Matrix{Any}
 
-	innery::Vector{Complex{Float64}}
+	tmpMulVec::Vector{Complex{Float64}}
+	tmpMulcVec::Vector{Complex{Float64}}
+	weigthedVec::Vector{Complex{Float64}}
 end
 
 
@@ -100,29 +102,32 @@ end
 # Constructors
 
 function Freq2NoBoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wavename, diag, NFFT)
-	innery = Array{Complex{Float64}}( length(internal) )
-	Freq2NoBoundaryWave1D( internal, weights, J, wavename, diag, NFFT, innery )
+	tmpMulVec = Array{Complex{Float64}}( length(internal) )
+	Freq2NoBoundaryWave1D( internal, weights, J, wavename, diag, NFFT, tmpMulVec )
 end
 
 function Freq2NoBoundaryWave2D(internal::Matrix{Complex{Float64}}, weights, J, wavename, diag, NFFT)
-	innery = Array{Complex{Float64}}( size(internal,1) )
-	Freq2NoBoundaryWave2D( internal, weights, J, wavename, diag, NFFT, innery )
+	tmpMulVec = Array{Complex{Float64}}( size(internal,1) )
+	Freq2NoBoundaryWave2D( internal, weights, J, wavename, diag, NFFT, tmpMulVec )
 end
 
 function Freq2BoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wavename, diag, NFFT, left, right)
-	innery = Array{Complex{Float64}}( length(internal) )
-	Freq2BoundaryWave1D( internal, weights, J, wavename, diag, NFFT, left, right, innery )
+	tmpMulVec = Array{Complex{Float64}}( length(internal) )
+	Freq2BoundaryWave1D( internal, weights, J, wavename, diag, NFFT, left, right, tmpMulVec )
 end
 
 function Freq2BoundaryWave2D(internal::Matrix{Complex{Float64}}, weights, J, wavename, diag, NFFT, left, right)
 	#= size(internal,1) == 2 || throw(DimensionMismatch()) =#
-	innery = Array{Complex{Float64}}( size(internal,1) )
+	tmpMulVec = Array{Complex{Float64}}( size(internal,1) )
+	tmpMulcVec = similar(tmpMulVec)
+	weigthedVec = similar(tmpMulVec)
 
 	# TODO: Different for uniform samples
 	NFFTx = NFFTPlan( NFFT.x[1,:], (NFFT.N[1],) )
 	NFFTy = NFFTPlan( NFFT.x[2,:], (NFFT.N[2],) )
 
-	Freq2BoundaryWave2D( internal, weights, J, wavename, diag, NFFT, NFFTx, NFFTy, left, right, innery )
+	Freq2BoundaryWave2D( internal, weights, J, wavename, diag, NFFT,
+	NFFTx, NFFTy, left, right, tmpMulVec, tmpMulcVec, weigthedVec )
 end
 
 

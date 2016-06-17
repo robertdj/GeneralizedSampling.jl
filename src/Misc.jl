@@ -3,10 +3,22 @@
 
 In-place Hadamard product: Replace `A` with `A.*B`.
 """->
-function had!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
+function had!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T})
 	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] *= B[idx]
+	end
+end
+
+@doc """
+	had!(A, B, C) -> A
+
+In-place Hadamard product: Replace `A` with `B.*C`.
+"""->
+function had!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T}, C::AbstractArray{T})
+	size(A) == size(B) == size(C) || throw(DimensionMismatch())
+	for idx in eachindex(A)
+		@inbounds A[idx] = B[idx] * C[idx]
 	end
 end
 
@@ -16,10 +28,23 @@ end
 In-place Hadamard product with complex conjugation: Replace `A` with
 `A.*conj(B)`.
 """->
-function hadc!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
+function hadc!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T})
 	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] *= conj(B[idx])
+	end
+end
+
+@doc """
+	hadc!(A, B, C) -> A
+
+In-place Hadamard product with complex conjugation: Replace `A` with
+`B.*conj(C)`.
+"""->
+function hadc!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T}, C::AbstractArray{T})
+	size(A) == size(B) == size(C) || throw(DimensionMismatch())
+	for idx in eachindex(A)
+		@inbounds A[idx] = B[idx] * conj(C[idx])
 	end
 end
 
@@ -28,7 +53,7 @@ end
 
 Replace `y` with `y + a.*b`.
 """->
-function yphad!{T<:Number}(y::DenseVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
+function yphad!{T<:Number}(y::StridedVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
 	(Ny = length(y)) == length(a) == length(b) || throw(DimensionMismatch())
 	for ny in 1:Ny
 		@inbounds y[ny] += a[ny] * b[ny]
@@ -40,7 +65,7 @@ end
 
 Replace `A` with `conj(B)`.
 """->
-function Base.conj!(A::DenseArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
+function Base.conj!(A::StridedArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
 	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] = conj(B[idx])
@@ -53,7 +78,7 @@ end
 
 Test if the rows in the `M`-by-2 matrix `points` are on a uniform 2D grid.
 """->
-function isuniform{T<:Real}( points::DenseMatrix{T} )
+function isuniform{T<:Real}( points::AbstractMatrix{T} )
 	M, D = size(points)
 	D == 2 || throw(DimensionMismatch())
 
