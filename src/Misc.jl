@@ -3,10 +3,22 @@
 
 In-place Hadamard product: Replace `A` with `A.*B`.
 """->
-function had!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
+function had!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T})
 	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] *= B[idx]
+	end
+end
+
+@doc """
+	had!(A, B, C) -> A
+
+In-place Hadamard product: Replace `A` with `B.*C`.
+"""->
+function had!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T}, C::AbstractArray{T})
+	size(A) == size(B) == size(C) || throw(DimensionMismatch())
+	for idx in eachindex(A)
+		@inbounds A[idx] = B[idx] * C[idx]
 	end
 end
 
@@ -16,10 +28,23 @@ end
 In-place Hadamard product with complex conjugation: Replace `A` with
 `A.*conj(B)`.
 """->
-function hadc!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
+function hadc!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T})
 	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] *= conj(B[idx])
+	end
+end
+
+@doc """
+	hadc!(A, B, C) -> A
+
+In-place Hadamard product with complex conjugation: Replace `A` with
+`B.*conj(C)`.
+"""->
+function hadc!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T}, C::AbstractArray{T})
+	size(A) == size(B) == size(C) || throw(DimensionMismatch())
+	for idx in eachindex(A)
+		@inbounds A[idx] = B[idx] * conj(C[idx])
 	end
 end
 
@@ -28,7 +53,7 @@ end
 
 Replace `y` with `y + a.*b`.
 """->
-function yphad!{T<:Number}(y::DenseVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
+function yphad!{T<:Number}(y::StridedVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
 	(Ny = length(y)) == length(a) == length(b) || throw(DimensionMismatch())
 	for ny in 1:Ny
 		@inbounds y[ny] += a[ny] * b[ny]
@@ -40,7 +65,7 @@ end
 
 Replace `A` with `conj(B)`.
 """->
-function Base.conj!(A::DenseArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
+function Base.conj!(A::StridedArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
 	size(A) == size(B) || throw(DimensionMismatch())
 	for idx in eachindex(A)
 		@inbounds A[idx] = conj(B[idx])
@@ -53,7 +78,7 @@ end
 
 Test if the rows in the `M`-by-2 matrix `points` are on a uniform 2D grid.
 """->
-function isuniform{T<:Real}( points::DenseMatrix{T} )
+function isuniform{T<:Real}( points::AbstractMatrix{T} )
 	M, D = size(points)
 	D == 2 || throw(DimensionMismatch())
 
@@ -305,7 +330,7 @@ end
 Split `x` into 3 parts:
 Left, internal and right, where left and right are `border` outmost entries.
 """->
-function Base.split(x::DenseVector, border::Int)
+function Base.split(x::DenseVector, border::Integer)
 	border >= 1 || throw(DomainError())
 	(N = length(x)) > 2*border || throw(AssertionError())
 
@@ -316,60 +341,55 @@ function Base.split(x::DenseVector, border::Int)
 	return L, I, R
 end
 
-type SplitMatrix
-	LL::AbstractMatrix
-	IL::AbstractMatrix
-	RL::AbstractMatrix
-	LI::AbstractMatrix
-	II::AbstractMatrix
-	RI::AbstractMatrix
-	LR::AbstractMatrix
-	IR::AbstractMatrix
-	RR::AbstractMatrix
+type SplitMatrix{T, A<:AbstractMatrix}
+	left::A
+	internal::A
+	right::A
+	upper::A
+	lower::A
+
+	SplitMatrix(left::AbstractMatrix{T}, internal::AbstractMatrix{T},
+	right::AbstractMatrix{T}, upper::AbstractMatrix{T}, 
+	lower::AbstractMatrix{T}) = new(left, internal, right, upper, lower)
 end
+SplitMatrix(left, internal, right, upper, lower) =
+SplitMatrix{eltype(left), typeof(left)}(left, internal, right, upper, lower)
 
 @doc """
 	split(A::Matrix, border) -> SplitMatrix
 
-Split `A` into 9 parts:
-4 corners, 4 sides and the internal part. `border` is the width of the
-boundary.
+Split `A` into 5 parts:
 
-With both the horizontal and the vertical part divided in `L`eft,
-`I`nternal and `R`ight, the parts are
+- Internal
+- left
+- right
+- upper
+- lower
 
 	 ________________ 
-	| LL |  LI  | LR |
-	|____|______|____|
+	|    |  up  |    |
+	|    |______|    |
 	|    |      |    |
-	| IL |  II  | IR |
-	|____|______|____|
-	| RL |  RI  | RR |
+	| le |  int | ri |
+	|    |______|    |
+	|    |  lo  |    |
 	|____|______|____|
 """->
-function Base.split(A::DenseMatrix, border::Int)
-	border >= 1 || throw(DomainError())
+function Base.split{T}(A::DenseMatrix{T}, border::Integer)
+	border >= 2 || throw(DomainError())
 	N = size(A)
 	minimum(N) > 2*border || throw(AssertionError())
 
-	Lidx = 1:border
 	I1idx = border+1:N[1]-border
-	R1idx = N[1]-border+1:N[1]
 	I2idx = border+1:N[2]-border
-	R2idx = N[2]-border+1:N[2]
 
-	LL = slice(A, Lidx, Lidx)
-	IL = slice(A, I1idx, Lidx)
-	RL = slice(A, R1idx, Lidx)
+	left = slice(A, 1:N[1], 1:border)
+	internal = slice(A, I1idx, I2idx)
+	right = slice(A, 1:N[1], N[2]-border+1:N[2])
 
-	LI = slice(A, Lidx, I2idx)
-	II = slice(A, I1idx, I2idx)
-	RI = slice(A, R1idx, I2idx)
+	upper = slice(A, 1:border, I1idx)
+	lower = slice(A, N[1]-border+1:N[1], I2idx)
 
-	LR = slice(A, Lidx, R2idx)
-	IR = slice(A, I1idx, R2idx)
-	RR = slice(A, R1idx, R2idx)
-
-	SplitMatrix( LL, IL, RL, LI, II, RI, LR, IR, RR )
+	SplitMatrix{T, typeof(left)}(left, internal, right, upper, lower)
 end
 
