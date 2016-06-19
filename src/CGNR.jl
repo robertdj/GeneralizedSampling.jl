@@ -61,7 +61,7 @@ end
 Conjugate gradient for normal equations residual method for `Freq2Wave`.
 The initial point `x0` must be of the same dimension as `T`.
 """->
-function cgnr(T::Freq2Wave, b::AbstractVector{Complex{Float64}}, x0::AbstractVecOrMat{Complex{Float64}}; prec=LARGE_EPS, maxiter=max(length(x0),50))
+function cgnr(T::Freq2Wave, b::AbstractVector{Complex{Float64}}, x0::AbstractVecOrMat{Complex{Float64}}=zeros(eltype(T), wsize(T)); prec=LARGE_EPS, maxiter=max(length(x0),50))
 	size(T,1) == length(b) || throw(DimensionMismatch())
 	wsize(T) == size(x0) || throw(DimensionMismatch())
 	prec >= SMALL_EPS || throw(DomainError())

@@ -108,7 +108,7 @@ For `side == 'L'` the *first* column of the output is related to the function cl
 but for `side == 'R'` the *last* column is related to the function closest to the right boundary.
 Furthermore, the right side functions are translated (in the time domain) such that the right endpoint of their support is 1.
 
-This behavior is not shared with the lower lever functions for Fourier transforms.
+This behavior is *not* shared with the lower lever functions for Fourier transforms.
 """->
 function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0; args... )
 	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))

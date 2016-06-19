@@ -230,15 +230,19 @@ end
 
 Return (a view of) the `k`'th column of `T`'s left boundary Fourier
 transform in dimension `d`.
+For the x coordinate `d = 1` and for the y coordinate `d = 2`.
 """->
 left(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.left[d,k+1]
-# TODO: d -> :x/:y
 left(T::Freq2BoundaryWave2D, d::Integer) = T.left[d,1]
 @doc """
 	right(T, d, k) -> Vector
 
 Return (a view of) the `k`'th column of `T`'s right boundary Fourier
 transform in dimension `d`.
+For the x coordinate `d = 1` and for the y coordinate `d = 2`.
+
+Note that `right(T, d, 1)` is the right boundary functions *furthest*
+from the boundary, cf. the ordering from `FourScalingFunc`.
 """->
 right(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.right[d,k+1]
 right(T::Freq2BoundaryWave2D, d::Integer) = T.right[d,1]
@@ -366,7 +370,7 @@ end
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2Wave2D, x::DenseVector{Complex{Float64}})
 	size(T,2) == length(x) || throw(DimensionMismatch())
 
-	X = reshape_view(x, wsize(T))
+	X = reshape(x, wsize(T))
 	A_mul_B!(y, T, X)
 
 	return y
@@ -377,7 +381,7 @@ function Base.(:(*))(T::Freq2Wave, x::DenseArray)
 		x = map(Complex{Float64}, x)
 	end
 
-	y = Array{Complex{Float64}}(size(T,1))
+	y = Array{Complex{Float64}}( size(T,1) )
 	A_mul_B!(y, T, x)
 
 	return y
@@ -451,7 +455,7 @@ function Base.Ac_mul_B!(Z::StridedMatrix{Complex{Float64}}, T::Freq2BoundaryWave
 	Ac_mul_B!( zright, right(T,d), T.tmpMulVec )
 
 	# Internal scaling function
-	for m in 1:length(y)
+	for m in 1:length(v)
 		@inbounds T.tmpMulVec[m] *= conj(T.diag[d,m])
 	end
 
@@ -485,21 +489,21 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 		Ac_mul_B!( Z, T, T.tmpMulcVec, 1, k )
 
 		# Right
-		# TODO: Order of T.right
 		hadc!(T.tmpMulcVec, T.weigthedVec, right(T,2,k))
 		Ac_mul_B!( Z, T, T.tmpMulcVec, 1, N[2]-vm+k )
 
 		# Upper
+		hadc!( T.tmpMulcVec, T.weigthedVec, left(T,1,k) )
 		for m in 1:M
-			@inbounds T.tmpMulcVec[m] = T.weigthedVec[m] * conj(T.left[1][m,k]) * conj(T.diag[2,m])
+			@inbounds T.tmpMulcVec[m] *= conj(T.diag[2,m])
 		end
 		z = slice(Z, k, vm+1:N[2]-vm)
 		NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
 
 		# Lower
+		hadc!( T.tmpMulcVec, T.weigthedVec, right(T,1,k) )
 		for m in 1:M
-			# TODO: Order of T.right
-			@inbounds T.tmpMulcVec[m] = T.weigthedVec[m] * conj(T.right[1][m,k]) * conj(T.diag[2,m])
+			@inbounds T.tmpMulcVec[m] *= conj(T.diag[2,m])
 		end
 		z = slice(Z, N[1]-vm+k, vm+1:N[2]-vm)
 		NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
@@ -518,16 +522,14 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	return Z
 end
 
-#=
-function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave{2}, v::DenseVector{Complex{Float64}})
+function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2Wave2D, v::DenseVector{Complex{Float64}})
 	size(T,2) == length(z) || throw(DimensionMismatch())
 
-	Z = reshape_view(z, wsize(T))
+	Z = reshape(z, wsize(T))
 	Ac_mul_B!(Z, T, v)
 
 	return z
 end
-=#
 
 function Base.Ac_mul_B(T::Freq2Wave, v::AbstractVector)
 	if !isa(v, Array{Complex{Float64}})
@@ -559,6 +561,7 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 
 	x0 = zeros(Complex{Float64}, wsize(T))
 	x = cgnr(T, y, x0)
+	#= x, h = lsqr(T, y) =#
 end
 
 
