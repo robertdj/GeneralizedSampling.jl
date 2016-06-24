@@ -192,7 +192,10 @@ function weights(xi::DenseMatrix{Float64}, bandwidth::Real)
 	size(xi,1) >= 2 || throw(DimensionMismatch())
 	maxabs(xi) <= bandwidth || throw(AssertionError())
 
-	voronoiarea(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
+	x = slice(xi, :, 1)
+	y = slice(xi, :, 2)
+	rw = [-bandwidth; bandwidth; -bandwidth; bandwidth]
+	voronoiarea(x, y, rw)
 end
 
 
@@ -227,36 +230,17 @@ function density(xi::AbstractVector{Float64}, bandwidth::Real)
 	return density
 end
 
-function density(xi::DenseMatrix{Float64}, bandwidth::Real)
+function density(xi::AbstractMatrix{Float64}, bandwidth::Real)
 	bandwidth > 0 || throw(DomainError())
 	maxabs(xi) <= bandwidth || throw(AssertionError())
 	M, dim = size(xi)
 	M >= 2 || throw(DimensionMismatch())
 	dim == 2 || throw(DimensionMismatch())
 
-	# Compute Voronoi tesselation
-	D = deldir(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
-
-	# Corners of Voronoi cells
-	x1 = D.vorsgs[:x1]
-	y1 = D.vorsgs[:y1]
-	x2 = D.vorsgs[:x2]
-	y2 = D.vorsgs[:y2]
-
-	# Edge-sampling point relation
-	ind = D.vorsgs[:ind1]
-
-	# Compute the distance from each xi to the corners of its Voronoi cell
-	density = 0.0
-	@inbounds for n in 1:length(ind)
-		idx = ind[n]
-		# Distance^2 from end points of Voronoi edge to one of the xi's with this edge
-		diff1 = (x1[n] - xi[idx,1])^2 + (y1[n] - xi[idx,2])^2
-		diff2 = (x2[n] - xi[idx,1])^2 + (y2[n] - xi[idx,2])^2
-		density = max(density, diff1, diff2)
-	end
-
-	return sqrt(density)
+	x = slice(xi, :, 1)
+	y = slice(xi, :, 2)
+	rw = [-bandwidth; bandwidth; -bandwidth; bandwidth]
+	density(x, y, rw)
 end
 
 @doc """

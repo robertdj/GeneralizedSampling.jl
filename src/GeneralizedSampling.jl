@@ -4,7 +4,7 @@ using NFFT
 using IntervalWavelets
 import IntervalWavelets: isuniform, van_moment
 
-import Deldir: deldir, voronoiarea
+import VoronoiCells: density, voronoiarea
 import Wavelets: wavelet, WT
 import ArrayViews: reshape_view, flatten_view
 import Base: A_mul_B!, Ac_mul_B!
