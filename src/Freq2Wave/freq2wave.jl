@@ -1,12 +1,11 @@
 # ------------------------------------------------------------
 # 1D change of basis matrix
 
-function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
 	Nint = 2^J
 	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	
-	# TODO: Good condition?
 	M = length(samples)
 	if Nint >= M
 		warn("The scale is high compared to the number of samples")
@@ -33,7 +32,7 @@ function Freq2Wave(samples::DenseVector, wavename::AbstractString, J::Int, B::Fl
 
 	# The number of internal wavelets in reconstruction
 	if hasboundary(wavename)
-		Nint -= 2*van_moment(wavename)
+		Nint -= 2*vm
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
 	end
 
@@ -152,57 +151,63 @@ function wsize(T::Freq2BoundaryWave2D)
 	N = 2^wscale(T)
 	return (N, N)
 end
-wsize(T::Freq2NoBoundaryWave1D) = T.NFFT.N
-wsize(T::Freq2BoundaryWave1D) = (2^wscale(T),)
 wsize(T::Freq2NoBoundaryWave2D) = T.NFFT.N
+wsize(T::Freq2BoundaryWave1D) = (2^wscale(T),)
+wsize(T::Freq2NoBoundaryWave1D) = T.NFFT.N
 
-function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
-	vm = van_moment(wavename)
-	Nint = 2^J
-	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
-	# TODO: 2 columns *or* 2 rows
-	M = size(samples, 1)
-	size(samples,2) == 2 || throw(DimensionMismatch("Samples must have two columns"))
+function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int; args...)
+	# Test if samples are on a grid and in the correct order
+	usamplesx = unique(slice(samples,:,1))
+	usamplesy = unique(slice(samples,:,2))
+	Mx = length(usamplesx)
+	My = length(usamplesy)
+	grid_samples = grid( (Mx, My), usamplesx[2]-usamplesx[1] )
 
-	# TODO: Good condition?
-	if Nint >= M
-		warn("The scale is high compared to the number of samples")
-	end
+	samples == grid_samples ||
+	throw(AssertionError("Samples are not on a grid or not ordered properly"))
 
-	# Weights for non-uniform samples
-	if isuniform(samples)
-		W = Nullable{ Vector{Complex{Float64}} }()
+	# Internal scaling function
+	internalx = FourScalingFunc( usamplesx, wavename, J )
+	internalx = kron(internalx, ones(My))
+	internaly = FourScalingFunc( usamplesy, wavename, J )
+	internaly = repmat(internaly, Mx)
+	internal = hcat(internalx, internaly)
+
+	# Boundary scaling functions
+	if !hasboundary(wavename)
+		return internal
 	else
-		isnan(B) && error("Samples are not uniform; supply bandwidth")
-		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
-		W = sqrt(weights(samples, B))
-		W = Nullable(complex( W ))
-	end
+		vm = van_moment(wavename)
 
+		leftx = FourScalingFunc( usamplesx, wavename, 'L', J; args... )
+		lefty = FourScalingFunc( usamplesy, wavename, 'L', J; args... )
+		left = cell(2,vm+1)
+		left[1] = kron(leftx, ones(My))
+		left[2] = repmat(lefty, Mx)
+
+		rightx = FourScalingFunc( usamplesx, wavename, 'R', J; args... )
+		righty = FourScalingFunc( usamplesy, wavename, 'R', J; args... )
+		right = cell(2,vm+1)
+		right[1] = kron(rightx, ones(My))
+		right[2] = repmat(righty, Mx)
+
+		# Views of the columns in left/right
+		for k in 1:vm, d in 1:2
+			left[d,k+1]  = slice( left[d], :, k )
+			right[d,k+1] = slice( right[d], :, k )
+		end
+
+		return internal, left, right
+	end
+end
+
+function NotUnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int, B::Float64; args...)
 	# Fourier transform of the internal scaling function
 	internal = FourScalingFunc( samples, wavename, J )
 
-	# Diagonal matrix for multiplication with internal scaling function
-	xi = samples'
-	diag = internal.'
-	for m in 1:M, d in 1:2
-		diag[d,m] *= cis( -pi*xi[d,m] )
-	end
-
-	# The number of internal wavelets in reconstruction
-	if hasboundary(wavename)
-		Nint -= 2*van_moment(wavename)
-		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
-	end
-
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
-	scale!(xi, 2.0^(-J))
-	frac!(xi)
-	p = NFFTPlan(xi, (Nint,Nint))
-
-	# Wavelets w/o boundary
+	# Boundary scaling functions
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave2D(internal, W, J, wavename, diag, p)
+		return internal
 	else
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
@@ -216,12 +221,69 @@ function Freq2Wave(samples::DenseMatrix, wavename::AbstractString, J::Int, B::Fl
 		right[2] = FourScalingFunc( samplesy, wavename, 'R', J; args... )
 
 		# Views of the columns in left/right
+		vm = van_moment(wavename)
 		for k in 1:vm, d in 1:2
 			left[d,k+1]  = slice( left[d], :, k )
 			right[d,k+1] = slice( right[d], :, k )
 		end
 
+		return internal, left, right
+	end
+end
+
+function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+	vm = van_moment(wavename)
+	Nint = 2^J
+	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
+	M = size(samples, 1)
+	size(samples,2) == 2 || throw(DimensionMismatch("Samples must have two columns"))
+
+	if Nint >= M
+		warn("The scale is high compared to the number of samples")
+	end
+
+	if isuniform(samples)
+		scaling_funcs = UnifFourScalingFunc(samples, wavename, J; args...)
+
+		W = Nullable{ Vector{Complex{Float64}} }()
+	else
+		scaling_funcs = NoUnifFourScalingFunc(samples, wavename, J; args...)
+
+		# Weights for non-uniform samples
+		isnan(B) && error("Samples are not uniform; supply bandwidth")
+		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
+		W = sqrt(weights(samples, B))
+		W = Nullable(complex( W ))
+	end
+
+	if hasboundary(wavename)
+		Nint -= 2*vm
+		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
+
+		internal = scaling_funcs[1]
+		left = scaling_funcs[2]
+		right = scaling_funcs[3]
+	else
+		internal = scaling_funcs
+	end
+
+	# Diagonal matrix for multiplication with internal scaling function
+	xi = samples'
+	diag = internal.'
+	for m in 1:M, d in 1:2
+		diag[d,m] *= cis( -pi*xi[d,m] )
+	end
+
+	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
+	scale!(xi, 2.0^(-J))
+	frac!(xi)
+	p = NFFTPlan(xi, (Nint,Nint))
+
+	# Wavelets w/o boundary
+	if hasboundary(wavename)
 		return Freq2BoundaryWave2D(internal, W, J, wavename, diag, p, left, right)
+	else
+		return Freq2NoBoundaryWave2D(internal, W, J, wavename, diag, p)
 	end
 end
 
@@ -234,6 +296,7 @@ For the x coordinate `d = 1` and for the y coordinate `d = 2`.
 """->
 left(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.left[d,k+1]
 left(T::Freq2BoundaryWave2D, d::Integer) = T.left[d,1]
+
 @doc """
 	right(T, d, k) -> Vector
 
@@ -246,6 +309,7 @@ from the boundary, cf. the ordering from `FourScalingFunc`.
 """->
 right(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.right[d,k+1]
 right(T::Freq2BoundaryWave2D, d::Integer) = T.right[d,1]
+
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1D, x::DenseVector{Complex{Float64}})
 	size(T,1) == length(y) || throw(DimensionMismatch())

@@ -114,7 +114,7 @@ function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0
 	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))
 
 	if !isdaubechies(wavename)
-		error(string("Fourier transform for ", wavename, " is not implemented"))
+		error(string("Fourier transform for boundary ", wavename, " is not implemented"))
 	end
 
 	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...)'
