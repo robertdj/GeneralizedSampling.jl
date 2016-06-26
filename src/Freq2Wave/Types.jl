@@ -117,12 +117,10 @@ function Freq2BoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wav
 end
 
 function Freq2BoundaryWave2D(internal::Matrix{Complex{Float64}}, weights, J, wavename, diag, NFFT, left, right)
-	#= size(internal,1) == 2 || throw(DimensionMismatch()) =#
 	tmpMulVec = Array{Complex{Float64}}( size(internal,1) )
 	tmpMulcVec = similar(tmpMulVec)
 	weigthedVec = similar(tmpMulVec)
 
-	# TODO: Different for uniform samples
 	NFFTx = NFFTPlan( NFFT.x[1,:], (NFFT.N[1],) )
 	NFFTy = NFFTPlan( NFFT.x[2,:], (NFFT.N[2],) )
 

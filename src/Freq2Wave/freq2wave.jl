@@ -388,12 +388,10 @@ end
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D, X::DenseMatrix{Complex{Float64}})
 	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
 	(N = wsize(T)) == size(X) || throw(DimensionMismatch())
-	
-	vm = van_moment(T)
-	# TODO: Skip split
-	S = split(X, vm)
 
 	# Internal scaling functions
+	vm = van_moment(T)
+	S = split(X, vm)
 	NFFT.nfft!(T.NFFT, S.internal, y)
 	for m in 1:M, d in 1:2
 		@inbounds y[m] *= T.diag[d,m]
@@ -625,7 +623,7 @@ function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
 
 	x0 = zeros(Complex{Float64}, wsize(T))
 	x = cgnr(T, y, x0)
-	#= x, h = lsqr(T, y) =#
+	#x, h = lsqr(T, y)
 end
 
 

@@ -6,7 +6,7 @@ import IntervalWavelets: isuniform, van_moment
 
 import VoronoiCells: density, voronoiarea
 import Wavelets: wavelet, WT
-import ArrayViews: reshape_view, flatten_view
+import ArrayViews: flatten_view
 import Base: A_mul_B!, Ac_mul_B!
 
 export
@@ -53,7 +53,6 @@ const ComplexOne = one(Complex{Float64})
 const ComplexZero = zero(Complex{Float64})
 const twoπ = 2.0*pi
 
-# TODO: Case conflict with types.jl
 include("Freq2Wave/Types.jl")
 include("Misc.jl")
 include("NFFT.jl")

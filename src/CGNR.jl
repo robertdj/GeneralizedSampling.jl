@@ -47,14 +47,6 @@ function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::Abstrac
 	return x
 end
 
-#=
-function cgnr(T::Freq2Wave, B::AbstractArray{Complex{Float64}},
-	x0::AbstractVecOrMat{Complex{Float64},D}; args...)
-	b = flatten_view(B)
-	cgnr(T, b, x0; args...)
-end
-=#
-
 @doc """
 	cgnr(T::Freq2wave, b, x0; ...) -> x
 

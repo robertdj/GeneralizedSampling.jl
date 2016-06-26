@@ -155,7 +155,6 @@ Compute weights for sampling points `xi`.
 - For 2D points `xi` must be a matrix with 2 columns.
 """->
 function weights(xi::AbstractVector{Float64}, bandwidth::Real)
-	# TODO: Make this function return 1D Voronoi areas?
 	bandwidth > 0 || throw(DomainError())
 	maxabs(xi) <= bandwidth || throw(AssertionError())
 	(Nx = length(xi)) >= 2 || throw(AssertionError())
