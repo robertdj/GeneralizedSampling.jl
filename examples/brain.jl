@@ -23,7 +23,7 @@ J = Int( log2(M[1]) ) - 1
 using GeneralizedSampling
 
 xi = GeneralizedSampling.grid(M)
-T = freq2wave( xi, "Haar", J )
+T = Freq2Wave( xi, "haar", J )
 wcoef = T \ f
 
 w = fftshift(wcoef)
@@ -33,7 +33,7 @@ w = fftshift(wcoef)
 
 using IntervalWavelets, Winston
 
-y = weval( abs(w), 10 )
+y = weval( abs(w), "haar", 10 )
 
 miny = minimum(y)
 maxy = maximum(y)

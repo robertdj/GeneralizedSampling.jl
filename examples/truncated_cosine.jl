@@ -29,11 +29,11 @@ using GeneralizedSampling
 
 J = 6
 M = 2^(J+1)
-# Both GeneralizedSampling and Winston (below) has a grid function
+# Both GeneralizedSampling and Winston (below) have a grid function
 xi = GeneralizedSampling.grid(M)
 f = ftcos(xi)
 
-T = freq2wave(xi, "db2", J)
+T = Freq2Wave(xi, "haar", J)
 wcoef = T \ f
 
 
@@ -43,8 +43,7 @@ wcoef = T \ f
 using IntervalWavelets
 using Winston
 
-#= x, yw = weval( real(wcoef), 10 ) =#
-x, yw = weval( real(wcoef), 2, 10 )
+x, yw = weval( real(wcoef), "haar", 10 )
 plot(x,yw)
 
 oplot(x, tcos(x), "r-")
