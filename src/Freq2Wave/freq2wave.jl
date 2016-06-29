@@ -212,6 +212,7 @@ function NotUnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::Abstr
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
 
+		vm = van_moment(wavename)
 		left = cell(2,vm+1)
 		left[1] = FourScalingFunc( samplesx, wavename, 'L', J; args... )
 		left[2] = FourScalingFunc( samplesy, wavename, 'L', J; args... )
@@ -243,17 +244,17 @@ function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J:
 	end
 
 	if isuniform(samples)
-		scaling_funcs = UnifFourScalingFunc(samples, wavename, J; args...)
-
 		W = Nullable{ Vector{Complex{Float64}} }()
-	else
-		scaling_funcs = NoUnifFourScalingFunc(samples, wavename, J; args...)
 
+		scaling_funcs = UnifFourScalingFunc(samples, wavename, J; args...)
+	else
 		# Weights for non-uniform samples
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
 		Nint <= 2*B || warn("The scale is high compared to the bandwidth")
 		W = sqrt(weights(samples, B))
 		W = Nullable(complex( W ))
+
+		scaling_funcs = NotUnifFourScalingFunc(samples, wavename, J, B; args...)
 	end
 
 	if hasboundary(wavename)
