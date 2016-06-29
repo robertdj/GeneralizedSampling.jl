@@ -3,7 +3,7 @@
 
 function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
-	Nint = 2^J
+	Nint = 2^(J+1)
 	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	
 	M = length(samples)
@@ -24,13 +24,7 @@ function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::
 	# Fourier transform of the internal scaling function
 	internal = FourScalingFunc( samples, wavename, J; args... )
 
-	# Diagonal matrix used in 'multiplication' with NFFT
-	diag = Vector{Complex{Float64}}(M)
-	for m in 1:M
-		diag[m] = internal[m] * cis(-pi*samples[m])
-	end
-
-	# The number of internal wavelets in reconstruction
+	# The number of internal wavelets in the reconstruction
 	if hasboundary(wavename)
 		Nint -= 2*vm
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
@@ -44,12 +38,12 @@ function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
-		return Freq2NoBoundaryWave1D(internal, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave1D(internal, W, J, wavename, p)
 	else
 		left = FourScalingFunc( samples, wavename, 'L', J; args... )
 		right = FourScalingFunc( samples, wavename, 'R', J; args... )
 
-		return Freq2BoundaryWave1D(internal, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave1D(internal, W, J, wavename, p, left, right)
 	end
 end
 

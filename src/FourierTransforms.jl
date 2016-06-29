@@ -104,9 +104,11 @@ For a vector `xi` of length `M`, the output is a matrix of size
 `M`-by-`p`, where `p` is the number of vanishing moments for `wavename`.
 
 **Note**: 
-For `side == 'L'` the *first* column of the output is related to the function closest to the left boundary, 
-but for `side == 'R'` the *last* column is related to the function closest to the right boundary.
-Furthermore, the right side functions are translated (in the time domain) such that the right endpoint of their support is 1.
+This function is intended to return the Fourier transform used in generalized sampling with reconstruction on [-1,1].
+This means that when `side` is `'L'` the function is translated with -1 (in the time domain) and when `side` is `'R'` the function is translated with 1.
+
+Furthermore, when `side` is `'L'` the *first* column of the output is related to the function closest to the left boundary, 
+but when `side` is 'R'` the *last* column is related to the function closest to the right boundary.
 
 This behavior is *not* shared with the lower lever functions for Fourier transforms.
 """->
@@ -119,7 +121,10 @@ function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0
 
 	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...)'
 
-	if side == 'R'
+	if side == 'L'
+		phase_shift = cis( twoπ*xi*2.0^-J )
+		broadcast!(*, Y, Y, phase_shift)
+	elseif side == 'R'
 		phase_shift = cis( -twoπ*xi*2.0^-J )
 		broadcast!(*, Y, Y, phase_shift)
 		Y = flipdim(Y,2)
