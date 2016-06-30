@@ -335,7 +335,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D,
 
 	# Internal scaling function
 	NFFT.nfft!(T.NFFT, xint, y)
-	had!(y, T.diag)
+	had!(y, T.internal)
 
 	# Contribution from the boundaries
 	BLAS.gemv!('N', ComplexOne, T.left, xleft, ComplexOne, y)
@@ -476,14 +476,14 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D
 
 	zleft, zint, zright = split(z, van_moment(T))
 
-	# Boundary contributions are first as they don't use T.diag
+	# Boundary contributions are first as they don't use T.internal
 	copy!(T.tmpMulVec, v)
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 	Ac_mul_B!( zleft, T.left, T.tmpMulVec )
 	Ac_mul_B!( zright, T.right, T.tmpMulVec )
 
 	# Internal scaling function
-	hadc!(T.tmpMulVec, T.diag)
+	hadc!(T.tmpMulVec, T.internal)
 	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, zint)
 
 	return z
