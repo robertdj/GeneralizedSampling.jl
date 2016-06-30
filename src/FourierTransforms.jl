@@ -119,7 +119,7 @@ function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0
 		error(string("Fourier transform for boundary ", wavename, " is not implemented"))
 	end
 
-	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...)'
+	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...).'
 
 	if side == 'L'
 		phase_shift = cis( twoπ*xi*2.0^-J )

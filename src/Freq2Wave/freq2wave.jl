@@ -3,8 +3,7 @@
 
 function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
-	Nint = 2^(J+1)
-	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
+	( Nint = 2^(J+1) ) >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	
 	M = length(samples)
 	if Nint >= M
@@ -73,9 +72,10 @@ function Base.collect(T::Freq2NoBoundaryWave1D)
 	M, N = size(T)
 
 	F = Array{Complex{Float64}}(M, N)
-	for n = 0:N-1
-		for m = 1:M
-			@inbounds F[m,n+1] = T.internal[m]*cis( -twoπ*n*T.NFFT.x[m] )
+	offset = div(N, 2) + 1
+	for n in 1:N
+		for m in 1:M
+			@inbounds F[m,n] = T.internal[m]*cis( -twoπ*(n-offset)*T.NFFT.x[m] )
 		end
 	end
 
@@ -96,9 +96,10 @@ function Base.collect(T::Freq2BoundaryWave1D)
 	F[:,1:p] = T.left
 
 	# Internal function
-	for n in p:N-p-1
+	offset = div(N, 2) + 1
+	for n in p+1:N-p
 		for m in 1:M
-			@inbounds F[m,n+1] = T.internal[m]*cis( -twoπ*n*T.NFFT.x[m] )
+			@inbounds F[m,n] = T.internal[m]*cis( -twoπ*(n-offset)*T.NFFT.x[m] )
 		end
 	end
 
@@ -149,7 +150,7 @@ wsize(T::Freq2NoBoundaryWave2D) = T.NFFT.N
 wsize(T::Freq2BoundaryWave1D) = (2^wscale(T),)
 wsize(T::Freq2NoBoundaryWave1D) = T.NFFT.N
 
-function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int; args...)
+function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Integer; args...)
 	# Test if samples are on a grid and in the correct order
 	usamplesx = unique(slice(samples,:,1))
 	usamplesy = unique(slice(samples,:,2))
@@ -195,7 +196,7 @@ function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::Abstract
 	end
 end
 
-function NotUnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int, B::Float64; args...)
+function NotUnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Integer, B::Float64; args...)
 	# Fourier transform of the internal scaling function
 	internal = FourScalingFunc( samples, wavename, J )
 
@@ -228,8 +229,7 @@ end
 
 function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
-	Nint = 2^J
-	Nint >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
+	( Nint = 2^(J+1) ) >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	M = size(samples, 1)
 	size(samples,2) == 2 || throw(DimensionMismatch("Samples must have two columns"))
 
@@ -262,23 +262,17 @@ function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J:
 		internal = scaling_funcs
 	end
 
-	# Diagonal matrix for multiplication with internal scaling function
-	xi = samples'
-	diag = internal.'
-	for m in 1:M, d in 1:2
-		diag[d,m] *= cis( -pi*xi[d,m] )
-	end
-
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
+	xi = samples'
 	scale!(xi, 2.0^(-J))
 	frac!(xi)
 	p = NFFTPlan(xi, (Nint,Nint))
 
 	# Wavelets w/o boundary
 	if hasboundary(wavename)
-		return Freq2BoundaryWave2D(internal, W, J, wavename, diag, p, left, right)
+		return Freq2BoundaryWave2D(internal, W, J, wavename, p, left, right)
 	else
-		return Freq2NoBoundaryWave2D(internal, W, J, wavename, diag, p)
+		return Freq2NoBoundaryWave2D(internal, W, J, wavename, p)
 	end
 end
 
@@ -311,7 +305,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1
 	size(T,2) == length(x) || throw(DimensionMismatch())
 
 	NFFT.nfft!(T.NFFT, x, y)
-	had!(y, T.diag)
+	had!(y, T.internal)
 
 	isuniform(T) || had!(y, get(T.weights))
 
@@ -450,7 +444,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave
 	size(T,2) == length(z) || throw(DimensionMismatch())
 
 	for m in 1:M
-		@inbounds T.tmpMulVec[m] = conj(T.diag[m]) * v[m]
+		@inbounds T.tmpMulVec[m] = conj(T.internal[m]) * v[m]
 	end
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
@@ -735,11 +729,11 @@ function Base.size(T::Freq2Wave)
 end
 
 function Base.size(T::Freq2Wave, d::Integer)
+	D = dim(T)
 	if d == 1
-		size(T.internal, 1)
+		size(T.internal, D)
 	elseif d == 2
-		D = dim(T)
-		2^(D*wscale(T))
+		(2*D)^(wscale(T)+1)
 	else
 		throw(AssertionError())
 	end

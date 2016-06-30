@@ -97,23 +97,23 @@ end
 # ------------------------------------------------------------------------
 # Constructors
 
-function Freq2NoBoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wavename, NFFT)
+function Freq2NoBoundaryWave1D(internal, weights, J, wavename, NFFT)
 	tmpMulVec = Array{Complex{Float64}}( length(internal) )
 	Freq2NoBoundaryWave1D( internal, weights, J, wavename, NFFT, tmpMulVec )
 end
 
-function Freq2NoBoundaryWave2D(internal::Matrix{Complex{Float64}}, weights, J, wavename, NFFT)
-	tmpMulVec = Array{Complex{Float64}}( size(internal,1) )
+function Freq2NoBoundaryWave2D(internal, weights, J, wavename, NFFT)
+	tmpMulVec = Array{Complex{Float64}}( T.NFFT.n[1] )
 	Freq2NoBoundaryWave2D( internal, weights, J, wavename, NFFT, tmpMulVec )
 end
 
-function Freq2BoundaryWave1D(internal::Vector{Complex{Float64}}, weights, J, wavename, NFFT, left, right)
+function Freq2BoundaryWave1D(internal, weights, J, wavename, NFFT, left, right)
 	tmpMulVec = Array{Complex{Float64}}( length(internal) )
 	Freq2BoundaryWave1D( internal, weights, J, wavename, NFFT, left, right, tmpMulVec )
 end
 
-function Freq2BoundaryWave2D(internal::Matrix{Complex{Float64}}, weights, J, wavename, NFFT, left, right)
-	tmpMulVec = Array{Complex{Float64}}( size(internal,1) )
+function Freq2BoundaryWave2D(internal, weights, J, wavename, NFFT, left, right)
+	tmpMulVec = Array{Complex{Float64}}( size(internal,2) )
 	tmpMulcVec = similar(tmpMulVec)
 	weigthedVec = similar(tmpMulVec)
 
