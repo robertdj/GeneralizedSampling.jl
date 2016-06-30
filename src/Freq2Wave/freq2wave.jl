@@ -137,17 +137,17 @@ end
 @doc """
 	wsize(T::Freq2Wave)
 
-The size of the reconstructed wavelet coefficients.
+The number of reconstructed wavelet coefficients (in each dimension).
 
 - When `D` == 1, the output is (Int,)
 - When `D` == 2, the output is (Int,Int)
 """->
 function wsize(T::Freq2BoundaryWave2D)
-	N = 2^wscale(T)
+	N = 2^(wscale(T)+1)
 	return (N, N)
 end
 wsize(T::Freq2NoBoundaryWave2D) = T.NFFT.N
-wsize(T::Freq2BoundaryWave1D) = (2^wscale(T),)
+wsize(T::Freq2BoundaryWave1D) = (2^(wscale(T)+1),)
 wsize(T::Freq2NoBoundaryWave1D) = T.NFFT.N
 
 function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Integer; args...)
@@ -255,11 +255,11 @@ function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J:
 		Nint -= 2*vm
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
 
-		internal = scaling_funcs[1]
+		internal = scaling_funcs[1].'
 		left = scaling_funcs[2]
 		right = scaling_funcs[3]
 	else
-		internal = scaling_funcs
+		internal = scaling_funcs.'
 	end
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
@@ -318,7 +318,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave2
 
 	NFFT.nfft!(T.NFFT, X, y)
 	for m in 1:M, d in 1:2
-		@inbounds y[m] *= T.diag[d,m]
+		@inbounds y[m] *= T.internal[d,m]
 	end
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -460,7 +460,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2NoBoundaryWave
 	for m in 1:M
 		@inbounds T.tmpMulVec[m] = v[m]
 		for d in 1:2
-			@inbounds T.tmpMulVec[m] *= conj(T.diag[d,m])
+			@inbounds T.tmpMulVec[m] *= conj(T.internal[d,m])
 		end
 	end
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
@@ -635,13 +635,15 @@ function Base.collect(T::Freq2NoBoundaryWave2D)
 	Nx, Ny = wsize(T)
 	F = Array{Complex{Float64}}(M, Nx*Ny)
 
-	phi = prod(T.internal, 2)
+	phi = prod(T.internal, 1)
 
-	idx = 0
-	for ny in 0:Ny-1, nx in 0:Nx-1
-		idx += 1
+	offsetx = div(Nx, 2) + 1
+	offsety = div(Ny, 2) + 1
+	row_idx = 0
+	for ny in 1:Ny, nx in 1:Nx
+		row_idx += 1
 		for m in 1:M
-			@inbounds F[m,idx] = phi[m]*cis( -twoπ*(nx*T.NFFT.x[1,m] + ny*T.NFFT.x[2,m]) )
+			@inbounds F[m,row_idx] = phi[m]*cis( -twoπ*((nx-offsetx)*T.NFFT.x[1,m] + (ny-offsety)*T.NFFT.x[2,m]) )
 		end
 	end
 
@@ -729,11 +731,10 @@ function Base.size(T::Freq2Wave)
 end
 
 function Base.size(T::Freq2Wave, d::Integer)
-	D = dim(T)
 	if d == 1
-		size(T.internal, D)
+		size(T.internal, dim(T))
 	elseif d == 2
-		(2*D)^(wscale(T)+1)
+		prod( wsize(T) )
 	else
 		throw(AssertionError())
 	end
