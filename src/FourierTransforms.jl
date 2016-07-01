@@ -122,10 +122,10 @@ function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0
 	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...).'
 
 	if side == 'L'
-		phase_shift = cis( twoπ*xi*2.0^-J )
+		phase_shift = cis( twoπ*xi )
 		broadcast!(*, Y, Y, phase_shift)
 	elseif side == 'R'
-		phase_shift = cis( -twoπ*xi*2.0^-J )
+		phase_shift = cis( -twoπ*xi )
 		broadcast!(*, Y, Y, phase_shift)
 		Y = flipdim(Y,2)
 	end

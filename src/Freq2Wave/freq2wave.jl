@@ -360,7 +360,7 @@ function Base.A_mul_B!(y::StridedVector{Complex{Float64}}, T::Freq2BoundaryWave2
 		throw(DimensionMismatch())
 	end
 	for m in 1:length(y)
-		@inbounds y[m] *= T.diag[d,m]
+		@inbounds y[m] *= T.internal[d,m]
 	end
 
 	# Contribution from the boundaries
@@ -383,7 +383,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	S = split(X, vm)
 	NFFT.nfft!(T.NFFT, S.internal, y)
 	for m in 1:M, d in 1:2
-		@inbounds y[m] *= T.diag[d,m]
+		@inbounds y[m] *= T.internal[d,m]
 	end
 
 	# Update y with border contributions
@@ -400,7 +400,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 		x = slice(X, k, vm+1:N[2]-vm)
 		NFFT.nfft!( T.NFFTy, x, T.tmpMulVec )
 		for m in 1:M
-			@inbounds T.tmpMulVec[m] *= T.diag[2,m]
+			@inbounds T.tmpMulVec[m] *= T.internal[2,m]
 		end
 		yphad!(y, left(T,1,k), T.tmpMulVec)
 
@@ -408,7 +408,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 		x = slice(X, N[1]-vm+k, vm+1:N[2]-vm)
 		NFFT.nfft!( T.NFFTy, x, T.tmpMulVec )
 		for m in 1:M
-			@inbounds T.tmpMulVec[m] *= T.diag[2,m]
+			@inbounds T.tmpMulVec[m] *= T.internal[2,m]
 		end
 		yphad!(y, right(T,1,k), T.tmpMulVec)
 	end
@@ -507,7 +507,7 @@ function Base.Ac_mul_B!(Z::StridedMatrix{Complex{Float64}}, T::Freq2BoundaryWave
 
 	# Internal scaling function
 	for m in 1:length(v)
-		@inbounds T.tmpMulVec[m] *= conj(T.diag[d,m])
+		@inbounds T.tmpMulVec[m] *= conj(T.internal[d,m])
 	end
 
 	zint = slice(Z, vm+1:N-vm, k)
@@ -546,7 +546,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 		# Upper
 		hadc!( T.tmpMulcVec, T.weigthedVec, left(T,1,k) )
 		for m in 1:M
-			@inbounds T.tmpMulcVec[m] *= conj(T.diag[2,m])
+			@inbounds T.tmpMulcVec[m] *= conj(T.internal[2,m])
 		end
 		z = slice(Z, k, vm+1:N[2]-vm)
 		NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
@@ -554,7 +554,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 		# Lower
 		hadc!( T.tmpMulcVec, T.weigthedVec, right(T,1,k) )
 		for m in 1:M
-			@inbounds T.tmpMulcVec[m] *= conj(T.diag[2,m])
+			@inbounds T.tmpMulcVec[m] *= conj(T.internal[2,m])
 		end
 		z = slice(Z, N[1]-vm+k, vm+1:N[2]-vm)
 		NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
@@ -564,7 +564,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	for m in 1:M
 		@inbounds T.tmpMulVec[m] = v[m]
 		for d in 1:2
-			@inbounds T.tmpMulVec[m] *= conj(T.diag[d,m])
+			@inbounds T.tmpMulVec[m] *= conj(T.internal[d,m])
 		end
 	end
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
@@ -654,26 +654,6 @@ function Base.collect(T::Freq2NoBoundaryWave2D)
 	return F
 end
 
-function ucollect(T::Freq2NoBoundaryWave2D)
-	isuniform(T) || throw(AssertionError())
-
-	M1, M2 = T.NFFT.n
-	N1, N2 = T.NFFT.N
-
-	F1 = Array{Complex{Float64}}(M1, N1)
-	for n in 1:N1, m in 1:M2:M1
-		@inbounds F1[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
-	end
-
-	F2 = Array{Complex{Float64}}(M2, N2)
-	for n in 1:N1, m in 1:M2
-		@inbounds F1[m,n] = T.internal[m]*cis( -twoπ*T.NFFT.x[m]*(n-1) )
-	end
-
-	#kron(F1, F2)
-	return F1, F2
-end
-
 function Base.collect(T::Freq2BoundaryWave2D)
 	M = size(T,1)
 	Nx, Ny = wsize(T)
@@ -682,13 +662,13 @@ function Base.collect(T::Freq2BoundaryWave2D)
 	phix = Array{Complex{Float64}}(M)
 	phiy = similar(phix)
 
-	idx = 0
-	for ny in 0:Ny-1
+	row_idx = 0
+	for ny in 1:Ny
 		unsafe_FourScaling!(phiy, T, ny, 2)
-		for nx in 0:Nx-1
+		for nx in 1:Nx
 			unsafe_FourScaling!(phix, T, nx, 1)
 			had!(phix, phiy)
-			F[:,idx+=1] = phix
+			F[:,row_idx+=1] = phix
 		end
 	end
 
@@ -709,16 +689,15 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 	N = wsize(T)[d]
 	p = van_moment(T)
 
-	if p <= n < N-p
+	if p < n <= N-p
+		offset = div(N, 2) + 1
 		for m in 1:M
-			@inbounds phi[m] = T.internal[m,d]*cis( -twoπ*n*T.NFFT.x[d,m] )
+			@inbounds phi[m] = T.internal[d,m]*cis( -twoπ*(n-offset)*T.NFFT.x[d,m] )
 		end
-	elseif 0 <= n < p
-		so = n*M + 1
-		unsafe_copy!( phi, 1, T.left[d], so, M ) 
+	elseif 1 <= n <= p
+		copy!( phi, T.left[d,n+1] )
 	else
-		so = (n-N+p)*M + 1
-		unsafe_copy!( phi, 1, T.right[d], so, M ) 
+		copy!( phi, T.right[d,n-N+p+1] )
 	end
 end
 

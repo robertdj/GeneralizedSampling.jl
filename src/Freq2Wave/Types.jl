@@ -103,7 +103,7 @@ function Freq2NoBoundaryWave1D(internal, weights, J, wavename, NFFT)
 end
 
 function Freq2NoBoundaryWave2D(internal, weights, J, wavename, NFFT)
-	tmpMulVec = Array{Complex{Float64}}( T.NFFT.n[1] )
+	tmpMulVec = Array{Complex{Float64}}( NFFT.n[1] )
 	Freq2NoBoundaryWave2D( internal, weights, J, wavename, NFFT, tmpMulVec )
 end
 
