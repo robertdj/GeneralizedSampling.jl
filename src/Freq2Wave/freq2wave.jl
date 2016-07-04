@@ -3,7 +3,7 @@
 
 function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
-	( Nint = 2^(J+1) ) >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
+	( Nint = 2^J ) >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	
 	M = length(samples)
 	if Nint >= M
@@ -90,9 +90,8 @@ function Base.collect(T::Freq2BoundaryWave1D)
 	M, N = size(T)
 	F = Array{Complex{Float64}}(M, N)
 
-	p = van_moment(T)
-
 	# Left boundary
+	p = van_moment(T)
 	F[:,1:p] = T.left
 
 	# Internal function
@@ -143,11 +142,11 @@ The number of reconstructed wavelet coefficients (in each dimension).
 - When `D` == 2, the output is (Int,Int)
 """->
 function wsize(T::Freq2BoundaryWave2D)
-	N = 2^(wscale(T)+1)
+	N = 2^wscale(T)
 	return (N, N)
 end
 wsize(T::Freq2NoBoundaryWave2D) = T.NFFT.N
-wsize(T::Freq2BoundaryWave1D) = (2^(wscale(T)+1),)
+wsize(T::Freq2BoundaryWave1D) = (2^wscale(T),)
 wsize(T::Freq2NoBoundaryWave1D) = T.NFFT.N
 
 function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Integer; args...)
@@ -427,7 +426,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2Wave2D, x::Dens
 	return y
 end
 
-function Base.(:(*))(T::Freq2Wave, x::DenseArray)
+function Base.(:*)(T::Freq2Wave, x::DenseArray)
 	if !isa(x, Array{Complex{Float64}})
 		x = map(Complex{Float64}, x)
 	end
@@ -443,6 +442,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave
 	(M = size(T,1)) == length(v) || throw(DimensionMismatch())
 	size(T,2) == length(z) || throw(DimensionMismatch())
 
+	# TODO: hadc!
 	for m in 1:M
 		@inbounds T.tmpMulVec[m] = conj(T.internal[m]) * v[m]
 	end
