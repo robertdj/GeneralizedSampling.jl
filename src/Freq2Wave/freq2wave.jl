@@ -228,7 +228,7 @@ end
 
 function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
 	vm = van_moment(wavename)
-	( Nint = 2^(J+1) ) >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
+	( Nint = 2^J ) >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	M = size(samples, 1)
 	size(samples,2) == 2 || throw(DimensionMismatch("Samples must have two columns"))
 
@@ -442,10 +442,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave
 	(M = size(T,1)) == length(v) || throw(DimensionMismatch())
 	size(T,2) == length(z) || throw(DimensionMismatch())
 
-	# TODO: hadc!
-	for m in 1:M
-		@inbounds T.tmpMulVec[m] = conj(T.internal[m]) * v[m]
-	end
+	hadc!(T.tmpMulVec, v, T.internal)
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
 	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, z)
@@ -491,9 +488,6 @@ end
 
 # Ac_mul_B! for the `k`'th column of `Z` using the `d`'th dimension of T
 function Base.Ac_mul_B!(Z::StridedMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D, v::DenseVector{Complex{Float64}}, d::Integer, k::Integer)
-	#= (M = size(T,1)) == length(v) || throw(DimensionMismatch()) =#
-	#= wsize(T) == size(Z) || throw(DimensionMismatch()) =#
-
 	copy!(T.tmpMulVec, v)
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 

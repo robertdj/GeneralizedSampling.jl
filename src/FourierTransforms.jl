@@ -83,34 +83,28 @@ Optional arguments are passed to the Fourier transform of `wavename` (if relevan
 For the boundary functions an input vector `xi` of length `M` returns a matrix of size `M`-by-`p`, where `p` is the number of vanishing moments for `wavename`.
 
 **Note**: 
-This function is intended to return the Fourier transform used in generalized sampling with reconstruction on [-1,1].
+This function is intended to return the Fourier transform used in generalized sampling with reconstruction on [-1/2, 1/2].
 This has the following consequences which is **not** shared with the lower lever functions for Fourier transforms.
 
-- The kernel in the Fourier transform is `exp(-pi*im*k*x)` instead of the usual `exp(-2pi*im*k*x)` that has two periods on the interval [-1,1].
-- When `side` is `'L'` the function is translated with -1 (in the time domain) and when `side` is `'R'` the function is translated with 1.
+- When `side` is `'L'` the function is translated with -1/2 (in the time domain) and when `side` is `'R'` the function is translated with 1/2.
 - When `side` is `'L'` the *first* column of the output is related to the function closest to the left boundary, but when `side` is 'R'` the *last* column is related to the function closest to the right boundary.
+
+The internal scaling functions are not phase shifted since this is handled by the NFFT package.
 """->
 function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0; args... )
 	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))
 
-	#= xi *= 2.0 =#
 	if ishaar(wavename)
-		y = FourHaarScaling(xi, J)
+		return FourHaarScaling(xi, J)
 	elseif isdaubechies(wavename)
-		y = FourDaubScaling(xi, van_moment(wavename), J; args...)
+		return FourDaubScaling(xi, van_moment(wavename), J; args...)
 	else
 		error(string("Fourier transform for ", wavename, " is not implemented"))
 	end
-
-	#= phase_shift = 2.0*cis( twoπ*xi ) =#
-	#= phase_shift = cis( pi*xi ) =#
-	#= broadcast!(*, y, y, phase_shift) =#
-	return y
 end
 
 function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0; args... )
 	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))
-	#= xi *= 2.0 =#
 
 	if !isdaubechies(wavename)
 		error(string("Fourier transform for boundary ", wavename, " is not implemented"))
@@ -119,16 +113,14 @@ function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0
 	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...).'
 
 	if side == 'L'
-		phase_shift = cis( twoπ*xi )
+		phase_shift = cis( pi*xi )
 		broadcast!(*, Y, Y, phase_shift)
 	elseif side == 'R'
-		phase_shift = cis( -twoπ*xi )
+		phase_shift = cis( -pi*xi )
 		broadcast!(*, Y, Y, phase_shift)
 		Y = flipdim(Y,2)
 	end
 
-	#= phase_shift = 2.0*cis( twoπ*xi ) =#
-	#= broadcast!(*, Y, Y, phase_shift) =#
 	return Y
 end
 
