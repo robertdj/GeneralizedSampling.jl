@@ -1,6 +1,7 @@
 module GeneralizedSampling
 
 using NFFT
+import NFFT: nfft!, nfft_adjoint!
 using IntervalWavelets
 import IntervalWavelets: isuniform, van_moment
 
@@ -55,7 +56,6 @@ const twoπ = 2.0*pi
 
 include("Freq2Wave/Types.jl")
 include("Misc.jl")
-include("NFFT.jl")
 include("FourierTransforms.jl")
 include("CGNR.jl")
 

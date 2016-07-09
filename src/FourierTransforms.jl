@@ -74,42 +74,35 @@ end
 
 
 @doc """
-	FourScalingFunc( xi, wavename, J=0, k=0; ... )
+	FourScalingFunc( xi, wavename, J=0; ... )
+	FourScalingFunc( xi, wavename, side, J=0; ... )
 
-Compute the Fourier transform at `xi` of the scaling function `wavename` with
-scale `J` and translation `k`.
-
+Compute the Fourier transform at `xi` of the (boundary) scaling function `wavename` with scale `J` (at boundary `side`, which is either `'L'` or `'R'`).
 Optional arguments are passed to the Fourier transform of `wavename` (if relevant).
+
+For the boundary functions an input vector `xi` of length `M` returns a matrix of size `M`-by-`p`, where `p` is the number of vanishing moments for `wavename`.
+
+**Note**: 
+This function is intended to return the Fourier transform used in generalized sampling with reconstruction on [-1/2, 1/2].
+This has the following consequences which is **not** shared with the lower lever functions for Fourier transforms.
+
+- When `side` is `'L'` the function is translated with -1/2 (in the time domain) and when `side` is `'R'` the function is translated with 1/2.
+- When `side` is `'L'` the *first* column of the output is related to the function closest to the left boundary, but when `side` is 'R'` the *last* column is related to the function closest to the right boundary.
+
+The internal scaling functions are not phase shifted since this is handled by the NFFT package.
 """->
-function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0, k::Integer=0; args... )
+function FourScalingFunc( xi, wavename::AbstractString, J::Integer=0; args... )
 	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))
 
 	if ishaar(wavename)
-		return FourHaarScaling(xi, J, k)
+		return FourHaarScaling(xi, J)
 	elseif isdaubechies(wavename)
-		return FourDaubScaling(xi, van_moment(wavename), J, k; args...)
+		return FourDaubScaling(xi, van_moment(wavename), J; args...)
 	else
 		error(string("Fourier transform for ", wavename, " is not implemented"))
 	end
-
 end
 
-@doc """
-	FourScalingFunc( xi, wavename, side, J=0; ... )
-
-Compute the Fourier transform at `xi` of the boundary scaling function `wavename` with scale `J`.
-Optional arguments are passed to the Fourier transform of `wavename` (if relevant).
-
-For a vector `xi` of length `M`, the output is a matrix of size
-`M`-by-`p`, where `p` is the number of vanishing moments for `wavename`.
-
-**Note**: 
-For `side == 'L'` the *first* column of the output is related to the function closest to the left boundary, 
-but for `side == 'R'` the *last* column is related to the function closest to the right boundary.
-Furthermore, the right side functions are translated (in the time domain) such that the right endpoint of their support is 1.
-
-This behavior is *not* shared with the lower lever functions for Fourier transforms.
-"""->
 function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0; args... )
 	J >= 0 || throw(AssertionError("Scale must be a non-negative integer"))
 
@@ -117,10 +110,13 @@ function FourScalingFunc( xi, wavename::AbstractString, side::Char, J::Integer=0
 		error(string("Fourier transform for boundary ", wavename, " is not implemented"))
 	end
 
-	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...)'
+	Y = FourDaubScaling(xi, van_moment(wavename), side, J; args...).'
 
-	if side == 'R'
-		phase_shift = cis( -twoπ*xi*2.0^-J )
+	if side == 'L'
+		phase_shift = cis( pi*xi )
+		broadcast!(*, Y, Y, phase_shift)
+	elseif side == 'R'
+		phase_shift = cis( -pi*xi )
 		broadcast!(*, Y, Y, phase_shift)
 		Y = flipdim(Y,2)
 	end

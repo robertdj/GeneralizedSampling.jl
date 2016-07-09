@@ -370,7 +370,7 @@ function Base.split{T}(A::DenseMatrix{T}, border::Integer)
 	internal = slice(A, I1idx, I2idx)
 	right = slice(A, 1:N[1], N[2]-border+1:N[2])
 
-	upper = slice(A, 1:border, I1idx)
+	upper = slice(A, 1:border, I2idx)
 	lower = slice(A, N[1]-border+1:N[1], I2idx)
 
 	SplitMatrix{T, typeof(left)}(left, internal, right, upper, lower)
