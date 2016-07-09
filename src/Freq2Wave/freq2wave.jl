@@ -303,7 +303,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1
 	size(T,1) == length(y) || throw(DimensionMismatch())
 	size(T,2) == length(x) || throw(DimensionMismatch())
 
-	NFFT.nfft!(T.NFFT, x, y)
+	nfft!(T.NFFT, x, y)
 	had!(y, T.internal)
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -315,7 +315,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave2
 	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
 	wsize(T) == size(X) || throw(DimensionMismatch())
 
-	NFFT.nfft!(T.NFFT, X, y)
+	nfft!(T.NFFT, X, y)
 	for m in 1:M, d in 1:2
 		@inbounds y[m] *= T.internal[d,m]
 	end
@@ -333,7 +333,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D,
 	xleft, xint, xright = split(x, van_moment(T))
 
 	# Internal scaling function
-	NFFT.nfft!(T.NFFT, xint, y)
+	nfft!(T.NFFT, xint, y)
 	had!(y, T.internal)
 
 	# Contribution from the boundaries
@@ -352,9 +352,9 @@ function Base.A_mul_B!(y::StridedVector{Complex{Float64}}, T::Freq2BoundaryWave2
 
 	# Internal scaling function
 	if d == 1
-		NFFT.nfft!(T.NFFTx, xint, y)
+		nfft!(T.NFFTx, xint, y)
 	elseif d == 2
-		NFFT.nfft!(T.NFFTy, xint, y)
+		nfft!(T.NFFTy, xint, y)
 	else
 		throw(DimensionMismatch())
 	end
@@ -380,7 +380,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# Internal scaling functions
 	vm = van_moment(T)
 	S = split(X, vm)
-	NFFT.nfft!(T.NFFT, S.internal, y)
+	nfft!(T.NFFT, S.internal, y)
 	for m in 1:M, d in 1:2
 		@inbounds y[m] *= T.internal[d,m]
 	end
@@ -397,7 +397,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 
 		# Upper
 		x = slice(X, k, vm+1:N[2]-vm)
-		NFFT.nfft!( T.NFFTy, x, T.tmpMulVec )
+		nfft!( T.NFFTy, x, T.tmpMulVec )
 		for m in 1:M
 			@inbounds T.tmpMulVec[m] *= T.internal[2,m]
 		end
@@ -405,7 +405,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 
 		# Lower
 		x = slice(X, N[1]-vm+k, vm+1:N[2]-vm)
-		NFFT.nfft!( T.NFFTy, x, T.tmpMulVec )
+		nfft!( T.NFFTy, x, T.tmpMulVec )
 		for m in 1:M
 			@inbounds T.tmpMulVec[m] *= T.internal[2,m]
 		end
@@ -445,7 +445,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave
 	hadc!(T.tmpMulVec, v, T.internal)
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
-	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, z)
+	nfft_adjoint!(T.NFFT, T.tmpMulVec, z)
 
 	return z
 end
@@ -462,7 +462,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2NoBoundaryWave
 	end
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
-	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, Z)
+	nfft_adjoint!(T.NFFT, T.tmpMulVec, Z)
 
 	return Z
 end
@@ -481,7 +481,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D
 
 	# Internal scaling function
 	hadc!(T.tmpMulVec, T.internal)
-	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, zint)
+	nfft_adjoint!(T.NFFT, T.tmpMulVec, zint)
 
 	return z
 end
@@ -506,9 +506,9 @@ function Base.Ac_mul_B!(Z::StridedMatrix{Complex{Float64}}, T::Freq2BoundaryWave
 
 	zint = slice(Z, vm+1:N-vm, k)
 	if d == 1
-		NFFT.nfft_adjoint!(T.NFFTx, T.tmpMulVec, zint)
+		nfft_adjoint!(T.NFFTx, T.tmpMulVec, zint)
 	elseif d == 2
-		NFFT.nfft_adjoint!(T.NFFTy, T.tmpMulVec, zint)
+		nfft_adjoint!(T.NFFTy, T.tmpMulVec, zint)
 	else
 		throw(DimensionMismatch())
 	end
@@ -543,7 +543,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 			@inbounds T.tmpMulcVec[m] *= conj(T.internal[2,m])
 		end
 		z = slice(Z, k, vm+1:N[2]-vm)
-		NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
+		nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
 
 		# Lower
 		hadc!( T.tmpMulcVec, T.weigthedVec, right(T,1,k) )
@@ -551,7 +551,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 			@inbounds T.tmpMulcVec[m] *= conj(T.internal[2,m])
 		end
 		z = slice(Z, N[1]-vm+k, vm+1:N[2]-vm)
-		NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
+		nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
 	end
 
 	# Internal coefficients
@@ -562,7 +562,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 		end
 	end
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
-	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulVec, S.internal)
+	nfft_adjoint!(T.NFFT, T.tmpMulVec, S.internal)
 
 	return Z
 end
