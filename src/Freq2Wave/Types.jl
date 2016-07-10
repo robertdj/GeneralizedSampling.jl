@@ -66,7 +66,6 @@ immutable Freq2BoundaryWave1D <: Freq2Wave1D
 
 	NFFT::NFFT.NFFTPlan{1,Float64}
 
-	# TODO: Make type stable
 	left::Matrix{Complex{Float64}}
 	right::Matrix{Complex{Float64}}
 
@@ -85,10 +84,11 @@ immutable Freq2BoundaryWave2D <: Freq2Wave2D
 	NFFTy::NFFT.NFFTPlan{1,Float64}
 
 	# TODO: Make type stable
+	#= left::Vector{ Matrix{Complex{Float64}} } =#
 	left::Matrix{Any}
 	right::Matrix{Any}
 
-	tmpMulVec::Vector{Complex{Float64}}
+	tmpMulVec::StridedMatrix{Complex{Float64}}
 	tmpMulcVec::Vector{Complex{Float64}}
 	weigthedVec::Vector{Complex{Float64}}
 end
@@ -113,9 +113,9 @@ function Freq2BoundaryWave1D(internal, weights, J, wavename, NFFT, left, right)
 end
 
 function Freq2BoundaryWave2D(internal, weights, J, wavename, NFFT, left, right)
-	tmpMulVec = Array{Complex{Float64}}( NFFT.M )
-	tmpMulcVec = similar(tmpMulVec)
-	weigthedVec = similar(tmpMulVec)
+	tmpMulVec = similar(left[1])
+	tmpMulcVec = Array{Complex{Float64}}( NFFT.M )
+	weigthedVec = similar(tmpMulcVec)
 
 	NFFTx = NFFTPlan( NFFT.x[1,:], (NFFT.N[1],) )
 	NFFTy = NFFTPlan( NFFT.x[2,:], (NFFT.N[2],) )

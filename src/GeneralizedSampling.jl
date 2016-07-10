@@ -57,6 +57,7 @@ const twoπ = 2.0*pi
 include("Freq2Wave/Types.jl")
 include("Misc.jl")
 include("FourierTransforms.jl")
+include("NFFT.jl")
 include("CGNR.jl")
 
 end # module

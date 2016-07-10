@@ -345,33 +345,6 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D,
 	return y
 end
 
-function Base.A_mul_B!(y::StridedVector{Complex{Float64}}, T::Freq2BoundaryWave2D, X::DenseMatrix{Complex{Float64}}, d::Integer, k::Integer)
-	p = van_moment(T)
-	N = size(X,1)
-	xint = slice(X, p+1:N-p, k)
-
-	# Internal scaling function
-	if d == 1
-		nfft!(T.NFFTx, xint, y)
-	elseif d == 2
-		nfft!(T.NFFTy, xint, y)
-	else
-		throw(DimensionMismatch())
-	end
-	for m in 1:length(y)
-		@inbounds y[m] *= T.internal[d,m]
-	end
-
-	# Contribution from the boundaries
-	xleft = slice(X, 1:p, k)
-	BLAS.gemv!('N', ComplexOne, T.left[d], xleft, ComplexOne, y)
-	xright = slice(X, N-p+1:N, k)
-	BLAS.gemv!('N', ComplexOne, T.right[d], xright, ComplexOne, y)
-
-	isuniform(T) || had!(y, get(T.weights))
-
-	return y
-end
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D, X::DenseMatrix{Complex{Float64}})
 	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
@@ -380,37 +353,72 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# Internal scaling functions
 	vm = van_moment(T)
 	S = split(X, vm)
-	nfft!(T.NFFT, S.internal, y)
+	nfft!(T.NFFT, S.II, y)
 	for m in 1:M, d in 1:2
 		@inbounds y[m] *= T.internal[d,m]
 	end
 
-	# Update y with border contributions
-	for k in 1:vm
-		# Left
-		A_mul_B!( T.tmpMulVec, T, X, 1, k )
-		yphad!(y, left(T,2,k), T.tmpMulVec)
+	onesp = ones(Complex{Float64}, vm)
 
-		# Right
-		A_mul_B!( T.tmpMulVec, T, X, 1, N[2]-vm+k )
-		yphad!(y, right(T,2,k), T.tmpMulVec)
+	# ------------------------------------------------------------
+	# Corners
 
-		# Upper
-		x = slice(X, k, vm+1:N[2]-vm)
-		nfft!( T.NFFTy, x, T.tmpMulVec )
-		for m in 1:M
-			@inbounds T.tmpMulVec[m] *= T.internal[2,m]
-		end
-		yphad!(y, left(T,1,k), T.tmpMulVec)
+	# LL
+	A_mul_B!( T.tmpMulVec, T.left[1], S.LL )
+	had!( T.tmpMulVec, T.left[2] )
+	# y += sum(T.tmpMulVec,2)
+	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
-		# Lower
-		x = slice(X, N[1]-vm+k, vm+1:N[2]-vm)
-		nfft!( T.NFFTy, x, T.tmpMulVec )
-		for m in 1:M
-			@inbounds T.tmpMulVec[m] *= T.internal[2,m]
-		end
-		yphad!(y, right(T,1,k), T.tmpMulVec)
+	# RL
+	A_mul_B!( T.tmpMulVec, T.right[1], S.RL )
+	had!( T.tmpMulVec, T.left[2] )
+	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
+
+	# RR
+	A_mul_B!( T.tmpMulVec, T.right[1], S.RR )
+	had!( T.tmpMulVec, T.right[2] )
+	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
+
+	# LR
+	A_mul_B!( T.tmpMulVec, T.left[1], S.LR )
+	had!( T.tmpMulVec, T.right[2] )
+	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
+
+	# ------------------------------------------------------------
+	# Sides
+
+	# IL
+	nfft!(T.NFFTx, S.IL, T.tmpMulVec, Val{1})
+	for m in 1:M, p in 1:vm
+		@inbounds T.tmpMulVec[m,p] *= T.internal[1,m]
 	end
+	had!(T.tmpMulVec, T.left[2])
+	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
+
+	# IR
+	nfft!(T.NFFTx, S.IR, T.tmpMulVec, Val{1})
+	for m in 1:M, p in 1:vm
+		@inbounds T.tmpMulVec[m,p] *= T.internal[1,m]
+	end
+	had!(T.tmpMulVec, T.right[2])
+	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
+
+	# LI 
+	nfft!(T.NFFTy, S.LI, T.tmpMulVec, Val{2})
+	for m in 1:M, p in 1:vm
+		@inbounds T.tmpMulVec[m,p] *= T.internal[2,m]
+	end
+	had!(T.tmpMulVec, T.left[1])
+	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
+
+	# RI 
+	nfft!(T.NFFTy, S.RI, T.tmpMulVec, Val{2})
+	for m in 1:M, p in 1:vm
+		@inbounds T.tmpMulVec[m,p] *= T.internal[2,m]
+	end
+	had!(T.tmpMulVec, T.right[1])
+	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
+
 
 	isuniform(T) || had!(y, get(T.weights))
 
