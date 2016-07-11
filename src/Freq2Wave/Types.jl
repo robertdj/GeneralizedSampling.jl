@@ -73,7 +73,8 @@ immutable Freq2BoundaryWave1D <: Freq2Wave1D
 end
 
 immutable Freq2BoundaryWave2D <: Freq2Wave2D
-	internal::Matrix{Complex{Float64}}
+	internalx::Vector{Complex{Float64}}
+	internaly::Vector{Complex{Float64}}
 	weights::Nullable{Vector{Complex{Float64}}}
 
 	J::Int64
@@ -113,6 +114,9 @@ function Freq2BoundaryWave1D(internal, weights, J, wavename, NFFT, left, right)
 end
 
 function Freq2BoundaryWave2D(internal, weights, J, wavename, NFFT, left, right)
+	internalx = internal[:,1]
+	internaly = internal[:,2]
+
 	tmpMulVec = similar(left[1])
 	tmpMulcVec = Array{Complex{Float64}}( NFFT.M )
 	weigthedVec = similar(tmpMulcVec)
@@ -120,7 +124,7 @@ function Freq2BoundaryWave2D(internal, weights, J, wavename, NFFT, left, right)
 	NFFTx = NFFTPlan( NFFT.x[1,:], (NFFT.N[1],) )
 	NFFTy = NFFTPlan( NFFT.x[2,:], (NFFT.N[2],) )
 
-	Freq2BoundaryWave2D( internal, weights, J, wavename, NFFT,
+	Freq2BoundaryWave2D( internalx, internaly, weights, J, wavename, NFFT,
 	NFFTx, NFFTy, left, right, tmpMulVec, tmpMulcVec, weigthedVec )
 end
 

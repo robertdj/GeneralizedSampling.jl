@@ -254,11 +254,11 @@ function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J:
 		Nint -= 2*vm
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
 
-		internal = scaling_funcs[1].'
+		internal = scaling_funcs[1]
 		left = scaling_funcs[2]
 		right = scaling_funcs[3]
 	else
-		internal = scaling_funcs.'
+		internal = scaling_funcs
 	end
 
 	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
@@ -354,8 +354,8 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	vm = van_moment(T)
 	S = split(X, vm)
 	nfft!(T.NFFT, S.II, y)
-	for m in 1:M, d in 1:2
-		@inbounds y[m] *= T.internal[d,m]
+	for m in 1:M
+		@inbounds y[m] *= T.internalx[m] * T.internaly[m]
 	end
 
 	onesp = ones(Complex{Float64}, vm)
@@ -389,33 +389,37 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 
 	# IL
 	nfft!(T.NFFTx, S.IL, T.tmpMulVec, Val{1})
-	for m in 1:M, p in 1:vm
-		@inbounds T.tmpMulVec[m,p] *= T.internal[1,m]
-	end
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internalx)
+	#= for m in 1:M, p in 1:vm =#
+	#= 	@inbounds T.tmpMulVec[m,p] *= T.internal[1,m] =#
+	#= end =#
 	had!(T.tmpMulVec, T.left[2])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# IR
 	nfft!(T.NFFTx, S.IR, T.tmpMulVec, Val{1})
-	for m in 1:M, p in 1:vm
-		@inbounds T.tmpMulVec[m,p] *= T.internal[1,m]
-	end
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internalx)
+	#= for m in 1:M, p in 1:vm =#
+	#= 	@inbounds T.tmpMulVec[m,p] *= T.internal[1,m] =#
+	#= end =#
 	had!(T.tmpMulVec, T.right[2])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# LI 
 	nfft!(T.NFFTy, S.LI, T.tmpMulVec, Val{2})
-	for m in 1:M, p in 1:vm
-		@inbounds T.tmpMulVec[m,p] *= T.internal[2,m]
-	end
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internaly)
+	#= for m in 1:M, p in 1:vm =#
+	#= 	@inbounds T.tmpMulVec[m,p] *= T.internal[2,m] =#
+	#= end =#
 	had!(T.tmpMulVec, T.left[1])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# RI 
 	nfft!(T.NFFTy, S.RI, T.tmpMulVec, Val{2})
-	for m in 1:M, p in 1:vm
-		@inbounds T.tmpMulVec[m,p] *= T.internal[2,m]
-	end
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internaly)
+	#= for m in 1:M, p in 1:vm =#
+	#= 	@inbounds T.tmpMulVec[m,p] *= T.internal[2,m] =#
+	#= end =#
 	had!(T.tmpMulVec, T.right[1])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
@@ -570,7 +574,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 		end
 	end
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
-	nfft_adjoint!(T.NFFT, T.tmpMulVec, S.internal)
+	nfft_adjoint!(T.NFFT, T.tmpMulVec, S.II)
 
 	return Z
 end
@@ -693,8 +697,14 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 
 	if p < n <= N-p
 		offset = div(N, 2) + 1
-		for m in 1:M
-			@inbounds phi[m] = T.internal[d,m]*cis( -twoπ*(n-offset)*T.NFFT.x[d,m] )
+		if d == 1
+			for m in 1:M
+				@inbounds phi[m] = T.internalx[m]*cis( -twoπ*(n-offset)*T.NFFT.x[d,m] )
+			end
+		elseif d == 2
+			for m in 1:M
+				@inbounds phi[m] = T.internaly[m]*cis( -twoπ*(n-offset)*T.NFFT.x[d,m] )
+			end
 		end
 	elseif 1 <= n <= p
 		copy!( phi, T.left[d,n+1] )
@@ -713,7 +723,7 @@ end
 
 function Base.size(T::Freq2Wave, d::Integer)
 	if d == 1
-		size(T.internal, dim(T))
+		T.NFFT.M
 	elseif d == 2
 		prod( wsize(T) )
 	else
