@@ -1,13 +1,17 @@
+# Documentation: http://docs.travis-ci.com/user/languages/julia/
 language: julia
 os:
   - linux
   - osx
 julia:
-  - release
-  - nightly
+  - 0.4
 notifications:
   email: false
-# uncomment the following lines to override the default test script
-#script:
-#  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-#  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("GeneralizedSampling"); Pkg.test("GeneralizedSampling"; coverage=true)'
+script:
+  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+  - julia -e 'Pkg.add("VoronoiDelaunay"); Pkg.checkout("VoronoiDelaunay")'
+  - julia -e 'Pkg.add("GeometricalPredicates"); Pkg.checkout("GeometricalPredicates")'
+  - julia -e 'Pkg.clone(pwd()); Pkg.build("GeneralizedSampling"); Pkg.test("GeneralizedSampling"; coverage=true)'
+after_success:
+   - julia -e 'cd(Pkg.dir("GeneralizedSampling")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+
