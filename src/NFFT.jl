@@ -29,3 +29,30 @@ function NFFT.nfft!{T}(p::NFFTPlan{1}, f::AbstractMatrix{T}, fHat::StridedMatrix
 	return fHat
 end
 
+
+function NFFT.nfft_adjoint!{T}(p::NFFTPlan{1}, fHat::AbstractMatrix{T}, f::StridedMatrix{T}, ::Type{Val{1}})
+	( Nrows = size(f,2) ) == size(fHat,2) || throw(DimensionMismatch())
+
+	for rowidx in 1:Nrows
+		frow = slice(f, :, rowidx)
+		fhatrow = slice(fHat, :, rowidx)
+
+		NFFT.nfft_adjoint!(p, fhatrow, frow)
+	end
+
+	return f
+end
+
+function NFFT.nfft_adjoint!{T}(p::NFFTPlan{1}, fHat::AbstractMatrix{T}, f::StridedMatrix{T}, ::Type{Val{2}})
+	( Nrows = size(f,1) ) == size(fHat,2) || throw(DimensionMismatch())
+
+	for rowidx in 1:Nrows
+		frow = slice(f, rowidx, :)
+		fhatrow = slice(fHat, :, rowidx)
+
+		NFFT.nfft_adjoint!(p, fhatrow, frow)
+	end
+
+	return f
+end
+

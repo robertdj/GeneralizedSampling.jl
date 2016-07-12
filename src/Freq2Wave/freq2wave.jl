@@ -165,7 +165,9 @@ function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::Abstract
 	internalx = kron(internalx, ones(My))
 	internaly = FourScalingFunc( usamplesy, wavename, J )
 	internaly = repmat(internaly, Mx)
-	internal = hcat(internalx, internaly)
+	internal = cell(2)
+	internal[1] = internalx
+	internal[2] = internaly
 
 	# Boundary scaling functions
 	if !hasboundary(wavename)
@@ -175,21 +177,15 @@ function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::Abstract
 
 		leftx = FourScalingFunc( usamplesx, wavename, 'L', J; args... )
 		lefty = FourScalingFunc( usamplesy, wavename, 'L', J; args... )
-		left = cell(2,vm+1)
+		left = cell(2)
 		left[1] = kron(leftx, ones(My))
 		left[2] = repmat(lefty, Mx)
 
 		rightx = FourScalingFunc( usamplesx, wavename, 'R', J; args... )
 		righty = FourScalingFunc( usamplesy, wavename, 'R', J; args... )
-		right = cell(2,vm+1)
+		right = cell(2)
 		right[1] = kron(rightx, ones(My))
 		right[2] = repmat(righty, Mx)
-
-		# Views of the columns in left/right
-		for k in 1:vm, d in 1:2
-			left[d,k+1]  = slice( left[d], :, k )
-			right[d,k+1] = slice( right[d], :, k )
-		end
 
 		return internal, left, right
 	end
@@ -197,7 +193,10 @@ end
 
 function NotUnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Integer, B::Float64; args...)
 	# Fourier transform of the internal scaling function
-	internal = FourScalingFunc( samples, wavename, J )
+	int = FourScalingFunc( samples, wavename, J )
+	internal = cell(2)
+	internal[1] = int[:,1]
+	internal[2] = int[:,2]
 
 	# Boundary scaling functions
 	if !hasboundary(wavename)
@@ -206,21 +205,13 @@ function NotUnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::Abstr
 		samplesx = slice(samples, :, 1)
 		samplesy = slice(samples, :, 2)
 
-		vm = van_moment(wavename)
-		left = cell(2,vm+1)
+		left = cell(2)
 		left[1] = FourScalingFunc( samplesx, wavename, 'L', J; args... )
 		left[2] = FourScalingFunc( samplesy, wavename, 'L', J; args... )
 
-		right = cell(2,vm+1)
+		right = cell(2)
 		right[1] = FourScalingFunc( samplesx, wavename, 'R', J; args... )
 		right[2] = FourScalingFunc( samplesy, wavename, 'R', J; args... )
-
-		# Views of the columns in left/right
-		vm = van_moment(wavename)
-		for k in 1:vm, d in 1:2
-			left[d,k+1]  = slice( left[d], :, k )
-			right[d,k+1] = slice( right[d], :, k )
-		end
 
 		return internal, left, right
 	end
@@ -275,29 +266,6 @@ function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J:
 	end
 end
 
-@doc """
-	left(T, d, k) -> Vector
-
-Return (a view of) the `k`'th column of `T`'s left boundary Fourier
-transform in dimension `d`.
-For the x coordinate `d = 1` and for the y coordinate `d = 2`.
-"""->
-left(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.left[d,k+1]
-left(T::Freq2BoundaryWave2D, d::Integer) = T.left[d,1]
-
-@doc """
-	right(T, d, k) -> Vector
-
-Return (a view of) the `k`'th column of `T`'s right boundary Fourier
-transform in dimension `d`.
-For the x coordinate `d = 1` and for the y coordinate `d = 2`.
-
-Note that `right(T, d, 1)` is the right boundary functions *furthest*
-from the boundary, cf. the ordering from `FourScalingFunc`.
-"""->
-right(T::Freq2BoundaryWave2D, d::Integer, k::Integer) = T.right[d,k+1]
-right(T::Freq2BoundaryWave2D, d::Integer) = T.right[d,1]
-
 
 function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1D, x::DenseVector{Complex{Float64}})
 	size(T,1) == length(y) || throw(DimensionMismatch())
@@ -316,8 +284,8 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave2
 	wsize(T) == size(X) || throw(DimensionMismatch())
 
 	nfft!(T.NFFT, X, y)
-	for m in 1:M, d in 1:2
-		@inbounds y[m] *= T.internal[d,m]
+	for m in 1:M
+		@inbounds y[m] *= T.internal[1][m] * T.internal[2][m]
 	end
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -355,7 +323,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	S = split(X, vm)
 	nfft!(T.NFFT, S.II, y)
 	for m in 1:M
-		@inbounds y[m] *= T.internalx[m] * T.internaly[m]
+		@inbounds y[m] *= T.internal[1][m] * T.internal[2][m]
 	end
 
 	onesp = ones(Complex{Float64}, vm)
@@ -366,7 +334,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# LL
 	A_mul_B!( T.tmpMulVec, T.left[1], S.LL )
 	had!( T.tmpMulVec, T.left[2] )
-	# y += sum(T.tmpMulVec,2)
+	# y += sum(T.tmpMulVec,2) :
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# RL
@@ -389,37 +357,25 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 
 	# IL
 	nfft!(T.NFFTx, S.IL, T.tmpMulVec, Val{1})
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internalx)
-	#= for m in 1:M, p in 1:vm =#
-	#= 	@inbounds T.tmpMulVec[m,p] *= T.internal[1,m] =#
-	#= end =#
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internal[1])
 	had!(T.tmpMulVec, T.left[2])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# IR
 	nfft!(T.NFFTx, S.IR, T.tmpMulVec, Val{1})
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internalx)
-	#= for m in 1:M, p in 1:vm =#
-	#= 	@inbounds T.tmpMulVec[m,p] *= T.internal[1,m] =#
-	#= end =#
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internal[1])
 	had!(T.tmpMulVec, T.right[2])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# LI 
 	nfft!(T.NFFTy, S.LI, T.tmpMulVec, Val{2})
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internaly)
-	#= for m in 1:M, p in 1:vm =#
-	#= 	@inbounds T.tmpMulVec[m,p] *= T.internal[2,m] =#
-	#= end =#
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internal[2])
 	had!(T.tmpMulVec, T.left[1])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# RI 
 	nfft!(T.NFFTy, S.RI, T.tmpMulVec, Val{2})
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internaly)
-	#= for m in 1:M, p in 1:vm =#
-	#= 	@inbounds T.tmpMulVec[m,p] *= T.internal[2,m] =#
-	#= end =#
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internal[2])
 	had!(T.tmpMulVec, T.right[1])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
@@ -467,10 +423,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2NoBoundaryWave
 	wsize(T) == size(Z) || throw(DimensionMismatch())
 
 	for m in 1:M
-		@inbounds T.tmpMulVec[m] = v[m]
-		for d in 1:2
-			@inbounds T.tmpMulVec[m] *= conj(T.internal[d,m])
-		end
+		@inbounds T.tmpMulVec[m] = v[m] * conj(T.internal[1][m]) * conj(T.internal[2][m])
 	end
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
@@ -498,36 +451,6 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D
 	return z
 end
 
-# Ac_mul_B! for the `k`'th column of `Z` using the `d`'th dimension of T
-function Base.Ac_mul_B!(Z::StridedMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D, v::DenseVector{Complex{Float64}}, d::Integer, k::Integer)
-	copy!(T.tmpMulVec, v)
-	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
-
-	vm = van_moment(T)
-	N = size(Z,1)
-
-	zleft = slice(Z, 1:vm, k)
-	Ac_mul_B!( zleft, left(T,d), T.tmpMulVec )
-	zright = slice(Z, N-vm+1:N, k)
-	Ac_mul_B!( zright, right(T,d), T.tmpMulVec )
-
-	# Internal scaling function
-	for m in 1:length(v)
-		@inbounds T.tmpMulVec[m] *= conj(T.internal[d,m])
-	end
-
-	zint = slice(Z, vm+1:N-vm, k)
-	if d == 1
-		nfft_adjoint!(T.NFFTx, T.tmpMulVec, zint)
-	elseif d == 2
-		nfft_adjoint!(T.NFFTy, T.tmpMulVec, zint)
-	else
-		throw(DimensionMismatch())
-	end
-
-	return Z
-end
-
 function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D, v::DenseVector{Complex{Float64}})
 	(M = size(T,1)) == length(v) || throw(DimensionMismatch())
 	(N = wsize(T)) == size(Z) || throw(DimensionMismatch())
@@ -539,42 +462,61 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	vm = van_moment(T)
 	S = split(Z, vm)
 
-	# Update borders
-	for k in 1:vm
-		# Left
-		hadc!(T.tmpMulcVec, T.weigthedVec, left(T,2,k))
-		Ac_mul_B!( Z, T, T.tmpMulcVec, 1, k )
-
-		# Right
-		hadc!(T.tmpMulcVec, T.weigthedVec, right(T,2,k))
-		Ac_mul_B!( Z, T, T.tmpMulcVec, 1, N[2]-vm+k )
-
-		# Upper
-		hadc!( T.tmpMulcVec, T.weigthedVec, left(T,1,k) )
-		for m in 1:M
-			@inbounds T.tmpMulcVec[m] *= conj(T.internal[2,m])
-		end
-		z = slice(Z, k, vm+1:N[2]-vm)
-		nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
-
-		# Lower
-		hadc!( T.tmpMulcVec, T.weigthedVec, right(T,1,k) )
-		for m in 1:M
-			@inbounds T.tmpMulcVec[m] *= conj(T.internal[2,m])
-		end
-		z = slice(Z, N[1]-vm+k, vm+1:N[2]-vm)
-		nfft_adjoint!( T.NFFTy, T.tmpMulcVec, z )
-	end
-
 	# Internal coefficients
 	for m in 1:M
-		@inbounds T.tmpMulVec[m] = v[m]
-		for d in 1:2
-			@inbounds T.tmpMulVec[m] *= conj(T.internal[d,m])
-		end
+		@inbounds T.tmpMulcVec[m] = T.weigthedVec[m] * conj(T.internal[1][m]) * conj(T.internal[2][m])
 	end
-	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
-	nfft_adjoint!(T.NFFT, T.tmpMulVec, S.II)
+	nfft_adjoint!(T.NFFT, T.tmpMulcVec, S.II)
+
+	# ------------------------------------------------------------
+	# Left blocks: All use 'L' for the y coordinate
+
+	# LL
+	conj!(T.tmpMulVec, T.left[2])
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
+	Ac_mul_B!( S.LL, T.left[1], T.tmpMulVec )
+
+	# RL: Reuse T.tmpMulVec
+	Ac_mul_B!( S.RL, T.right[1], T.tmpMulVec )
+
+	# IL
+	conj!(T.tmpMulcVec, T.internal[1])
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
+	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IL, Val{1} )
+
+	# ------------------------------------------------------------
+	# Middle blocks: All use 'I' for the y coordinate
+
+	# LI
+	conj!(T.tmpMulVec, T.left[1])
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
+
+	conj!(T.tmpMulcVec, T.internal[2])
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
+	nfft_adjoint!( T.NFFTy, T.tmpMulVec, S.LI, Val{2} )
+
+	# RI: Reuse T.tmpMulcVec
+	conj!(T.tmpMulVec, T.right[1])
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
+	nfft_adjoint!( T.NFFTy, T.tmpMulVec, S.RI, Val{2} )
+
+	# ------------------------------------------------------------
+	# Right blocks: All use 'L' for the y coordinate
+
+	# LR
+	conj!(T.tmpMulVec, T.right[2])
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
+	Ac_mul_B!( S.LR, T.left[1], T.tmpMulVec )
+
+	# RR: Reuse T.tmpMulVec
+	Ac_mul_B!( S.RR, T.right[1], T.tmpMulVec )
+
+	# IR
+	conj!(T.tmpMulcVec, T.internal[1])
+	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
+	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IR, Val{1} )
+
 
 	return Z
 end
@@ -641,7 +583,7 @@ function Base.collect(T::Freq2NoBoundaryWave2D)
 	Nx, Ny = wsize(T)
 	F = Array{Complex{Float64}}(M, Nx*Ny)
 
-	phi = prod(T.internal, 1)
+	phi = T.internal[1] .* T.internal[2]
 
 	offsetx = div(Nx, 2) + 1
 	offsety = div(Ny, 2) + 1
@@ -697,14 +639,8 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 
 	if p < n <= N-p
 		offset = div(N, 2) + 1
-		if d == 1
-			for m in 1:M
-				@inbounds phi[m] = T.internalx[m]*cis( -twoπ*(n-offset)*T.NFFT.x[d,m] )
-			end
-		elseif d == 2
-			for m in 1:M
-				@inbounds phi[m] = T.internaly[m]*cis( -twoπ*(n-offset)*T.NFFT.x[d,m] )
-			end
+		for m in 1:M
+			@inbounds phi[m] = T.internal[d][m]*cis( -twoπ*(n-offset)*T.NFFT.x[d,m] )
 		end
 	elseif 1 <= n <= p
 		copy!( phi, T.left[d,n+1] )
