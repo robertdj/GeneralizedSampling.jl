@@ -9,11 +9,11 @@ Conjugate gradient for normal equations residual method for solving the least sq
 
 The iteration stops when `norm(xnew - xold) < prec` or after at most `maxiter` iterations.
 """->
-function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::AbstractVector{T}; prec=LARGE_PREC, maxiter=length(x0))
-	@assert size(A,1) == length(b)
-	@assert size(A,2) == length(x0)
-	@assert prec >= SMALL_PREC
-	@assert maxiter >= 1
+function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::AbstractVector{T}; prec=LARGE_EPS, maxiter=length(x0))
+	size(A,1) == length(b) || throw(DimensionMismatch())
+	size(A,2) == length(x0) || throw(DimensionMismatch())
+	prec >= SMALL_EPS || throw(DomainError())
+	maxiter >= 1 || throw(DomainError())
 
 	# Initialize
 	x = copy(x0)
@@ -40,7 +40,6 @@ function cgnr{T<:Number}(A::AbstractMatrix{T}, b::AbstractVector{T}, x0::Abstrac
 
 		# Check for convergence: |xnew - xold|
 		if xdiff < prec
-			println("Number of iterations: ", iter)
 			break
 		end
 	end
@@ -54,12 +53,11 @@ end
 Conjugate gradient for normal equations residual method for `Freq2Wave`.
 The initial point `x0` must be of the same dimension as `T`.
 """->
-function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::AbstractArray{Complex{Float64},D}; prec=LARGE_PREC, maxiter=length(x0))
-	# TODO: Assertions in macro?
-	@assert size(T,1) == length(b)
-	@assert wsize(T) == size(x0)
-	@assert prec >= SMALL_PREC
-	@assert maxiter >= 1
+function cgnr(T::Freq2Wave, b::AbstractVector{Complex{Float64}}, x0::AbstractVecOrMat{Complex{Float64}}=zeros(eltype(T), wsize(T)); prec=LARGE_EPS, maxiter=max(length(x0),50))
+	size(T,1) == length(b) || throw(DimensionMismatch())
+	wsize(T) == size(x0) || throw(DimensionMismatch())
+	prec >= SMALL_EPS || throw(DomainError())
+	maxiter >= 1 || throw(DomainError())
 
 	# Initialize
 	x = copy(x0)
@@ -86,7 +84,6 @@ function cgnr{D}(T::Freq2Wave{D}, b::AbstractVector{Complex{Float64}}, x0::Abstr
 
 		# Check for convergence: |xnew - xold|
 		if xdiff < prec
-			println("Number of iterations: ", iter)
 			break
 		end
 	end

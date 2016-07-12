@@ -1,12 +1,14 @@
 module GeneralizedSampling
 
 using NFFT
-using WaveletPlot
-import WaveletPlot: isuniform, van_moment
+import NFFT: nfft!, nfft_adjoint!
+using IntervalWavelets
+import IntervalWavelets: isuniform, van_moment
 
-import Deldir: deldir, voronoiarea
+import VoronoiCells: density, voronoiarea
 import Wavelets: wavelet, WT
-import ArrayViews: reshape_view
+import ArrayViews: flatten_view
+import Base: A_mul_B!, Ac_mul_B!
 
 export
 	# Types
@@ -16,15 +18,14 @@ export
 	Freq2NoBoundaryWave,
 
 	# Fourier transforms
+	FourScalingFunc,
 	FourHaarScaling,
-	FourHaarWavelet,
 	FourDaubScaling,
 
 	# Linear equation solvers
 	cgnr,
 
 	# Special CoB functions
-	freq2wave,
 	collect,
 
 	# misc
@@ -47,14 +48,16 @@ export
 	frac!
 
 const sqrt2 = sqrt(2)
-# TODO: Rename: SMALL_EPS, LARGE_EPS
-const SMALL_PREC = eps()
-const LARGE_PREC = sqrt(eps())
+const SMALL_EPS = eps()
+const LARGE_EPS= sqrt(eps())
 const ComplexOne = one(Complex{Float64})
+const ComplexZero = zero(Complex{Float64})
+const twoπ = 2.0*pi
 
-include("Types.jl")
+include("Freq2Wave/Types.jl")
 include("Misc.jl")
 include("FourierTransforms.jl")
+include("NFFT.jl")
 include("CGNR.jl")
 
 end # module

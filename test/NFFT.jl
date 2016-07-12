@@ -1,4 +1,4 @@
-#= using GeneralizedSampling =#
+using GeneralizedSampling
 using Base.Test
 
 println("Testing NFFT...")
@@ -19,10 +19,12 @@ begin
 	samples = collect( 0:N-1 )
 
 	J = Int(log2(N))
-	T = freq2wave(samples, "haar", J)
+	T = Freq2Wave(samples, "haar", J)
+	for idx in eachindex(T.internal)
+		T.internal[idx] = 1.0 + 0.0*im
+	end
 
-	TF = Freq2NoBoundaryWave(T.samples, ones(T.FT), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT)
-	F = collect(TF)
+	F = collect(T)
 	B = F'*F / N
 
 	@test_approx_eq B eye(B)
@@ -37,11 +39,13 @@ begin
 	samples = grid(M)
 
 	J = Int(log2(M))
-	T = freq2wave(samples, "haar", J)
+	T = Freq2Wave(samples, "haar", J)
+	for idx in eachindex(T.internal)
+		T.internal[idx] = 1.0 + 0.0*im
+	end
 
-	TF = Freq2NoBoundaryWave(T.samples, ones(T.FT), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT)
-	F = collect(TF)
-	N = size(TF,2)
+	F = collect(T)
+	N = size(T,2)
 	B = F'*F / N
 
 	@test_approx_eq B eye(B)

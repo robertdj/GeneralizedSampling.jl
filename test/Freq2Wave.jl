@@ -15,19 +15,19 @@ N = 2^J
 
 # Uniform samples, No Boundary
 Usamples = grid(M, 0.5)
-TUNB = freq2wave(Usamples, "haar", J)
+TUNB = Freq2Wave(Usamples, "haar", J)
 
 # Uniform samples, with Boundary
 wavename = "db3"
-TUB = freq2wave(Usamples, wavename, J)
+TUB = Freq2Wave(Usamples, wavename, J)
 
 # Non-Uniform samples, No Boundary
 K = N/2
 NUsamples = N*rand(M) - K
-TNUNB = freq2wave(NUsamples, "haar", J, K)
+TNUNB = Freq2Wave(NUsamples, "haar", J, K)
 
 # Non-Uniform samples, with Boundary
-TNUB = freq2wave(NUsamples, wavename, J, K)
+TNUB = Freq2Wave(NUsamples, wavename, J, K)
 
 
 # ------------------------------------------------------------

@@ -19,12 +19,12 @@ begin
 	samples = grid(M, 0.5)
 
 	# No boundary
-	T = freq2wave(samples, "haar", J)
+	T = Freq2Wave(samples, "haar", J)
 	A = collect(T)
 
 	# With boundary (using the same internal Fourier transform as above)
-	TMP = freq2wave(samples, "db2", J)
-	Tb = Freq2BoundaryWave(TMP.samples, T.FT, TMP.weights, TMP.J, TMP.wavename, T.diag, TMP.NFFT, TMP.left, TMP.right)
+	TMP = Freq2Wave(samples, "db2", J)
+	Tb = GeneralizedSampling.Freq2BoundaryWave1D(T.internal, TMP.weights, TMP.J, TMP.wavename, TMP.NFFT, TMP.left, TMP.right)
 	Ab = collect(Tb)
 
 	vm = van_moment(Tb)
@@ -44,23 +44,23 @@ begin
 	samples = grid((M,M), 0.5)
 
 	# No boundary
-	T = freq2wave(samples, "haar", J)
+	T = Freq2Wave(samples, "haar", J)
 	A = collect(T)
 
 	# With boundary (using the same internal Fourier transform as above)
-	TMP = freq2wave(samples, "db2", J)
-	Tb = Freq2BoundaryWave(TMP.samples, T.FT, TMP.weights, TMP.J, TMP.wavename, T.diag, TMP.NFFT, TMP.left, TMP.right)
+	TMP = Freq2Wave(samples, "db2", J)
+	Tb = GeneralizedSampling.Freq2BoundaryWave2D(T.internal, TMP.weights, TMP.J, TMP.wavename, TMP.NFFT, TMP.left, TMP.right)
 	Ab = collect(Tb)
 
 	# Select the indices of the internal scaling functions
 	vm = van_moment(Tb)
-	I = zeros(Bool, wsize(T))
-	S = split(I,vm)
+	J = zeros(Bool, wsize(T))
+	S = split(J,vm)
 	for idx in eachindex(S.II)
 		S.II[idx] = true
 	end
 
-	# @show norm( A[:,vec(I)] - Ab[:,vec(I)] )
-	@test_approx_eq A[:,vec(I)] Ab[:,vec(I)]
+	#@show norm( A[:,vec(J)] - Ab[:,vec(J)] )
+	@test_approx_eq A[:,vec(J)] Ab[:,vec(J)]
 end
 

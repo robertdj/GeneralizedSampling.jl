@@ -3,10 +3,22 @@
 
 In-place Hadamard product: Replace `A` with `A.*B`.
 """->
-function had!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
-	@assert size(A) == size(B)
-	for idx in eachindex(A)
+function had!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T})
+	size(A) == size(B) || throw(DimensionMismatch())
+	for idx in eachindex(A,B)
 		@inbounds A[idx] *= B[idx]
+	end
+end
+
+@doc """
+	had!(A, B, C) -> A
+
+In-place Hadamard product: Replace `A` with `B.*C`.
+"""->
+function had!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T}, C::AbstractArray{T})
+	size(A) == size(B) == size(C) || throw(DimensionMismatch())
+	for idx in eachindex(A,B)
+		@inbounds A[idx] = B[idx] * C[idx]
 	end
 end
 
@@ -16,10 +28,23 @@ end
 In-place Hadamard product with complex conjugation: Replace `A` with
 `A.*conj(B)`.
 """->
-function hadc!{T<:Number}(A::DenseArray{T}, B::AbstractArray{T})
-	@assert size(A) == size(B)
-	for idx in eachindex(A)
+function hadc!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T})
+	size(A) == size(B) || throw(DimensionMismatch())
+	for idx in eachindex(A,B)
 		@inbounds A[idx] *= conj(B[idx])
+	end
+end
+
+@doc """
+	hadc!(A, B, C) -> A
+
+In-place Hadamard product with complex conjugation: Replace `A` with
+`B.*conj(C)`.
+"""->
+function hadc!{T<:Number}(A::StridedArray{T}, B::AbstractArray{T}, C::AbstractArray{T})
+	size(A) == size(B) == size(C) || throw(DimensionMismatch())
+	for idx in eachindex(A,B)
+		@inbounds A[idx] = B[idx] * conj(C[idx])
 	end
 end
 
@@ -28,8 +53,8 @@ end
 
 Replace `y` with `y + a.*b`.
 """->
-function yphad!{T<:Number}(y::DenseVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
-	@assert (Ny = length(y)) == length(a) == length(b)
+function yphad!{T<:Number}(y::StridedVector{T}, a::AbstractVector{T}, b::AbstractVector{T})
+	(Ny = length(y)) == length(a) == length(b) || throw(DimensionMismatch())
 	for ny in 1:Ny
 		@inbounds y[ny] += a[ny] * b[ny]
 	end
@@ -40,9 +65,9 @@ end
 
 Replace `A` with `conj(B)`.
 """->
-function Base.conj!(A::DenseArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
-	@assert size(A) == size(B)
-	for idx in eachindex(A)
+function Base.conj!(A::StridedArray{Complex{Float64}}, B::AbstractArray{Complex{Float64}})
+	size(A) == size(B) || throw(DimensionMismatch())
+	for idx in eachindex(A,B)
 		@inbounds A[idx] = conj(B[idx])
 	end
 	return A
@@ -53,9 +78,9 @@ end
 
 Test if the rows in the `M`-by-2 matrix `points` are on a uniform 2D grid.
 """->
-function isuniform{T<:Real}( points::DenseMatrix{T} )
+function isuniform{T<:Real}( points::AbstractMatrix{T} )
 	M, D = size(points)
-	@assert D == 2
+	D == 2 || throw(DimensionMismatch())
 
 	M <= 2 && return true
 
@@ -83,9 +108,9 @@ With even `M` the grid has one extra point on the negative values.
 
 The points are scaled by `scale` which by default is 1.
 """->
-function grid(M::Int, grid_dist::Real=1)
-	@assert M >= 2
-	@assert grid_dist > 0
+function grid(M::Int, grid_dist::Real=1.0)
+	M >= 2 || throw(AssertionError())
+	grid_dist > 0 || throw(DomainError())
 
 	startx = -div(M,2)
 	endx = (isodd(M) ? -startx : -startx-1)
@@ -106,9 +131,9 @@ end
 
 The points are scaled by `scale` which by default is 1.
 """->
-function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1)
-	@assert minimum(M) >= 2
-	@assert grid_dist > 0
+function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1.0)
+	minimum(M) >= 2 || throw(AssertionError())
+	grid_dist > 0 || throw(DomainError())
 
 	# The points are sorted by the x coordinate
 	gridx = grid(M[1], grid_dist)
@@ -130,10 +155,9 @@ Compute weights for sampling points `xi`.
 - For 2D points `xi` must be a matrix with 2 columns.
 """->
 function weights(xi::AbstractVector{Float64}, bandwidth::Real)
-	# TODO: Make this function return 1D Voronoi areas?
-	@assert bandwidth > 0
-	@assert maxabs(xi) <= bandwidth
-	@assert (Nx = length(xi)) >= 2
+	bandwidth > 0 || throw(DomainError())
+	maxabs(xi) <= bandwidth || throw(AssertionError())
+	(Nx = length(xi)) >= 2 || throw(AssertionError())
 
 	is_xi_sorted = issorted(xi)
 	if !is_xi_sorted
@@ -142,7 +166,7 @@ function weights(xi::AbstractVector{Float64}, bandwidth::Real)
 		xi = xi[sort_idx]
 	end
 
-	mu = Array(Float64, Nx)
+	mu = Array{Float64}(Nx)
 
 	# Boundary cases
 	L = xi[Nx] - 2*bandwidth
@@ -161,14 +185,16 @@ function weights(xi::AbstractVector{Float64}, bandwidth::Real)
 	return mu 
 end
 
-# TODO: Default bandwidth = maxabs(xi)?
 function weights(xi::DenseMatrix{Float64}, bandwidth::Real)
-	@assert bandwidth > 0
-	@assert size(xi,2) == 2
-	@assert size(xi,1) >= 2
-	@assert maxabs(xi) <= bandwidth
+	bandwidth > 0 || throw(DomainError())
+	size(xi,2) == 2 || throw(DimensionMismatch())
+	size(xi,1) >= 2 || throw(DimensionMismatch())
+	maxabs(xi) <= bandwidth || throw(AssertionError())
 
-	voronoiarea(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
+	x = slice(xi, :, 1)
+	y = slice(xi, :, 2)
+	rw = [-bandwidth; bandwidth; -bandwidth; bandwidth]
+	voronoiarea(x, y, rw)
 end
 
 
@@ -184,9 +210,9 @@ Currently, the "bandwidth area" is a square centered at the origin and with side
 To ensure numerical stability in computations with the associated change of basis matrix, `xi` must contain both negative and positive elements. 
 """->
 function density(xi::AbstractVector{Float64}, bandwidth::Real)
-	@assert (minx = minimum(xi)) < 0
-	@assert 0 < (maxx = maximum(xi)) <= bandwidth
-	@assert (N = length(xi)) >= 2
+	(minx = minimum(xi)) < 0 || throw(AssertionError())
+	0 < (maxx = maximum(xi)) <= bandwidth || throw(AssertionError())
+	(N = length(xi)) >= 2 || throw(DimensionMismatch())
 
 	# Boundary cases
 	lower_boundary = maxx - 2*bandwidth
@@ -203,36 +229,17 @@ function density(xi::AbstractVector{Float64}, bandwidth::Real)
 	return density
 end
 
-function density(xi::DenseMatrix{Float64}, bandwidth::Real)
-	@assert bandwidth > 0
-	@assert maxabs(xi) <= bandwidth
+function density(xi::AbstractMatrix{Float64}, bandwidth::Real)
+	bandwidth > 0 || throw(DomainError())
+	maxabs(xi) <= bandwidth || throw(AssertionError())
 	M, dim = size(xi)
-	@assert M >= 2
-	@assert dim == 2
+	M >= 2 || throw(DimensionMismatch())
+	dim == 2 || throw(DimensionMismatch())
 
-	# Compute Voronoi tesselation
-	D = deldir(xi[:,1], xi[:,2]; rw=[-bandwidth; bandwidth; -bandwidth; bandwidth])
-
-	# Corners of Voronoi cells
-	x1 = D.vorsgs[:x1]
-	y1 = D.vorsgs[:y1]
-	x2 = D.vorsgs[:x2]
-	y2 = D.vorsgs[:y2]
-
-	# Edge-sampling point relation
-	ind = D.vorsgs[:ind1]
-
-	# Compute the distance from each xi to the corners of its Voronoi cell
-	density = 0.0
-	@inbounds for n in 1:length(ind)
-		idx = ind[n]
-		# Distance^2 from end points of Voronoi edge to one of the xi's with this edge
-		diff1 = (x1[n] - xi[idx,1])^2 + (y1[n] - xi[idx,2])^2
-		diff2 = (x2[n] - xi[idx,1])^2 + (y2[n] - xi[idx,2])^2
-		density = max(density, diff1, diff2)
-	end
-
-	return sqrt(density)
+	x = slice(xi, :, 1)
+	y = slice(xi, :, 2)
+	rw = [-bandwidth; bandwidth; -bandwidth; bandwidth]
+	density(x, y, rw)
 end
 
 @doc """
@@ -306,9 +313,9 @@ end
 Split `x` into 3 parts:
 Left, internal and right, where left and right are `border` outmost entries.
 """->
-function Base.split(x::DenseVector, border::Int)
-	@assert border >= 1
-	@assert (N = length(x)) > 2*border
+function Base.split(x::DenseVector, border::Integer)
+	border >= 1 || throw(DomainError())
+	(N = length(x)) > 2*border || throw(AssertionError())
 
 	L = slice(x, 1:border)
 	I = slice(x, border+1:N-border)
@@ -317,41 +324,101 @@ function Base.split(x::DenseVector, border::Int)
 	return L, I, R
 end
 
-type SplitMatrix
-	LL::AbstractMatrix
-	IL::AbstractMatrix
-	RL::AbstractMatrix
-	LI::AbstractMatrix
-	II::AbstractMatrix
-	RI::AbstractMatrix
-	LR::AbstractMatrix
-	IR::AbstractMatrix
-	RR::AbstractMatrix
+#=
+type SplitMatrix{T, A<:AbstractMatrix}
+	left::A
+	internal::A
+	right::A
+	upper::A
+	lower::A
+
+	SplitMatrix(left::AbstractMatrix{T}, internal::AbstractMatrix{T},
+	right::AbstractMatrix{T}, upper::AbstractMatrix{T}, 
+	lower::AbstractMatrix{T}) = new(left, internal, right, upper, lower)
 end
+SplitMatrix(left, internal, right, upper, lower) =
+SplitMatrix{eltype(left), typeof(left)}(left, internal, right, upper, lower)
 
 @doc """
 	split(A::Matrix, border) -> SplitMatrix
 
-Split `A` into 9 parts:
-4 corners, 4 sides and the internal part. `border` is the width of the
-boundary.
+Split `A` into 5 parts:
 
-With both the horizontal and the vertical part divided in `L`eft,
-`I`nternal and `R`ight, the parts are
+- Internal
+- left
+- right
+- upper
+- lower
 
 	 ________________ 
+	|    |  up  |    |
+	|    |______|    |
+	|    |      |    |
+	| le |  int | ri |
+	|    |______|    |
+	|    |  lo  |    |
+	|____|______|____|
+"""->
+function Base.split{T}(A::DenseMatrix{T}, border::Integer)
+	border >= 2 || throw(DomainError())
+	N = size(A)
+	minimum(N) > 2*border || throw(AssertionError())
+
+	I1idx = border+1:N[1]-border
+	I2idx = border+1:N[2]-border
+
+	left = slice(A, 1:N[1], 1:border)
+	internal = slice(A, I1idx, I2idx)
+	right = slice(A, 1:N[1], N[2]-border+1:N[2])
+
+	upper = slice(A, 1:border, I2idx)
+	lower = slice(A, N[1]-border+1:N[1], I2idx)
+
+	SplitMatrix{T, typeof(left)}(left, internal, right, upper, lower)
+end
+=#
+
+
+type SplitMatrix{T, A<:AbstractMatrix}
+	LL::A
+	IL::A
+	RL::A
+	LI::A
+	II::A
+	RI::A
+	LR::A
+	IR::A
+	RR::A
+
+	SplitMatrix(LL::AbstractMatrix{T}, IL::AbstractMatrix{T},
+	RL::AbstractMatrix{T}, LI::AbstractMatrix{T}, II::AbstractMatrix{T},
+	RI::AbstractMatrix{T}, LR::AbstractMatrix{T}, IR::AbstractMatrix{T},
+	RR::AbstractMatrix{T}) = new(LL, IL, RL, LI, II, RI, LR, IR, RR)
+end
+SplitMatrix(LL, IL, RL, LI, II, RI, LR, IR, RR) =
+SplitMatrix{eltype(LL), typeof(LL)}(LL, IL, RL, LI, II, RI, LR, IR, RR)
+
+@doc """
+	split(A::Matrix, border) -> SplitMatrix
+
+Split `A` into 9 parts, where the outer parts are `border` wide/high.
+`LL` is e.g. `border`-by-`border`.
+
+	 ________________ 
+	|    |      |    |
 	| LL |  LI  | LR |
 	|____|______|____|
 	|    |      |    |
 	| IL |  II  | IR |
 	|____|______|____|
+	|    |      |    |
 	| RL |  RI  | RR |
 	|____|______|____|
 """->
-function Base.split(A::DenseMatrix, border::Int)
-	@assert border >= 1
+function Base.split{T}(A::DenseMatrix{T}, border::Integer)
+	border >= 2 || throw(DomainError())
 	N = size(A)
-	@assert minimum(N) > 2*border
+	minimum(N) > 2*border || throw(AssertionError())
 
 	Lidx = 1:border
 	I1idx = border+1:N[1]-border
@@ -371,6 +438,6 @@ function Base.split(A::DenseMatrix, border::Int)
 	IR = slice(A, I1idx, R2idx)
 	RR = slice(A, R1idx, R2idx)
 
-	SplitMatrix( LL, IL, RL, LI, II, RI, LR, IR, RR )
+	SplitMatrix{T, typeof(LL)}( LL, IL, RL, LI, II, RI, LR, IR, RR )
 end
 
