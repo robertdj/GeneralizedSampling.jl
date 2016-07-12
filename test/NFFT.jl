@@ -20,9 +20,11 @@ begin
 
 	J = Int(log2(N))
 	T = Freq2Wave(samples, "haar", J)
+	for idx in eachindex(T.internal)
+		T.internal[idx] = 1.0 + 0.0*im
+	end
 
-	TF = Freq2NoBoundaryWave(ones(T.internal), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT)
-	F = collect(TF)
+	F = collect(T)
 	B = F'*F / N
 
 	@test_approx_eq B eye(B)
@@ -38,10 +40,12 @@ begin
 
 	J = Int(log2(M))
 	T = Freq2Wave(samples, "haar", J)
+	for idx in eachindex(T.internal)
+		T.internal[idx] = 1.0 + 0.0*im
+	end
 
-	TF = Freq2NoBoundaryWave(ones(T.internal), T.weights, T.J, T.wavename, ones(T.diag), T.NFFT)
-	F = collect(TF)
-	N = size(TF,2)
+	F = collect(T)
+	N = size(T,2)
 	B = F'*F / N
 
 	@test_approx_eq B eye(B)

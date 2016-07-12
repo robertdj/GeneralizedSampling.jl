@@ -73,7 +73,7 @@ end
 
 # A corner in the "middle" of each quadrant
 xi = [0.5 0.5 ; -0.5 0.5 ; -0.5 -0.5 ; 0.5 -0.5]
-@test_approx_eq weights(xi,1) ones(4)
+@test_approx_eq weights(xi, 1.0) ones(4)
 
 
 # ------------------------------------------------------------
@@ -89,7 +89,7 @@ end
 
 # A corner in the "middle" of each quadrant
 xi = [0.5 0.5 ; -0.5 0.5 ; -0.5 -0.5 ; 0.5 -0.5]
-@test_approx_eq density(xi,1) sqrt(2)/2
+@test_approx_eq density(xi, 1.0) sqrt(2)/2
 
 
 # ------------------------------------------------------------
