@@ -14,7 +14,7 @@ function ftcos(xi)
 	if abs(xi) == 1.0
 		return 0.25 + 0.0*im
 	else
-		return im*xi*( 1.0 + exp(-pi*xi*im) ) / (2.0*pi*(1 - xi^2))
+		return im*xi*( 1 + exp(-pi*xi*im) ) / (2*pi*(1 - xi^2))
 	end
 end
 
@@ -46,6 +46,8 @@ using IntervalWavelets
 using Winston
 
 x, yw = weval( real(wcoef), "haar", 10 )
+# Waiting for IntervalWavelets to return x on [-0.5, 0.5] instead of [-1,1]
+x -= 0.5
 
 plot(x, yw, x, tcos(x))
 

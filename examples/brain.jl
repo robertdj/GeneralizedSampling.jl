@@ -25,7 +25,6 @@ using GeneralizedSampling
 xi = GeneralizedSampling.grid(M)
 T = Freq2Wave( xi, "db4", J )
 w = T \ f
-#= w = fftshift(wcoef) =#
 
 
 # ------------------------------------------------------------
