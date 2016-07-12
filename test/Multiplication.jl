@@ -12,7 +12,6 @@ and wavelets with and without boundaries are tested with the
 multiplications * and '*
 =#
 
-#= const EPS = 1e-5 =#
 EPS = 1e-5
 
 # ------------------------------------------------------------
@@ -63,7 +62,6 @@ begin
 	# Non-uniform points
 	K = N/2 # bandwidth
 	NUsamples = N*rand(M) - K
-	#= sort!(NUsamples) =#
 
 	# Non-Uniform points, No Boundary
 	TNUNB = Freq2Wave(NUsamples, "haar", J, K)

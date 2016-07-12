@@ -643,9 +643,9 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 			@inbounds phi[m] = T.internal[d][m]*cis( -twoπ*(n-offset)*T.NFFT.x[d,m] )
 		end
 	elseif 1 <= n <= p
-		copy!( phi, T.left[d,n+1] )
+		unsafe_copy!( phi, 1, T.left[d], (n-1)*M+1, M )
 	else
-		copy!( phi, T.right[d,n-N+p+1] )
+		unsafe_copy!( phi, 1, T.right[d], (n-N+p-1)*M+1, M )
 	end
 end
 
