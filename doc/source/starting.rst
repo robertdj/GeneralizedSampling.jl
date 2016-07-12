@@ -17,13 +17,13 @@ Think e.g. of the `Gibbs phenomenon <https://en.wikipedia.org/wiki/Gibbs_phenome
 
 Generalized sampling is a general technique for transforming samples of a function w.r.t. one basis into samples w.r.t. another basis, i.e., essentially performing a change of basis.
 
-The *GeneralizedSampling* package currently implements transformations from the Fourier to the Wavelet basis on :math:`L^2([0,1])`.
+The *GeneralizedSampling* package currently implements transformations from the Fourier to the scaling function basis on :math:`L^2([-1/2,1/2]^d)`.
 
 
 Basic Usage
 -----------
 
-The primary element in *GeneralizedSampling* is a change of basis type (`CoB`) computed from the **sample locations**, the name of wavelet used for reconstruction and the scale `J` of the wavelet space:
+The primary element in *GeneralizedSampling* is a change of basis type (`CoB`) computed from the sample **locations**, the name of wavelet used for reconstruction and the scale `J` of the wavelet space:
 
 .. code-block:: julia
 
@@ -38,17 +38,33 @@ So if the Fourier transform :code:`Ghat` of a function :code:`G` is sampled in t
     f = Ghat(samples)
     w = T \ f
 
-To evaluate ``w`` in the wavelet basis, the `WaveletPlots package <https://github.com/robertdj/WaveletPlots.jl>`_ can be used:
+To evaluate ``w`` in the wavelet basis, the `IntervalWavelets package <https://github.com/robertdj/IntervalWavelets.jl>`_ can be used:
 
 .. code-block:: julia
 
-    using WaveletPlots
-    y = weval(w, wavename)
+    using IntervalWavelets
+    y = weval(w, wavename, R)
+
+The third argument ``R`` controls the number of points in which each scaling function is evaluated -- se the documentation for :code:`IntervalWavelets` for examples.
+
+Complete examples are found in the `examples` folder.
+The file :code:`truncated_cosine.jl` computes a representation in the Haar basis and is called using
+
+.. code-block:: julia
+
+    include("examples/truncated_cosine.jl")
+
+When you are in the folder :code:`GeneralizedSampling`.
+Otherwise, change folder using :code:`cd( Pkg.dir("GeneralizedSampling") )`.
 
 
 **Note**: 
 
-- The theory of generalized sampling promises that the change of basis matrix :math:`T` is numerically stable, *if* the number of samples are sufficiently high compared to :math:`J`.
+- The theory of generalized sampling promises that the change of basis matrix :math:`T` is numerically stable under a number of assumptions:
+    * The number of samples must be sufficiently high compared to :math:`J`.
+    * The samples must be in a domain symmetric around the origin.
+    * For samples on a grid the distance to neighboring sample points must be less than the inverse length of the reconstruction interval.
+    * Non-uniform samples must have a sufficiently high bandwidth and sufficiently low density -- see :cite:`Adcock.Gataric.Hansen.2014` and :cite:`Adcock.Gataric.Hansen.2015` for further details.
 - The condition number of :math:`T` is not directly available. To compute the condition number the change of basis matrix has to be computed explicitly with ``collect(T)``.
 - The change of basis matrix may very well be too large to compute explicitly; check ``size(T)`` before collecting.
 

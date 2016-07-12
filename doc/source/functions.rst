@@ -13,7 +13,7 @@ Wavelets
 --------
 
 Currently *GeneralizedSampling* supports reconstruction in Daubechies wavelets/scaling functions.
-As the reconstruction happens on :math:`[0,1]` the functions near the boundaries needs to be modified -- which can happen in multiple ways.
+As the reconstruction happens on :math:`[-1/2,1/2]` the functions near the boundaries needs to be modified -- which can happen in multiple ways.
 We have chosen the boundary wavelets from :cite:`Cohen:Daubechies:Vial:1993`, which has the same number of vanishing moments as the internal/non-boundary wavelets.
 
 The allowed wavelets are named "haar", "db1", "db2", ..., "db8".
@@ -37,8 +37,15 @@ Change of basis
     As mentioned in :ref:`starting`, the benefit of generalized sampling is that the computations are numerically stable.
     However, some assumptions must be fulfilled:
     
-    - There should be more samples than reconstruction coefficients. The ratio between samples and the number of reconstruction coefficients that ensures a numerically stable matrix is called the *staple sampling rate*. For uniform samples the stable sampling rate is well described -- see :ref:`references`. For non-uniform samples the staple sampling rate also depends on the *density* of the samples, which is defined as the minimum radius that gives a covering of the bandwidth area with equal sized circles centered at the sampling points.
+    - There should be more samples than reconstruction coefficients. The ratio between samples and the number of reconstruction coefficients that ensures a numerically stable matrix is called the *stable sampling rate*. For uniform samples the stable sampling rate is well described -- see :ref:`references`. For non-uniform samples the stable sampling rate also depends on the *density* of the samples, which is defined as the minimum radius that gives a covering of the bandwidth area with equal sized circles centered at the sampling points.
     - The samples should be distributed around the origin, i.e., only positive samples does not work.
+
+    Example:
+
+    .. code-block:: julia
+    
+        samples = grid(2^7, 0.5)
+        T = freq2wave(samples, "db2", 6)
 
 .. function:: collect(T)
 
@@ -93,12 +100,14 @@ They are collectively denoted ``Freq2Wave`` and are a subtype of ``CoB``:
 
     Freq2Wave <: CoB
 
-The computations for wavelets with boundary correction are more involved than for those without and therefore two subtypes of ``Freq2Wave`` are introduced 
+The computations for wavelets with boundary correction are more involved than for those without and therefore two subtypes of ``Freq2Wave`` are introduced for both 1D and 2D:
 
 .. code-block:: julia
 
-    Freq2NoBoundaryWave <: Freq2Wave
-    Freq2BoundaryWave <: Freq2Wave
+    Freq2NoBoundaryWave1D <: Freq2Wave
+    Freq2BoundaryWave2D <: Freq2Wave
+    Freq2NoBoundaryWave1D <: Freq2Wave
+    Freq2BoundaryWave2D <: Freq2Wave
 
 
 .. _fourier:
@@ -121,26 +130,24 @@ The high level interface is
     The remaining arguments relate to the iterative computations of the Fourier transforms and are usually not needed. 
     Check the inside documentation for more info.
 
-The lower level functions are available for each type of scaling function.
-The common interface is that the first arguments are the point(s) at which to evaluate the Fourier transform and specification(s) of scaling function. 
-The ``J`` and ``k`` arguments are the scale and translation, respectively, as above.
+    As an example, the following command computes the Fourier transform of the Daubechies 2 scaling function and plots the real and imaginary part using `Winston <https://github.com/nolta/Winston.jl>`_:
 
-.. function:: FourHaarScaling(xi, J, k)
+    .. code-block:: julia
+    
+        x = linspace(-5, 5, 1000)
+        y = FourDaubScaling(x, "db2")
+        using Winston
+        plot(x, real(y), x, imag(y))
 
-    Fourier transform of the Haar scaling function (which is exact).
+.. function:: FourScalingFunc(xi, wavename, side, J, k; ...)
 
-.. function:: FourDaubScaling(xi, C, J, k; ...)
+    As above, but for the boundary scaling functions.
+    ``side`` is either ``'L'`` or ``'R'``.
 
-    Fourier transform of the Daubechies scaling function defined by the filter vector ``C``.
-    The filter ``C`` must sum to 1.
+    Note that these Fourier transforms are for the scaling functions that in the time domain are translated to fir the reconstruction interval :math:`[-1/2,1/2]`, i.e., their Fourier transforms are phase shifted.
 
-.. function:: FourDaubScaling(xi, N, J, k; ...)
-
-    Fourier transform of the Daubechies scaling function with ``N`` vanishing moments.
-
-.. function:: FourDaubScaling(xi, N, side, J; ...)
-
-    Fourier transform of the Daubechies scaling function with ``N`` vanishing moments adapted to the left (``'L'``) or right (``'R'``) boundaries.
+The lower level functions are available for each type of scaling function, but not documented here. 
+Check the documentation in Julia with the usual ``?function`` where ``function`` is ``FourHaarScaling`` or ``FourDaubScaling``.
 
 
 Miscellaneous
@@ -171,7 +178,7 @@ For a configuration of sampling locations ``xi`` the density correcting weights 
 
 .. function:: density(xi, K)
 
-The bandwidth ``K`` is explained in :ref:`CoB` and must be at least ``maxabs(xi)(xi)``.
+The bandwidth ``K`` is explained in :ref:`CoB` and must be at least ``maxabs(xi)``.
 
 When dealing with wavelets with boundary corrections, computations differs for the internal and boundary parts.
 To this end, the ``split`` function is available to help divide a vector or matrix of coefficients into the parts related to internal/boundary functions.
