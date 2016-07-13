@@ -2,6 +2,7 @@ GeneralizedSampling
 ===================
 
 [![Build Status](https://travis-ci.org/robertdj/GeneralizedSampling.jl.svg?branch=master)](https://travis-ci.org/robertdj/GeneralizedSampling.jl)
+[![codecov.io](https://codecov.io/github/robertdj/GeneralizedSampling.jl/coverage.svg?branch=master)](https://codecov.io/github/robertdj/GeneralizedSampling.jl?branch=master)
 
 A Julia package implementing the generalized sampling framework by Anders Hansen, Ben Adcock et al. between Fourier measurements and wavelets.
 
@@ -14,8 +15,8 @@ The package is not yet registered, so install using
 Pkg.clone("https://github.com/robertdj/GeneralizedSampling.jl")
 ```
 
-Note that one of the necessary packages [VoronoiCells](https://github.com/robertdj/VoronoiCells.jl) currently needs special attention.
-Follow the instructions on *VoronoiCells'* the above link.
+Note that one of the necessary packages [VoronoiCells](https://github.com/robertdj/VoronoiCells.jl) currently needs special attention;
+follow the instructions on the link.
 
 
 ## Resources
