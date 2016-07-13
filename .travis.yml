@@ -9,9 +9,10 @@ notifications:
   email: false
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e 'Pkg.add("VoronoiDelaunay"); Pkg.checkout("VoronoiDelaunay")'
   - julia -e 'Pkg.add("GeometricalPredicates"); Pkg.checkout("GeometricalPredicates")'
+  - julia -e 'Pkg.add("VoronoiDelaunay"); Pkg.checkout("VoronoiDelaunay")'
+  - julia -e 'Pkg.add("VoronoiCells"); Pkg.checkout("VoronoiCells")'
   - julia -e 'Pkg.clone(pwd()); Pkg.build("GeneralizedSampling"); Pkg.test("GeneralizedSampling"; coverage=true)'
-after_success:
-   - julia -e 'cd(Pkg.dir("GeneralizedSampling")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
+#after_success:
+#- julia -e 'cd(Pkg.dir("GeneralizedSampling")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder())'
 
