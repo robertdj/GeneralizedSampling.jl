@@ -3,8 +3,9 @@ GeneralizedSampling
 
 [![Build Status](https://travis-ci.org/robertdj/GeneralizedSampling.jl.svg?branch=master)](https://travis-ci.org/robertdj/GeneralizedSampling.jl)
 [![codecov.io](https://codecov.io/github/robertdj/GeneralizedSampling.jl/coverage.svg?branch=master)](https://codecov.io/github/robertdj/GeneralizedSampling.jl?branch=master)
+[![Documentation Status](https://readthedocs.org/projects/generalizedsamplingjl/badge/?version=latest)](http://generalizedsamplingjl.readthedocs.io/en/latest/?badge=latest)
 
-A Julia package implementing the generalized sampling framework by Anders Hansen, Ben Adcock et al. between Fourier measurements and wavelets.
+A Julia package implementing the generalized sampling framework by Anders Hansen, Ben Adcock et al. from Fourier measurements to Daubechies wavelets.
 
 
 ## Installation
