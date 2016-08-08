@@ -64,7 +64,7 @@ Otherwise, change folder using :code:`cd( Pkg.dir("GeneralizedSampling") )`.
     * The number of samples must be sufficiently high compared to :math:`J`.
     * The samples must be in a domain symmetric around the origin.
     * For samples on a grid the distance to neighboring sample points must be less than the inverse length of the reconstruction interval.
-    * Non-uniform samples must have a sufficiently high bandwidth and sufficiently low density -- see :cite:`Adcock.Gataric.Hansen.2014` and :cite:`Adcock.Gataric.Hansen.2015` for further details.
+    * Non-uniform samples must have a sufficiently high bandwidth and sufficiently low density -- see :cite:`Adcock:Gataric:Hansen:2014` and :cite:`Adcock:Gataric:Hansen:2015` for further details.
 - The condition number of :math:`T` is not directly available. To compute the condition number the change of basis matrix has to be computed explicitly with ``collect(T)``.
 - The change of basis matrix may very well be too large to compute explicitly; check ``size(T)`` before collecting.
 
