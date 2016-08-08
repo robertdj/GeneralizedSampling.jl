@@ -10,14 +10,11 @@ A Julia package implementing the generalized sampling framework by Anders Hansen
 
 ## Installation
 
-The package is not yet registered, so install using
+In Julia, run
 
 ```julia
-Pkg.clone("https://github.com/robertdj/GeneralizedSampling.jl")
+Pkg.add("GeneralizedSampling")
 ```
-
-Note that one of the necessary packages [VoronoiCells](https://github.com/robertdj/VoronoiCells.jl) currently needs special attention;
-follow the instructions on the link.
 
 
 ## Resources
