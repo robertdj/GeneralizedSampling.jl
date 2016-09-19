@@ -356,26 +356,28 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# Sides
 
 	# IL
-	nfft!(T.NFFTx, S.IL, T.tmpMulVec, Val{1})
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internal[1])
+	nfft!(T.NFFTx, S.IL, T.tmpMulVec)
+	scale!(T.internal[1], T.tmpMulVec)
 	had!(T.tmpMulVec, T.left[2])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# IR
-	nfft!(T.NFFTx, S.IR, T.tmpMulVec, Val{1})
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internal[1])
+	nfft!(T.NFFTx, S.IR, T.tmpMulVec)
+	scale!(T.internal[1], T.tmpMulVec)
 	had!(T.tmpMulVec, T.right[2])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# LI 
-	nfft!(T.NFFTy, S.LI, T.tmpMulVec, Val{2})
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internal[2])
+	nfft!(T.NFFTy, S.LI, T.tmpMulVecT)
+	transpose!(T.tmpMulVec, T.tmpMulVecT)
+	scale!(T.internal[2], T.tmpMulVec)
 	had!(T.tmpMulVec, T.left[1])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# RI 
-	nfft!(T.NFFTy, S.RI, T.tmpMulVec, Val{2})
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.internal[2])
+	nfft!(T.NFFTy, S.RI, T.tmpMulVecT)
+	transpose!(T.tmpMulVec, T.tmpMulVecT)
+	scale!(T.internal[2], T.tmpMulVec)
 	had!(T.tmpMulVec, T.right[1])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
@@ -456,8 +458,11 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	(N = wsize(T)) == size(Z) || throw(DimensionMismatch())
 	
 	# As in Ac_mul_B! for Freq2BoundaryWave1D
-	copy!(T.weigthedVec, v)
-	isuniform(T) || had!(T.weigthedVec, get(T.weights))
+	if isuniform(T)
+		copy!(T.weigthedVec, v)
+	else
+		had!(T.weigthedVec, v, get(T.weights))
+	end
 
 	vm = van_moment(T)
 	S = split(Z, vm)
@@ -473,7 +478,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 
 	# LL
 	conj!(T.tmpMulVec, T.left[2])
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
+	scale!(T.weigthedVec, T.tmpMulVec)
 	Ac_mul_B!( S.LL, T.left[1], T.tmpMulVec )
 
 	# RL: Reuse T.tmpMulVec
@@ -481,8 +486,8 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 
 	# IL
 	conj!(T.tmpMulcVec, T.internal[1])
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
-	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IL, Val{1} )
+	scale!(T.tmpMulcVec, T.tmpMulVec)
+	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IL )
 
 	# ------------------------------------------------------------
 	# Middle blocks: All use 'I' for the y coordinate
@@ -493,16 +498,18 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 
 	conj!(T.tmpMulcVec, T.internal[2])
 	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
-	nfft_adjoint!( T.NFFTy, T.tmpMulVec, S.LI, Val{2} )
+	transpose!(T.tmpMulVecT, T.tmpMulVec)
+	nfft_adjoint!( T.NFFTy, T.tmpMulVecT, S.LI )
 
 	# RI: Reuse T.tmpMulcVec
 	conj!(T.tmpMulVec, T.right[1])
 	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
 	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
-	nfft_adjoint!( T.NFFTy, T.tmpMulVec, S.RI, Val{2} )
+	transpose!(T.tmpMulVecT, T.tmpMulVec)
+	nfft_adjoint!( T.NFFTy, T.tmpMulVecT, S.RI )
 
 	# ------------------------------------------------------------
-	# Right blocks: All use 'L' for the y coordinate
+	# Right blocks: All use 'R' for the y coordinate
 
 	# LR
 	conj!(T.tmpMulVec, T.right[2])
@@ -515,7 +522,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	# IR
 	conj!(T.tmpMulcVec, T.internal[1])
 	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
-	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IR, Val{1} )
+	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IR )
 
 
 	return Z
