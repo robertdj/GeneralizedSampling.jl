@@ -80,7 +80,7 @@ function Base.collect(T::Freq2NoBoundaryWave1D)
 	end
 
 	if !isuniform(T)
-		broadcast!(*, F, F, get(T.weights))
+		scale!(get(T.weights), F)
 	end
 
 	return F
@@ -106,7 +106,7 @@ function Base.collect(T::Freq2BoundaryWave1D)
 	F[:,N-p+1:N] = T.right
 
 	if !isuniform(T)
-		broadcast!(*, F, F, get(T.weights))
+		scale!(get(T.weights), F)
 	end
 
 	return F
@@ -487,19 +487,17 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 
 	# LI
 	conj!(T.tmpMulVec, T.left[:x])
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
+	scale!(T.weigthedVec, T.tmpMulVec)
 
 	conj!(T.tmpMulcVec, T.internal[:y])
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
+	scale!(T.tmpMulcVec, T.tmpMulVec)
 	transpose!(T.tmpMulVecT, T.tmpMulVec)
 	nfft_adjoint!( T.NFFTy, T.tmpMulVecT, S.LI )
 
 	# RI: Reuse T.tmpMulcVec
 	conj!(T.tmpMulVec, T.right[:x])
-	#= scale!(T.weigthedVec, T.tmpMulVec) =#
-	#= scale!(T.tmpMulcVec, T.tmpMulVec) =#
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
+	scale!(T.weigthedVec, T.tmpMulVec)
+	scale!(T.tmpMulcVec, T.tmpMulVec)
 	transpose!(T.tmpMulVecT, T.tmpMulVec)
 	nfft_adjoint!( T.NFFTy, T.tmpMulVecT, S.RI )
 
@@ -508,7 +506,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 
 	# LR
 	conj!(T.tmpMulVec, T.right[:y])
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.weigthedVec)
+	scale!(T.weigthedVec, T.tmpMulVec)
 	Ac_mul_B!( S.LR, T.left[:x], T.tmpMulVec )
 
 	# RR: Reuse T.tmpMulVec
@@ -516,7 +514,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 
 	# IR
 	conj!(T.tmpMulcVec, T.internal[:x])
-	broadcast!(*, T.tmpMulVec, T.tmpMulVec, T.tmpMulcVec)
+	scale!(T.tmpMulcVec, T.tmpMulVec)
 	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IR )
 
 
@@ -598,7 +596,7 @@ function Base.collect(T::Freq2NoBoundaryWave2D)
 	end
 
 	if !isuniform(T)
-		broadcast!( *, F, F, get(T.weights) )
+		scale!(get(T.weights), F)
 	end
 
 	return F
@@ -623,7 +621,7 @@ function Base.collect(T::Freq2BoundaryWave2D)
 	end
 
 	if !isuniform(T)
-		broadcast!( *, F, F, get(T.weights) )
+		scale!(get(T.weights), F)
 	end
 
 	return F
