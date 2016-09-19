@@ -308,10 +308,10 @@ end
 
 
 @doc """
-	split(x::Vector, border::Int) -> SubVector, SubVector, SubVector
+	split(x::Vector, border) -> L, I, R
 
-Split `x` into 3 parts:
-Left, internal and right, where left and right are `border` outmost entries.
+Split `x` into 3 slices:
+Left, internal and right, where left and right are the `border` outmost entries.
 """->
 function Base.split(x::DenseVector, border::Integer)
 	border >= 1 || throw(DomainError())
@@ -323,60 +323,6 @@ function Base.split(x::DenseVector, border::Integer)
 
 	return L, I, R
 end
-
-#=
-type SplitMatrix{T, A<:AbstractMatrix}
-	left::A
-	internal::A
-	right::A
-	upper::A
-	lower::A
-
-	SplitMatrix(left::AbstractMatrix{T}, internal::AbstractMatrix{T},
-	right::AbstractMatrix{T}, upper::AbstractMatrix{T}, 
-	lower::AbstractMatrix{T}) = new(left, internal, right, upper, lower)
-end
-SplitMatrix(left, internal, right, upper, lower) =
-SplitMatrix{eltype(left), typeof(left)}(left, internal, right, upper, lower)
-
-@doc """
-	split(A::Matrix, border) -> SplitMatrix
-
-Split `A` into 5 parts:
-
-- Internal
-- left
-- right
-- upper
-- lower
-
-	 ________________ 
-	|    |  up  |    |
-	|    |______|    |
-	|    |      |    |
-	| le |  int | ri |
-	|    |______|    |
-	|    |  lo  |    |
-	|____|______|____|
-"""->
-function Base.split{T}(A::DenseMatrix{T}, border::Integer)
-	border >= 2 || throw(DomainError())
-	N = size(A)
-	minimum(N) > 2*border || throw(AssertionError())
-
-	I1idx = border+1:N[1]-border
-	I2idx = border+1:N[2]-border
-
-	left = slice(A, 1:N[1], 1:border)
-	internal = slice(A, I1idx, I2idx)
-	right = slice(A, 1:N[1], N[2]-border+1:N[2])
-
-	upper = slice(A, 1:border, I2idx)
-	lower = slice(A, N[1]-border+1:N[1], I2idx)
-
-	SplitMatrix{T, typeof(left)}(left, internal, right, upper, lower)
-end
-=#
 
 
 type SplitMatrix{T, A<:AbstractMatrix}
