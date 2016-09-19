@@ -2,6 +2,7 @@ GeneralizedSampling
 ===================
 
 [![Build Status](https://travis-ci.org/robertdj/GeneralizedSampling.jl.svg?branch=master)](https://travis-ci.org/robertdj/GeneralizedSampling.jl)
+[![AppVeyor](https://ci.appveyor.com/api/projects/status/github/robertdj/GeneralizedSampling.jl?branch=master&svg=true)](https://ci.appveyor.com/project/robertdj/generalizedsampling-jl)
 [![codecov.io](https://codecov.io/github/robertdj/GeneralizedSampling.jl/coverage.svg?branch=master)](https://codecov.io/github/robertdj/GeneralizedSampling.jl?branch=master)
 [![Documentation Status](https://readthedocs.org/projects/generalizedsamplingjl/badge/?version=latest)](http://generalizedsamplingjl.readthedocs.io/en/latest/?badge=latest)
 
