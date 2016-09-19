@@ -45,7 +45,7 @@ immutable Freq2NoBoundaryWave1D <: Freq2Wave1D
 end
 
 immutable Freq2NoBoundaryWave2D <: Freq2Wave2D
-	internal::Vector{ Vector{Complex{Float64}} }
+	internal::Dict{ Symbol, Vector{Complex{Float64}} }
 	weights::Nullable{ Vector{Complex{Float64}} }
 
 	J::Int64
@@ -73,8 +73,8 @@ immutable Freq2BoundaryWave1D <: Freq2Wave1D
 end
 
 immutable Freq2BoundaryWave2D <: Freq2Wave2D
-	internal::Vector{ Vector{Complex{Float64}} }
-	weights::Nullable{Vector{Complex{Float64}}}
+	internal::Dict{ Symbol, Vector{Complex{Float64}} }
+	weights::Nullable{ Vector{Complex{Float64}} }
 
 	J::Int64
 	wavename::AbstractString
@@ -83,9 +83,8 @@ immutable Freq2BoundaryWave2D <: Freq2Wave2D
 	NFFTx::NFFT.NFFTPlan{2,1,Float64}
 	NFFTy::NFFT.NFFTPlan{2,2,Float64}
 
-	#= left::Dict{ Symbol, Matrix{Complex{Float64}} } =#
-	left::Vector{ Matrix{Complex{Float64}} }
-	right::Vector{ Matrix{Complex{Float64}} }
+	left::Dict{ Symbol, Matrix{Complex{Float64}} }
+	right::Dict{ Symbol, Matrix{Complex{Float64}} }
 
 	tmpMulVec::Matrix{Complex{Float64}}
 	tmpMulVecT::Matrix{Complex{Float64}} # Serves as the transpose of tmpMulVec
@@ -113,7 +112,7 @@ function Freq2BoundaryWave1D(internal, weights, J, wavename, NFFT, left, right)
 end
 
 function Freq2BoundaryWave2D(internal, weights, J, wavename, NFFT, left, right)
-	tmpMulVec = similar(left[1])
+	tmpMulVec = similar(left[:x])
 	tmpMulVecT = tmpMulVec.'
 
 	tmpMulcVec = Array{Complex{Float64}}( NFFT.M )
