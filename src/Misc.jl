@@ -191,8 +191,8 @@ function weights(xi::DenseMatrix{Float64}, bandwidth::Real)
 	size(xi,1) >= 2 || throw(DimensionMismatch())
 	maxabs(xi) <= bandwidth || throw(AssertionError())
 
-	x = slice(xi, :, 1)
-	y = slice(xi, :, 2)
+	x = view(xi, :, 1)
+	y = view(xi, :, 2)
 	rw = [-bandwidth; bandwidth; -bandwidth; bandwidth]
 	voronoiarea(x, y, rw)
 end
@@ -236,8 +236,8 @@ function density(xi::AbstractMatrix{Float64}, bandwidth::Real)
 	M >= 2 || throw(DimensionMismatch())
 	dim == 2 || throw(DimensionMismatch())
 
-	x = slice(xi, :, 1)
-	y = slice(xi, :, 2)
+	x = view(xi, :, 1)
+	y = view(xi, :, 2)
 	rw = [-bandwidth; bandwidth; -bandwidth; bandwidth]
 	density(x, y, rw)
 end
@@ -317,9 +317,9 @@ function Base.split(x::DenseVector, border::Integer)
 	border >= 1 || throw(DomainError())
 	(N = length(x)) > 2*border || throw(AssertionError())
 
-	L = slice(x, 1:border)
-	I = slice(x, border+1:N-border)
-	R = slice(x, N-border+1:N)
+	L = view(x, 1:border)
+	I = view(x, border+1:N-border)
+	R = view(x, N-border+1:N)
 
 	return L, I, R
 end
@@ -372,17 +372,17 @@ function Base.split{T}(A::DenseMatrix{T}, border::Integer)
 	I2idx = border+1:N[2]-border
 	R2idx = N[2]-border+1:N[2]
 
-	LL = slice(A, Lidx, Lidx)
-	IL = slice(A, I1idx, Lidx)
-	RL = slice(A, R1idx, Lidx)
+	LL = view(A, Lidx, Lidx)
+	IL = view(A, I1idx, Lidx)
+	RL = view(A, R1idx, Lidx)
 
-	LI = slice(A, Lidx, I2idx)
-	II = slice(A, I1idx, I2idx)
-	RI = slice(A, R1idx, I2idx)
+	LI = view(A, Lidx, I2idx)
+	II = view(A, I1idx, I2idx)
+	RI = view(A, R1idx, I2idx)
 
-	LR = slice(A, Lidx, R2idx)
-	IR = slice(A, I1idx, R2idx)
-	RR = slice(A, R1idx, R2idx)
+	LR = view(A, Lidx, R2idx)
+	IR = view(A, I1idx, R2idx)
+	RR = view(A, R1idx, R2idx)
 
 	SplitMatrix{T, typeof(LL)}( LL, IL, RL, LI, II, RI, LR, IR, RR )
 end

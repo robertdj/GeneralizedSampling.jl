@@ -1,5 +1,8 @@
 module GeneralizedSampling
 
+using Compat
+import Compat.view
+
 using NFFT
 import NFFT: nfft!, nfft_adjoint!
 using IntervalWavelets

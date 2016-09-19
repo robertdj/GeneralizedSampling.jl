@@ -145,14 +145,15 @@ function wsize(T::Freq2BoundaryWave2D)
 	N = 2^wscale(T)
 	return (N, N)
 end
+
 wsize(T::Freq2NoBoundaryWave2D) = T.NFFT.N
 wsize(T::Freq2BoundaryWave1D) = (2^wscale(T),)
 wsize(T::Freq2NoBoundaryWave1D) = T.NFFT.N
 
 function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Integer; args...)
 	# Test if samples are on a grid and in the correct order
-	usamplesx = unique(slice(samples,:,1))
-	usamplesy = unique(slice(samples,:,2))
+	usamplesx = unique(view(samples,:,1))
+	usamplesy = unique(view(samples,:,2))
 	Mx = length(usamplesx)
 	My = length(usamplesy)
 	grid_samples = grid( (Mx, My), usamplesx[2]-usamplesx[1] )
@@ -202,8 +203,8 @@ function NotUnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::Abstr
 	if !hasboundary(wavename)
 		return internal
 	else
-		samplesx = slice(samples, :, 1)
-		samplesy = slice(samples, :, 2)
+		samplesx = view(samples, :, 1)
+		samplesy = view(samples, :, 2)
 
 		left = cell(2)
 		left[1] = FourScalingFunc( samplesx, wavename, 'L', J; args... )
@@ -396,7 +397,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2Wave2D, x::Dens
 	return y
 end
 
-function Base.(:*)(T::Freq2Wave, x::DenseArray)
+@compat function Base.:*(T::Freq2Wave, x::DenseArray)
 	if !isa(x, Array{Complex{Float64}})
 		x = map(Complex{Float64}, x)
 	end
@@ -548,14 +549,14 @@ function Base.Ac_mul_B(T::Freq2Wave, v::AbstractVector)
 	return z
 end
 
-function Base.(:(\))(T::Freq2Wave, Y::AbstractMatrix)
+@compat function Base.:\(T::Freq2Wave, Y::AbstractMatrix)
 	length(Y) == (M = size(T,1)) || throw(DimensionMismatch())
 
 	y = flatten_view(Y)
 	x = T \ y
 end
 
-function Base.(:(\))(T::Freq2Wave, y::AbstractVector)
+@compat function Base.:\(T::Freq2Wave, y::AbstractVector)
 	if !isa(y, Array{Complex{Float64}})
 		y = map(Complex{Float64}, y)
 	end
