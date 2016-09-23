@@ -5,6 +5,45 @@ abstract CoB
 
 
 # ------------------------------------------------------------
+# "N"FFT plan for equidistant points 
+
+type FFTPlan{D}
+	forwardFFT::Base.DFT.FFTW.cFFTWPlan
+	backwardFFT::Base.DFT.FFTW.cFFTWPlan
+	pre_phaseshift::Array{Complex{Float64}}
+	post_phaseshift::Array{Complex{Float64}}
+	x::Vector
+	eps::Float64
+	M::Int64
+	N::Int64
+	q::Int64
+	tmpVec::Array{Complex{Float64},D}
+end
+
+function FFTPlan(samples::Vector, J::Integer, N::Integer)
+	M = length(samples)
+	myeps = samples[2] - samples[1]
+	dilation = 2^J
+
+	pre = Array{Complex{Float64}}(N)
+	for l in 1:N
+		pre[l] = cis( pi*(l-1)*myeps*M/dilation )
+	end
+
+	xi = samples / dilation
+	post = cis( pi*N*xi )
+
+	q = div(M, Int(dilation/myeps)) + 1
+	tmpVec = Array{Complex{Float64}}( q*Int(dilation/myeps) )
+
+	fP = plan_fft!(tmpVec)
+	bP = plan_bfft!(tmpVec)
+
+	FFTPlan(fP, bP, pre, post, xi, myeps, M, N, q, tmpVec)
+end
+
+
+# ------------------------------------------------------------
 # Frequency to wavelets
 
 @doc """
@@ -15,7 +54,7 @@ To initialize a `Freq2Wave` type, run
 
 	Freq2Wave(samples, wavename::String, J::Int, B; ...)
 
-- `samples` are the sampling locations as a vector for 1D and M-by-2 matrix for 2D.
+- `samples` are the sampling locations as a vector for 1D and a matrix with 2 columns for 2D.
 - `wave` is the name of the wavelet; see documentation for possibilities.
 - `J` is the scale of the wavelet transform to reconstruct.
 - `B` is the bandwidth of the samples; only needed if `samples` are non-uniform.
@@ -29,7 +68,7 @@ abstract Freq2Wave2D <: Freq2Wave
 # use the dimension as a TypePar.
 
 # No boundary correction
-immutable Freq2NoBoundaryWave1D <: Freq2Wave1D
+immutable Freq2NoBoundaryWave1D{P} <: Freq2Wave1D
 	# Sampling
 	internal::Vector{Complex{Float64}}
 	weights::Nullable{ Vector{Complex{Float64}} }
@@ -39,7 +78,8 @@ immutable Freq2NoBoundaryWave1D <: Freq2Wave1D
 	wavename::AbstractString
 
 	# Multiplication
-	NFFT::NFFT.NFFTPlan{1,0,Float64}
+	#= NFFT::NFFT.NFFTPlan{1,0,Float64} =#
+	NFFT::P
 
 	tmpMulVec::Vector{Complex{Float64}}
 end
@@ -52,19 +92,21 @@ immutable Freq2NoBoundaryWave2D <: Freq2Wave2D
 	wavename::AbstractString
 
 	NFFT::NFFT.NFFTPlan{2,0,Float64}
+	#= NFFT::FTPlan =#
 
 	tmpMulVec::Vector{Complex{Float64}}
 end
 
 # Boundary correction
-immutable Freq2BoundaryWave1D <: Freq2Wave1D
+immutable Freq2BoundaryWave1D{P} <: Freq2Wave1D
 	internal::Vector{Complex{Float64}}
 	weights::Nullable{Vector{Complex{Float64}}}
 
 	J::Int64
 	wavename::AbstractString
 
-	NFFT::NFFT.NFFTPlan{1,0,Float64}
+	#= NFFT::NFFT.NFFTPlan{1,0,Float64} =#
+	NFFT::P
 
 	left::Matrix{Complex{Float64}}
 	right::Matrix{Complex{Float64}}

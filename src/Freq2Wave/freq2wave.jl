@@ -1,7 +1,7 @@
 # ------------------------------------------------------------
 # 1D change of basis matrix
 
-function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::Float64=NaN; uniform::Bool=true, args...)
 	vm = van_moment(wavename)
 	( Nint = 2^J ) >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	
@@ -11,7 +11,9 @@ function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::
 	end
 
 	# Weights for non-uniform samples
-	if isuniform(samples)
+	uni_samples = isuniform(samples)
+	if uni_samples
+		sample_dist = samples[2] - samples[1]
 		W = Nullable{ Vector{Complex{Float64}} }()
 	else
 		isnan(B) && error("Samples are not uniform; supply bandwidth")
@@ -29,11 +31,15 @@ function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
 	end
 
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
-	# TODO: Should window width m and oversampling factor sigma be changed for higher precision?
-	xi = samples*2.0^(-J)
-	frac!(xi)
-	p = NFFTPlan(xi, Nint)
+	# For suitable uniform samples, the ordinary FFT can be used instead of NFFT
+	if uni_samples && isinteger(1/sample_dist) && uniform
+		p = FFTPlan(samples, J, Nint)
+	else
+		# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
+		xi = samples*2.0^(-J)
+		frac!(xi)
+		p = NFFTPlan(xi, Nint)
+	end
 
 	# Wavelets w/o boundary
 	if !hasboundary(wavename)
@@ -96,7 +102,7 @@ function Base.collect(T::Freq2BoundaryWave1D)
 
 	# Internal function
 	offset = div(N, 2) + 1
-	for n in p+1:N-p
+	for n in (p+1):(N-p)
 		for m in 1:M
 			@inbounds F[m,n] = T.internal[m]*cis( -twoπ*(n-offset)*T.NFFT.x[m] )
 		end
@@ -146,8 +152,8 @@ function wsize(T::Freq2BoundaryWave2D)
 	return (N, N)
 end
 
-wsize(T::Freq2NoBoundaryWave2D) = T.NFFT.N
 wsize(T::Freq2BoundaryWave1D) = (2^wscale(T),)
+wsize(T::Freq2NoBoundaryWave2D) = T.NFFT.N
 wsize(T::Freq2NoBoundaryWave1D) = T.NFFT.N
 
 function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Integer; args...)
@@ -264,7 +270,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave1
 	size(T,1) == length(y) || throw(DimensionMismatch())
 	size(T,2) == length(x) || throw(DimensionMismatch())
 
-	nfft!(T.NFFT, x, y)
+	myfft!(y, T.NFFT, x)
 	had!(y, T.internal)
 
 	isuniform(T) || had!(y, get(T.weights))
@@ -294,7 +300,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D,
 	xleft, xint, xright = split(x, van_moment(T))
 
 	# Internal scaling function
-	nfft!(T.NFFT, xint, y)
+	myfft!(y, T.NFFT, xint)
 	had!(y, T.internal)
 
 	# Contribution from the boundaries
