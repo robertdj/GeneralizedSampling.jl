@@ -12,34 +12,75 @@ type FFTPlan{D}
 	backwardFFT::Base.DFT.FFTW.cFFTWPlan
 	pre_phaseshift::Array{Complex{Float64}}
 	post_phaseshift::Array{Complex{Float64}}
-	x::Vector
+	x::Matrix
 	eps::Float64
-	M::Int64
-	N::Int64
-	q::Int64
-	tmpVec::Array{Complex{Float64},D}
+	M::NTuple{D, Int64}
+    N::NTuple{D, Int64}
+	q::NTuple{D, Int64}
+	tmpVec::Array{Complex{Float64}, D}
+end
+
+#=
+function FFTPlan(samples::Vector, J::Integer, N::Integer)
+    M = length(samples)
+    myeps = samples[2] - samples[1]
+
+    pre = Array{Complex{Float64}}(N)
+    dilation = 2^J
+    for l in 1:N
+        pre[l] = cis( pi*(l-1)*myeps*M/dilation )
+    end
+
+    xi = samples / dilation
+    post = cis( pi*N*xi )
+
+    q = div(M, Int(dilation/myeps)) + 1
+    tmpVec = Array{Complex{Float64}}( q*Int(dilation/myeps) )
+
+    fP = plan_fft!(tmpVec)
+    bP = plan_bfft!(tmpVec)
+
+    FFTPlan(fP, bP, pre, post, xi, myeps, M, N, q, tmpVec)
+end
+=#
+
+function Base.show(io::IO, P::FFTPlan)
+    print(io, "FFTPlan with ", P.M, " sampling points for ", P.N, " array")
 end
 
 function FFTPlan(samples::Vector, J::Integer, N::Integer)
-	M = length(samples)
-	myeps = samples[2] - samples[1]
-	dilation = 2^J
+    samples_view = reshape_view( samples, (1, length(samples)) )
+    FFTPlan( samples_view, J, (N,) )
+end
 
-	pre = Array{Complex{Float64}}(N)
-	for l in 1:N
-		pre[l] = cis( pi*(l-1)*myeps*M/dilation )
-	end
+function FFTPlan{D}(samples::AbstractMatrix, J::Integer, N::NTuple{D, Int})
+    size(samples, 1) == D || throw(DimensionMismatch())
 
-	xi = samples / dilation
-	post = cis( pi*N*xi )
+    M = Array{Int64}(D)
+    for d in 1:D
+        M[d] = length( unique(samples[d, :]) )
+    end
+    prod(M) == size(samples, 2) || throw(AssertionError())
 
-	q = div(M, Int(dilation/myeps)) + 1
-	tmpVec = Array{Complex{Float64}}( q*Int(dilation/myeps) )
+    myeps = samples[1,2] - samples[1,1]
 
-	fP = plan_fft!(tmpVec)
-	bP = plan_bfft!(tmpVec)
+    pre = Array{Complex{Float64}}(N)
+    dilation = 2^J
+    for idx in CartesianRange(size(pre))
+        pre[idx] = cis( pi*myeps/dilation*dot([idx.I...]-1, M) )
+    end
 
-	FFTPlan(fP, bP, pre, post, xi, myeps, M, N, q, tmpVec)
+    xi = samples / dilation
+    log_post = [N...]'* xi
+    post = cis( pi*vec(log_post) )
+
+    q = div(M, Int(dilation/myeps)) + 1
+    tmpVec = Array{Complex{Float64}}( tuple(q*Int(dilation/myeps)...) )
+
+    fP = plan_fft!(tmpVec)
+    bP = plan_bfft!(tmpVec)
+
+    FFTPlan(fP, bP, pre, post, xi, myeps, (M...), N, (q...), tmpVec)
 end
 
 
@@ -84,15 +125,15 @@ immutable Freq2NoBoundaryWave1D{P} <: Freq2Wave1D
 	tmpMulVec::Vector{Complex{Float64}}
 end
 
-immutable Freq2NoBoundaryWave2D <: Freq2Wave2D
+immutable Freq2NoBoundaryWave2D{P} <: Freq2Wave2D
 	internal::Dict{ Symbol, Vector{Complex{Float64}} }
 	weights::Nullable{ Vector{Complex{Float64}} }
 
 	J::Int64
 	wavename::AbstractString
 
-	NFFT::NFFT.NFFTPlan{2,0,Float64}
-	#= NFFT::FTPlan =#
+	#= NFFT::NFFT.NFFTPlan{2,0,Float64} =#
+	NFFT::P
 
 	tmpMulVec::Vector{Complex{Float64}}
 end
@@ -144,7 +185,7 @@ function Freq2NoBoundaryWave1D(internal, weights, J, wavename, NFFT)
 end
 
 function Freq2NoBoundaryWave2D(internal, weights, J, wavename, NFFT)
-	tmpMulVec = Array{Complex{Float64}}( NFFT.M )
+    tmpMulVec = Array{Complex{Float64}}( prod(NFFT.M) )
 	Freq2NoBoundaryWave2D( internal, weights, J, wavename, NFFT, tmpMulVec )
 end
 

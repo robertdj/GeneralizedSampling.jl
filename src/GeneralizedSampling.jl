@@ -1,16 +1,20 @@
 module GeneralizedSampling
 
 using Compat
-import Compat.view
+import Compat: view
+
+#= using Base.Cartesian =#
 
 using NFFT
+# TODO: Don't import 
 import NFFT: nfft!, nfft_adjoint!
+
 using IntervalWavelets
 import IntervalWavelets: isuniform, van_moment
 
 import VoronoiCells: density, voronoiarea
 import Wavelets: wavelet, WT
-import ArrayViews: flatten_view
+import ArrayViews: flatten_view, reshape_view
 import Base: A_mul_B!, Ac_mul_B!
 
 export

@@ -31,8 +31,8 @@ function Freq2Wave(samples::StridedVector, wavename::AbstractString, J::Int, B::
 		Nint <= 0 && error("Too few wavelets: Boundary functions overlap")
 	end
 
+    if uni_samples && isinteger(1/sample_dist) && uniform
 	# For suitable uniform samples, the ordinary FFT can be used instead of NFFT
-	if uni_samples && isinteger(1/sample_dist) && uniform
 		p = FFTPlan(samples, J, Nint)
 	else
 		# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)
@@ -216,7 +216,7 @@ function NotUnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::Abstr
 	end
 end
 
-function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int, B::Float64=NaN; args...)
+function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J::Int, B::Float64=NaN; uniform::Bool=true, args...)
 	vm = van_moment(wavename)
 	( Nint = 2^J ) >= 2*vm-1 || throw(AssertionError("Scale it not large enough for this wavelet"))
 	M = size(samples, 1)
@@ -226,9 +226,11 @@ function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J:
 		warn("The scale is high compared to the number of samples")
 	end
 
-	if isuniform(samples)
+	uni_samples = isuniform(samples)
+	if uni_samples
 		W = Nullable{ Vector{Complex{Float64}} }()
 
+		sample_dist = samples[2,1] - samples[1,1]
 		scaling_funcs = UnifFourScalingFunc(samples, wavename, J; args...)
 	else
 		# Weights for non-uniform samples
@@ -251,11 +253,16 @@ function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J:
 		internal = scaling_funcs
 	end
 
-	# NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
-	xi = samples'
-	scale!(xi, 2.0^(-J))
-	frac!(xi)
-	p = NFFTPlan(xi, (Nint,Nint))
+    xi = samples'
+	if uni_samples && isinteger(1/sample_dist) && uniform
+        # For suitable uniform samples, the ordinary FFT can be used instead of NFFT
+        p = FFTPlan(xi, J, (Nint,Nint))
+	else
+        # NFFTPlans: Frequencies must be in the torus [-1/2, 1/2)^2
+        scale!(xi, 2.0^(-J))
+        frac!(xi)
+        p = NFFTPlan(xi, (Nint,Nint))
+    end
 
 	# Wavelets w/o boundary
 	if hasboundary(wavename)
@@ -282,7 +289,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave2
 	(M = size(T,1)) == length(y) || throw(DimensionMismatch())
 	wsize(T) == size(X) || throw(DimensionMismatch())
 
-	nfft!(T.NFFT, X, y)
+	myfft!(y, T.NFFT, X)
 	for m in 1:M
 		@inbounds y[m] *= T.internal[:x][m] * T.internal[:y][m]
 	end
@@ -320,7 +327,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# Internal scaling functions
 	vm = van_moment(T)
 	S = split(X, vm)
-	nfft!(T.NFFT, S.II, y)
+	nfft!(y, T.NFFT, S.II)
 	for m in 1:M
 		@inbounds y[m] *= T.internal[:x][m] * T.internal[:y][m]
 	end
@@ -666,7 +673,7 @@ end
 
 function Base.size(T::Freq2Wave, d::Integer)
 	if d == 1
-		T.NFFT.M
+        prod(T.NFFT.M)
 	elseif d == 2
 		prod( wsize(T) )
 	else
