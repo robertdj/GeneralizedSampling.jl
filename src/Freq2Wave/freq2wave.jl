@@ -327,7 +327,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# Internal scaling functions
 	vm = van_moment(T)
 	S = split(X, vm)
-	nfft!(y, T.NFFT, S.II)
+	NFFT.nfft!(y, T.NFFT, S.II)
 	for m in 1:M
 		@inbounds y[m] *= T.internal[:x][m] * T.internal[:y][m]
 	end
@@ -362,26 +362,26 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# Sides
 
 	# IL
-	nfft!(T.NFFTx, S.IL, T.tmpMulVec)
+	NFFT.nfft!(T.NFFTx, S.IL, T.tmpMulVec)
 	scale!(T.internal[:x], T.tmpMulVec)
 	had!(T.tmpMulVec, T.left[:y])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# IR
-	nfft!(T.NFFTx, S.IR, T.tmpMulVec)
+	NFFT.nfft!(T.NFFTx, S.IR, T.tmpMulVec)
 	scale!(T.internal[:x], T.tmpMulVec)
 	had!(T.tmpMulVec, T.right[:y])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# LI 
-	nfft!(T.NFFTy, S.LI, T.tmpMulVecT)
+	NFFT.nfft!(T.NFFTy, S.LI, T.tmpMulVecT)
 	transpose!(T.tmpMulVec, T.tmpMulVecT)
 	scale!(T.internal[:y], T.tmpMulVec)
 	had!(T.tmpMulVec, T.left[:x])
 	BLAS.gemv!('N', ComplexOne, T.tmpMulVec, onesp, ComplexOne, y)
 
 	# RI 
-	nfft!(T.NFFTy, S.RI, T.tmpMulVecT)
+	NFFT.nfft!(T.NFFTy, S.RI, T.tmpMulVecT)
 	transpose!(T.tmpMulVec, T.tmpMulVecT)
 	scale!(T.internal[:y], T.tmpMulVec)
 	had!(T.tmpMulVec, T.right[:x])
@@ -421,7 +421,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2NoBoundaryWave
 	hadc!(T.tmpMulVec, v, T.internal)
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
-	nfft_adjoint!(T.NFFT, T.tmpMulVec, z)
+	myfft_adjoint!(z, T.NFFT, T.tmpMulVec)
 
 	return z
 end
@@ -435,7 +435,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2NoBoundaryWave
 	end
 	isuniform(T) || had!(T.tmpMulVec, get(T.weights))
 
-	nfft_adjoint!(T.NFFT, T.tmpMulVec, Z)
+	myfft_adjoint!(Z, T.NFFT, T.tmpMulVec)
 
 	return Z
 end
@@ -454,7 +454,7 @@ function Base.Ac_mul_B!(z::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave1D
 
 	# Internal scaling function
 	hadc!(T.tmpMulVec, T.internal)
-	nfft_adjoint!(T.NFFT, T.tmpMulVec, zint)
+	myfft_adjoint!(zint, T.NFFT, T.tmpMulVec)
 
 	return z
 end
@@ -477,7 +477,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	for m in 1:M
 		@inbounds T.tmpMulcVec[m] = T.weigthedVec[m] * conj(T.internal[:x][m]) * conj(T.internal[:y][m])
 	end
-	nfft_adjoint!(T.NFFT, T.tmpMulcVec, S.II)
+	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulcVec, S.II)
 
 	# ------------------------------------------------------------
 	# Left blocks: All use 'L' for the y coordinate
@@ -493,7 +493,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	# IL
 	conj!(T.tmpMulcVec, T.internal[:x])
 	scale!(T.tmpMulcVec, T.tmpMulVec)
-	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IL )
+	NFFT.nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IL )
 
 	# ------------------------------------------------------------
 	# Middle blocks: All use 'I' for the y coordinate
@@ -505,14 +505,14 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	conj!(T.tmpMulcVec, T.internal[:y])
 	scale!(T.tmpMulcVec, T.tmpMulVec)
 	transpose!(T.tmpMulVecT, T.tmpMulVec)
-	nfft_adjoint!( T.NFFTy, T.tmpMulVecT, S.LI )
+	NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulVecT, S.LI )
 
 	# RI: Reuse T.tmpMulcVec
 	conj!(T.tmpMulVec, T.right[:x])
 	scale!(T.weigthedVec, T.tmpMulVec)
 	scale!(T.tmpMulcVec, T.tmpMulVec)
 	transpose!(T.tmpMulVecT, T.tmpMulVec)
-	nfft_adjoint!( T.NFFTy, T.tmpMulVecT, S.RI )
+	NFFT.nfft_adjoint!( T.NFFTy, T.tmpMulVecT, S.RI )
 
 	# ------------------------------------------------------------
 	# Right blocks: All use 'R' for the y coordinate
@@ -528,7 +528,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	# IR
 	conj!(T.tmpMulcVec, T.internal[:x])
 	scale!(T.tmpMulcVec, T.tmpMulVec)
-	nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IR )
+	NFFT.nfft_adjoint!( T.NFFTx, T.tmpMulVec, S.IR )
 
 
 	return Z

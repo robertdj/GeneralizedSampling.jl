@@ -10,39 +10,15 @@ abstract CoB
 type FFTPlan{D}
 	forwardFFT::Base.DFT.FFTW.cFFTWPlan
 	backwardFFT::Base.DFT.FFTW.cFFTWPlan
-	pre_phaseshift::Array{Complex{Float64}}
-	post_phaseshift::Array{Complex{Float64}}
+	pre_phaseshift::Array{Complex{Float64}, D}
+	post_phaseshift::Vector{Complex{Float64}}
 	x::Matrix
 	eps::Float64
 	M::NTuple{D, Int64}
     N::NTuple{D, Int64}
 	q::NTuple{D, Int64}
-	tmpVec::Array{Complex{Float64}, D}
+	FFTvec::Array{Complex{Float64}, D}
 end
-
-#=
-function FFTPlan(samples::Vector, J::Integer, N::Integer)
-    M = length(samples)
-    myeps = samples[2] - samples[1]
-
-    pre = Array{Complex{Float64}}(N)
-    dilation = 2^J
-    for l in 1:N
-        pre[l] = cis( pi*(l-1)*myeps*M/dilation )
-    end
-
-    xi = samples / dilation
-    post = cis( pi*N*xi )
-
-    q = div(M, Int(dilation/myeps)) + 1
-    tmpVec = Array{Complex{Float64}}( q*Int(dilation/myeps) )
-
-    fP = plan_fft!(tmpVec)
-    bP = plan_bfft!(tmpVec)
-
-    FFTPlan(fP, bP, pre, post, xi, myeps, M, N, q, tmpVec)
-end
-=#
 
 function Base.show(io::IO, P::FFTPlan)
     print(io, "FFTPlan with ", P.M, " sampling points for ", P.N, " array")
@@ -75,12 +51,12 @@ function FFTPlan{D}(samples::AbstractMatrix, J::Integer, N::NTuple{D, Int})
     post = cis( pi*vec(log_post) )
 
     q = div(M, Int(dilation/myeps)) + 1
-    tmpVec = Array{Complex{Float64}}( tuple(q*Int(dilation/myeps)...) )
+    FFTvec = Array{Complex{Float64}}( tuple(q*Int(dilation/myeps)...) )
 
-    fP = plan_fft!(tmpVec)
-    bP = plan_bfft!(tmpVec)
+    fP = plan_fft!(FFTvec)#; flags=FFTW.PATIENT)
+    bP = plan_bfft!(FFTvec)#; flags=FFTW.PATIENT)
 
-    FFTPlan(fP, bP, pre, post, xi, myeps, (M...), N, (q...), tmpVec)
+    FFTPlan(fP, bP, pre, post, xi, myeps, (M...), N, (q...), FFTvec)
 end
 
 

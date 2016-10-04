@@ -6,8 +6,6 @@ import Compat: view
 #= using Base.Cartesian =#
 
 using NFFT
-# TODO: Don't import 
-import NFFT: nfft!, nfft_adjoint!
 
 using IntervalWavelets
 import IntervalWavelets: isuniform, van_moment
