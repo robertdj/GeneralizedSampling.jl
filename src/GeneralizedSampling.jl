@@ -3,7 +3,7 @@ module GeneralizedSampling
 using Compat
 import Compat: view
 
-#= using Base.Cartesian =#
+using Base.Cartesian
 
 using NFFT
 
