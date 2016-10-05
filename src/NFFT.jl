@@ -2,7 +2,8 @@
 @inline myfft_adjoint!(A::StridedArray, P::NFFT.NFFTPlan, B::AbstractArray) = NFFT.nfft_adjoint!(P, B, A)
 
 
-@generated function myfft!{D}(A::StridedVector{Complex{Float64}}, P::FFTPlan{D}, B::AbstractArray{Complex{Float64}, D})
+@generated function myfft!{D}(A::StridedVector{Complex{Float64}}, 
+                              P::FFTPlan{D}, B::AbstractArray{Complex{Float64}, D})
     quote
         length(A) == prod(P.M) || throw(DimensionMismatch())
         size(B) == P.N || throw(DimensionMismatch())
@@ -27,51 +28,29 @@
 end
 
 
-function myfft_adjoint!(A::StridedVector{Complex{Float64}}, P::FFTPlan, B::AbstractVector{Complex{Float64}})
-    size(A) == P.N || throw(DimensionMismatch())
-    length(B) == prod(P.M) || throw(DimensionMismatch())
+@generated function myfft_adjoint!{D}(A::StridedArray{Complex{Float64}, D}, 
+                                      P::FFTPlan{D}, B::AbstractVector{Complex{Float64}})
+    quote
+        size(A) == P.N || throw(DimensionMismatch())
+        length(B) == prod(P.M) || throw(DimensionMismatch())
 
-    fill!(P.FFTvec, ComplexZero)
-    for l in 1:P.M[1]
-        P.FFTvec[l] = B[l] * conj(P.post_phaseshift[l])
-    end
-
-    P.backwardFFT * P.FFTvec
-
-    idx = 1
-    for l in 1:P.N[1]
-        A[l] = P.FFTvec[idx] * conj(P.pre_phaseshift[l])
-        idx += P.q[1]
-    end
-
-    return A
-end
-
-function myfft_adjoint!(A::StridedMatrix{Complex{Float64}}, P::FFTPlan, B::AbstractVector{Complex{Float64}})
-    size(A) == P.N || throw(DimensionMismatch())
-    length(B) == prod(P.M) || throw(DimensionMismatch())
-
-    fill!(P.FFTvec, ComplexZero)
-    idx = 0
-    for l2 in 1:P.M[2]
-        for l1 in 1:P.M[1]
-            idx += 1
-            P.FFTvec[l1, l2] = B[idx] * conj(P.post_phaseshift[idx])
+        fill!(P.FFTvec, ComplexZero)
+        FFTvec = P.FFTvec
+        idx_0 = 0
+        @nloops $D l d->1:P.M[d] begin
+            idx_0 += 1
+            (@nref $D FFTvec l) = B[idx_0] * conj(P.post_phaseshift[idx_0])
         end
-    end
 
-    P.backwardFFT * P.FFTvec
+        P.backwardFFT * FFTvec
 
-    idx2 = 1
-    for l2 in 1:P.N[2]
-        idx1 = 1
-        for l1 in 1:P.N[1]
-            A[l1, l2] = P.FFTvec[idx1, idx2] * conj(P.pre_phaseshift[l1, l2])
-            idx1 += P.q[1]
+        pre_phaseshift = P.pre_phaseshift
+        @nexprs $D d -> idx_d = 1
+        @nloops $D l d->1:P.N[d] d->idx_{d-1}=1 d->idx_d+=P.q[d] begin
+            (@nref $D A l) = (@nref $D FFTvec idx) * conj( (@nref $D pre_phaseshift l) )
         end
-        idx2 += P.q[2]
-    end
 
-    return A
+        return A
+    end
 end
 
