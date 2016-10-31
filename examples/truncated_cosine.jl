@@ -46,8 +46,6 @@ using IntervalWavelets
 using Winston
 
 x, yw = weval( real(wcoef), "haar", 10 )
-# Waiting for IntervalWavelets to return x on [-0.5, 0.5] instead of [-1,1]
-x -= 0.5
 
 plot(x, yw, x, tcos(x))
 
