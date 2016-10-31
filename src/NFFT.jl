@@ -1,58 +1,56 @@
-#=
-Compute 1D NFFT on each column/row of a matrix.
-# TODO: Not very elegant, try to mimick the mapreduce approach of e.g. sum
-=#
+myfft!(fHat::StridedArray, P::NFFT.NFFTPlan, f::AbstractArray) = NFFT.nfft!(P, f, fHat)
+myfft_adjoint!(f::StridedArray, P::NFFT.NFFTPlan, fHat::AbstractArray) = NFFT.nfft_adjoint!(P, fHat, f)
 
-function NFFT.nfft!{T}(p::NFFTPlan{1}, f::AbstractMatrix{T}, fHat::StridedMatrix{T}, ::Type{Val{1}})
-	( Nrows = size(f,2) ) == size(fHat,2) || throw(DimensionMismatch())
 
-	for rowidx in 1:Nrows
-		frow = slice(f, :, rowidx)
-		fhatrow = slice(fHat, :, rowidx)
+@generated function myfft!{D}(fHat::StridedVector{Complex{Float64}}, 
+                              P::FFTPlan{D}, f::AbstractArray{Complex{Float64}, D})
+    quote
+        length(fHat) == prod(P.M) || throw(DimensionMismatch())
+        size(f) == P.N || throw(DimensionMismatch())
 
-		NFFT.nfft!(p, frow, fhatrow)
-	end
+        fill!(P.FFTvec, ComplexZero)
+        FFTvec = P.FFTvec
+        pre_phaseshift = P.pre_phaseshift
+        @nloops $D l d->1:P.N[d] d->idx_d = 1 + P.q[d]*(l_d - 1) begin
+            (@nref $D FFTvec idx) = (@nref $D f l) * (@nref $D pre_phaseshift l)
+        end
 
-	return fHat
+        P.forwardFFT * FFTvec
+
+        idx = 0
+        @nloops $D l d->1:P.M[d] begin
+            idx += 1
+            fHat[idx] = (@nref $D FFTvec l) * P.post_phaseshift[idx]
+        end
+
+        return fHat
+    end
 end
 
-function NFFT.nfft!{T}(p::NFFTPlan{1}, f::AbstractMatrix{T}, fHat::StridedMatrix{T}, ::Type{Val{2}})
-	( Nrows = size(f,1) ) == size(fHat,2) || throw(DimensionMismatch())
 
-	for rowidx in 1:Nrows
-		frow = slice(f, rowidx, :)
-		fhatrow = slice(fHat, :, rowidx)
+@generated function myfft_adjoint!{D}(f::StridedArray{Complex{Float64}, D}, 
+                                      P::FFTPlan{D}, fHat::AbstractVector{Complex{Float64}})
+    quote
+        size(f) == P.N || throw(DimensionMismatch())
+        length(fHat) == prod(P.M) || throw(DimensionMismatch())
 
-		NFFT.nfft!(p, frow, fhatrow)
-	end
+        fill!(P.FFTvec, ComplexZero)
+        FFTvec = P.FFTvec
+        idx_0 = 0
+        @nloops $D l d->1:P.M[d] begin
+            idx_0 += 1
+            (@nref $D FFTvec l) = fHat[idx_0] * conj(P.post_phaseshift[idx_0])
+        end
 
-	return fHat
-end
+        P.backwardFFT * FFTvec
 
+        pre_phaseshift = P.pre_phaseshift
+        @nexprs $D d -> idx_d = 1
+        @nloops $D l d->1:P.N[d] d->idx_{d-1}=1 d->idx_d+=P.q[d] begin
+            (@nref $D f l) = (@nref $D FFTvec idx) * conj( (@nref $D pre_phaseshift l) )
+        end
 
-function NFFT.nfft_adjoint!{T}(p::NFFTPlan{1}, fHat::AbstractMatrix{T}, f::StridedMatrix{T}, ::Type{Val{1}})
-	( Nrows = size(f,2) ) == size(fHat,2) || throw(DimensionMismatch())
-
-	for rowidx in 1:Nrows
-		frow = slice(f, :, rowidx)
-		fhatrow = slice(fHat, :, rowidx)
-
-		NFFT.nfft_adjoint!(p, fhatrow, frow)
-	end
-
-	return f
-end
-
-function NFFT.nfft_adjoint!{T}(p::NFFTPlan{1}, fHat::AbstractMatrix{T}, f::StridedMatrix{T}, ::Type{Val{2}})
-	( Nrows = size(f,1) ) == size(fHat,2) || throw(DimensionMismatch())
-
-	for rowidx in 1:Nrows
-		frow = slice(f, rowidx, :)
-		fhatrow = slice(fHat, :, rowidx)
-
-		NFFT.nfft_adjoint!(p, fhatrow, frow)
-	end
-
-	return f
+        return f
+    end
 end
 

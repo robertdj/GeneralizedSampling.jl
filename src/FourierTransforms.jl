@@ -263,13 +263,13 @@ function FourHaarScaling{T<:Real}( xi::AbstractArray{T}, J::Integer, k::Integer)
 end
 
 
-function FourDaubScaling( xi, p::Integer, J::Integer=0; offset::Integer=-p, args... )
+function FourDaubScaling( xi, p::Integer, J::Integer; offset::Integer=-p, args... )
 	C = coef( ifilter(p) )
 	scale!(C, 1/sum(C))
 	FourDaubScaling( xi, C, J; offset=offset, args... )
 end
 
-function FourDaubScaling( xi, p::Integer, J::Integer=0, k::Integer=0; offset::Integer=-p, args... )
+function FourDaubScaling( xi, p::Integer, J::Integer, k::Integer; offset::Integer=-p, args... )
 	C = coef( ifilter(p) )
 	scale!(C, 1/sum(C))
 	FourDaubScaling( xi, C, J, k; offset=offset, args... )

@@ -137,10 +137,10 @@ function grid( M::Tuple{Integer,Integer}, grid_dist::Real=1.0)
 
 	# The points are sorted by the x coordinate
 	gridx = grid(M[1], grid_dist)
-	x = kron(gridx, ones(M[2]))
+	x = repmat(gridx, M[2])
 
 	gridy = grid(M[2], grid_dist)
-	y = repmat(gridy, M[1])
+	y = kron(gridy, ones(M[1]))
 
 	return hcat(x, y)
 end
