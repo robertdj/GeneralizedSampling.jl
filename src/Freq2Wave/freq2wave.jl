@@ -327,7 +327,7 @@ function Base.A_mul_B!(y::DenseVector{Complex{Float64}}, T::Freq2BoundaryWave2D,
 	# Internal scaling functions
 	vm = van_moment(T)
 	S = split(X, vm)
-	NFFT.nfft!(y, T.NFFT, S.II)
+	myfft!(y, T.NFFT, S.II)
 	for m in 1:M
 		@inbounds y[m] *= T.internal[:x][m] * T.internal[:y][m]
 	end
@@ -477,7 +477,7 @@ function Base.Ac_mul_B!(Z::DenseMatrix{Complex{Float64}}, T::Freq2BoundaryWave2D
 	for m in 1:M
 		@inbounds T.tmpMulcVec[m] = T.weigthedVec[m] * conj(T.internal[:x][m]) * conj(T.internal[:y][m])
 	end
-	NFFT.nfft_adjoint!(T.NFFT, T.tmpMulcVec, S.II)
+	myfft_adjoint!(S.II, T.NFFT, T.tmpMulcVec)
 
 	# ------------------------------------------------------------
 	# Left blocks: All use 'L' for the y coordinate

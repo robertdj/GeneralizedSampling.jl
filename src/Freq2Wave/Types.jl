@@ -8,8 +8,8 @@ abstract CoB
 # "N"FFT plan for equidistant points 
 
 type FFTPlan{D}
-	forwardFFT::Base.DFT.FFTW.cFFTWPlan
-	backwardFFT::Base.DFT.FFTW.cFFTWPlan
+    forwardFFT::Base.DFT.FFTW.cFFTWPlan{Complex{Float64},-1,true,D}
+    backwardFFT::Base.DFT.FFTW.cFFTWPlan{Complex{Float64},1,true,D}
 	pre_phaseshift::Array{Complex{Float64}, D}
 	post_phaseshift::Vector{Complex{Float64}}
 	x::Matrix
@@ -56,7 +56,7 @@ function FFTPlan{D}(samples::AbstractMatrix, J::Integer, N::NTuple{D, Int})
     fP = plan_fft!(FFTvec)#; flags=FFTW.PATIENT)
     bP = plan_bfft!(FFTvec)#; flags=FFTW.PATIENT)
 
-    FFTPlan(fP, bP, pre, post, xi, myeps, (M...), N, (q...), FFTvec)
+    FFTPlan{D}(fP, bP, pre, post, xi, myeps, (M...), N, (q...), FFTvec)
 end
 
 
@@ -95,7 +95,6 @@ immutable Freq2NoBoundaryWave1D{P} <: Freq2Wave1D
 	wavename::AbstractString
 
 	# Multiplication
-	#= NFFT::NFFT.NFFTPlan{1,0,Float64} =#
 	NFFT::P
 
 	tmpMulVec::Vector{Complex{Float64}}
@@ -108,7 +107,6 @@ immutable Freq2NoBoundaryWave2D{P} <: Freq2Wave2D
 	J::Int64
 	wavename::AbstractString
 
-	#= NFFT::NFFT.NFFTPlan{2,0,Float64} =#
 	NFFT::P
 
 	tmpMulVec::Vector{Complex{Float64}}
@@ -117,12 +115,11 @@ end
 # Boundary correction
 immutable Freq2BoundaryWave1D{P} <: Freq2Wave1D
 	internal::Vector{Complex{Float64}}
-	weights::Nullable{Vector{Complex{Float64}}}
+	weights::Nullable{ Vector{Complex{Float64}} }
 
 	J::Int64
 	wavename::AbstractString
 
-	#= NFFT::NFFT.NFFTPlan{1,0,Float64} =#
 	NFFT::P
 
 	left::Matrix{Complex{Float64}}
@@ -131,14 +128,14 @@ immutable Freq2BoundaryWave1D{P} <: Freq2Wave1D
 	tmpMulVec::Vector{Complex{Float64}}
 end
 
-immutable Freq2BoundaryWave2D <: Freq2Wave2D
+immutable Freq2BoundaryWave2D{P} <: Freq2Wave2D
 	internal::Dict{ Symbol, Vector{Complex{Float64}} }
 	weights::Nullable{ Vector{Complex{Float64}} }
 
 	J::Int64
 	wavename::AbstractString
 
-	NFFT::NFFT.NFFTPlan{2,0,Float64}
+	NFFT::P
 	NFFTx::NFFT.NFFTPlan{2,1,Float64}
 	NFFTy::NFFT.NFFTPlan{2,2,Float64}
 
@@ -174,12 +171,12 @@ function Freq2BoundaryWave2D(internal, weights, J, wavename, NFFT, left, right)
 	tmpMulVec = similar(left[:x])
 	tmpMulVecT = tmpMulVec.'
 
-	tmpMulcVec = Array{Complex{Float64}}( NFFT.M )
+    tmpMulcVec = Array{Complex{Float64}}( prod(NFFT.M) )
 	weigthedVec = similar(tmpMulcVec)
 
 	vm = van_moment(wavename)
-	NFFTx = NFFTPlan( NFFT.x[1,:], 1, (NFFT.N[1],vm) )
-	NFFTy = NFFTPlan( NFFT.x[2,:], 2, (vm,NFFT.N[2]) )
+	NFFTx = NFFTPlan( frac(NFFT.x[1,:]), 1, (NFFT.N[1], vm) )
+	NFFTy = NFFTPlan( frac(NFFT.x[2,:]), 2, (vm, NFFT.N[2]) )
 
 	Freq2BoundaryWave2D( internal, weights, J, wavename, NFFT,
 	NFFTx, NFFTy, left, right, tmpMulVec, tmpMulVecT, tmpMulcVec, weigthedVec )
