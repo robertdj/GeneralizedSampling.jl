@@ -13,7 +13,6 @@ type FFTPlan{D}
 	pre_phaseshift::Array{Complex{Float64}, D}
 	post_phaseshift::Vector{Complex{Float64}}
 	x::Matrix
-	eps::Float64
 	M::NTuple{D, Int64}
     N::NTuple{D, Int64}
 	q::NTuple{D, Int64}
@@ -25,8 +24,9 @@ function Base.show(io::IO, P::FFTPlan)
 end
 
 function FFTPlan(samples::Vector, J::Integer, N::Integer)
-    samples_view = reshape_view( samples, (1, length(samples)) )
-    FFTPlan( samples_view, J, (N,) )
+    #= samples_view = reshape_view( samples, (1, length(samples)) ) =#
+    #= FFTPlan( samples_view, J, (N,) ) =#
+    FFTPlan( samples', J, (N,) )
 end
 
 function FFTPlan{D}(samples::AbstractMatrix, J::Integer, N::NTuple{D, Int})
@@ -39,6 +39,12 @@ function FFTPlan{D}(samples::AbstractMatrix, J::Integer, N::NTuple{D, Int})
     prod(M) == size(samples, 2) || throw(AssertionError())
 
     myeps = samples[1,2] - samples[1,1]
+    inv_eps = 1 / myeps
+    if isapprox(inv_eps, round(inv_eps))
+        inv_eps = round(Int, inv_eps)
+    else
+        throw(DomainError())
+    end
 
     pre = Array{Complex{Float64}}(N)
     dilation = 2^J
@@ -50,13 +56,13 @@ function FFTPlan{D}(samples::AbstractMatrix, J::Integer, N::NTuple{D, Int})
     log_post = [N...]'* xi
     post = cis( pi*vec(log_post) )
 
-    q = div(M, Int(dilation/myeps)) + 1
-    FFTvec = Array{Complex{Float64}}( tuple(q*Int(dilation/myeps)...) )
+    q = div(M, dilation*inv_eps) + 1
+    FFTvec = Array{Complex{Float64}}( tuple(q*dilation*inv_eps...) )
 
     fP = plan_fft!(FFTvec)#; flags=FFTW.PATIENT)
     bP = plan_bfft!(FFTvec)#; flags=FFTW.PATIENT)
 
-    FFTPlan{D}(fP, bP, pre, post, xi, myeps, (M...), N, (q...), FFTvec)
+    FFTPlan{D}(fP, bP, pre, post, xi, (M...), N, (q...), FFTvec)
 end
 
 

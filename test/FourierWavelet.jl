@@ -15,7 +15,7 @@ functions (boundary and internal) are orthonormal in L2.
 # ------------------------------------------------------------
 # Haar and Daubechies 1
 xi = randn(10)
-@test_approx_eq_eps FourHaarScaling(xi) FourDaubScaling(xi,1) 1e-7
+@test_approx_eq_eps FourHaarScaling(xi) FourDaubScaling(xi, 1) 1e-7
 
 
 # ------------------------------------------------------------
