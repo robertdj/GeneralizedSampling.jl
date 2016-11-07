@@ -4,6 +4,10 @@ The measurements are generated with the Matlab files from
 http://bigwww.epfl.ch/algorithms/mriphantom
 =#
 
+# Julia v0.5 hack for Winston
+using Winston
+display(plot(rand(2)))
+
 # ------------------------------------------------------------
 # Load data
 
@@ -30,7 +34,7 @@ w = T \ f
 # ------------------------------------------------------------
 # Plot reconstruction
 
-using IntervalWavelets, Winston
+using IntervalWavelets
 
 y = weval( abs(w), "db4", 10 )
 

@@ -23,11 +23,7 @@ function Base.show(io::IO, P::FFTPlan)
     print(io, "FFTPlan with ", P.M, " sampling points for ", P.N, " array")
 end
 
-function FFTPlan(samples::Vector, J::Integer, N::Integer)
-    #= samples_view = reshape_view( samples, (1, length(samples)) ) =#
-    #= FFTPlan( samples_view, J, (N,) ) =#
-    FFTPlan( samples', J, (N,) )
-end
+FFTPlan(samples::Vector, J::Integer, N::Integer) = FFTPlan( samples', J, (N,) )
 
 function FFTPlan{D}(samples::AbstractMatrix, J::Integer, N::NTuple{D, Int})
     size(samples, 1) == D || throw(DimensionMismatch())
@@ -38,7 +34,7 @@ function FFTPlan{D}(samples::AbstractMatrix, J::Integer, N::NTuple{D, Int})
     end
     prod(M) == size(samples, 2) || throw(AssertionError())
 
-    myeps = samples[1,2] - samples[1,1]
+    myeps = samples[D,2] - samples[D,1]
     inv_eps = 1 / myeps
     if isapprox(inv_eps, round(inv_eps))
         inv_eps = round(Int, inv_eps)

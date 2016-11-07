@@ -25,8 +25,10 @@ Pkg.add("GeneralizedSampling")
 
 ## Examples
 
-The example file `examples/brain.jl` uses precomputed data from this [MRI phantom Matlab package](http://bigwww.epfl.ch/algorithms/mriphantom) and the data is *not* included in the package as it takes up about 21 MB.
+The examples use the [Winston package](https://github.com/nolta/Winston.jl) for plotting and this package has some issues in Julia v0.5.
+To circumvent this you will see a random plot when calling the examples; the plot will be replaced by the expected output when the computations are completed.
 
+The example file `examples/brain.jl` uses precomputed data from this [MRI phantom Matlab package](http://bigwww.epfl.ch/algorithms/mriphantom) and the data is *not* included in the package as it takes up about 21 MB.
 The data is available for download in the native Julia format `jld` from <http://people.math.aau.dk/~robert/software/brain.zip>.
 Unzip the three `jld` files in the `examples` folder.
 

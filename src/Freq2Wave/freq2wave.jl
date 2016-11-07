@@ -182,11 +182,11 @@ function UnifFourScalingFunc(samples::StridedMatrix{Float64}, wavename::Abstract
 
 		leftx = FourScalingFunc( usamplesx, wavename, 'L', J; args... )
 		lefty = FourScalingFunc( usamplesy, wavename, 'L', J; args... )
-		left = Dict( :x => kron(leftx, ones(My)), :y => repmat(lefty, Mx) )
+		left = Dict( :x => repmat(leftx, My), :y => kron(lefty, ones(Mx)) )
 
 		rightx = FourScalingFunc( usamplesx, wavename, 'R', J; args... )
 		righty = FourScalingFunc( usamplesy, wavename, 'R', J; args... )
-		right = Dict( :x => kron(rightx, ones(My)), :y => repmat(righty, Mx) )
+		right = Dict( :x => repmat(rightx, My), :y => kron(righty, ones(Mx)) )
 
 		return internal, left, right
 	end
@@ -230,7 +230,7 @@ function Freq2Wave(samples::StridedMatrix{Float64}, wavename::AbstractString, J:
 	if uni_samples
 		W = Nullable{ Vector{Complex{Float64}} }()
 
-		sample_dist = samples[2,1] - samples[1,1]
+		sample_dist = samples[2,2] - samples[1,2]
 		scaling_funcs = UnifFourScalingFunc(samples, wavename, J; args...)
 	else
 		# Weights for non-uniform samples
@@ -652,7 +652,7 @@ function unsafe_FourScaling!(phi::Vector{Complex{Float64}}, T::Freq2BoundaryWave
 
 	if p < n <= N-p
 		offset = div(N, 2) + 1
-		D = d == :x ? D = 1 : D = 2
+        D = (d == :x ? 1 : 2)
 		for m in 1:M
 			@inbounds phi[m] = T.internal[d][m]*cis( -twoπ*(n-offset)*T.NFFT.x[D,m] )
 		end
