@@ -1,7 +1,3 @@
-# Julia v0.5 hack for Winston
-using Winston
-display(plot(rand(2)))
-
 # ------------------------------------------------------------
 # Truncated cosine and its Fourier transform
 
@@ -47,9 +43,12 @@ wcoef = T \ f
 # Plot reconstruction
 
 using IntervalWavelets
-#= using Winston =#
 
 x, yw = weval( real(wcoef), "haar", 10 )
 
-plot(x, yw, x, tcos(x))
+using Plots
+
+p = plot(x, yw, label="reconstruction")
+plot!(p, x, tcos(x), label="original")
+display(p)
 

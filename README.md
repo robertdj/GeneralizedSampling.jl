@@ -12,7 +12,6 @@ A Julia package implementing the generalized sampling framework by Anders Hansen
 ## Installation
 
 In Julia, run
-
 ```julia
 Pkg.add("GeneralizedSampling")
 ```
@@ -20,13 +19,15 @@ Pkg.add("GeneralizedSampling")
 
 ## Resources
 
-- **Documentation**: <http://generalizedsamplingjl.readthedocs.org/en/latest/>
+- **Documentation**: <http://generalizedsamplingjl.readthedocs.org/en/latest>
 
 
 ## Examples
 
-The examples use the [Winston package](https://github.com/nolta/Winston.jl) for plotting and this package has some issues in Julia v0.5.
-To circumvent this you will see a random plot when calling the examples; the plot will be replaced by the expected output when the computations are completed.
+The examples use the [Plots package](https://github.com/tbreloff/Plots.jl) for plotting examples.
+*Plots* requires a backend as described in its [documentation](https://juliaplots.github.io/backends).
+I have tested the [GR package](https://github.com/jheinen/GR.jl); 
+the *Plots* interaction with this backend is described in these [Plots examples](https://juliaplots.github.io/examples/gr).
 
 The example file `examples/brain.jl` uses precomputed data from this [MRI phantom Matlab package](http://bigwww.epfl.ch/algorithms/mriphantom) and the data is *not* included in the package as it takes up about 21 MB.
 The data is available for download in the native Julia format `jld` from <http://people.math.aau.dk/~robert/software/brain.zip>.

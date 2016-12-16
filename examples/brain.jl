@@ -4,10 +4,6 @@ The measurements are generated with the Matlab files from
 http://bigwww.epfl.ch/algorithms/mriphantom
 =#
 
-# Julia v0.5 hack for Winston
-using Winston
-display(plot(rand(2)))
-
 # ------------------------------------------------------------
 # Load data
 
@@ -38,7 +34,7 @@ using IntervalWavelets
 
 y = weval( abs(w), "db4", 10 )
 
-miny = minimum(y)
-maxy = maximum(y)
-imagesc( y, (miny,maxy) )
+using Plots
+
+heatmap( y )
 

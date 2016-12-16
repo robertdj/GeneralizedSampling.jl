@@ -48,14 +48,12 @@ To evaluate ``w`` in the wavelet basis, the `IntervalWavelets package <https://g
 The third argument ``R`` controls the number of points in which each scaling function is evaluated -- se the documentation for :code:`IntervalWavelets` for examples.
 
 Complete examples are found in the `examples` folder.
-The file :code:`truncated_cosine.jl` computes a representation in the Haar basis and is called using
+The file :code:`truncated_cosine.jl` computes a representation in the Haar basis and can be called using
 
 .. code-block:: julia
 
-    include("examples/truncated_cosine.jl")
-
-When you are in the folder :code:`GeneralizedSampling`.
-Otherwise, change folder using :code:`cd( Pkg.dir("GeneralizedSampling") )`.
+    tc_path = joinpath(Pkg.dir("GeneralizedSampling"), "examples", "truncated_cosine.jl")
+    include(tc_path)
 
 
 **Note**: 
