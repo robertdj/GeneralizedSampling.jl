@@ -26,8 +26,8 @@ Pkg.add("GeneralizedSampling")
 
 The examples use the [Plots package](https://github.com/tbreloff/Plots.jl) for plotting examples.
 *Plots* requires a backend as described in its [documentation](https://juliaplots.github.io/backends).
-I have tested the [GR package](https://github.com/jheinen/GR.jl); 
-the *Plots* interaction with this backend is described in these [Plots examples](https://juliaplots.github.io/examples/gr).
+I have tested the [GR backend](https://github.com/jheinen/GR.jl) with the examples in *GeneralizedSampling*;
+the *Plots* interaction with GR is described in these [Plots examples](https://juliaplots.github.io/examples/gr).
 
 The example file `examples/brain.jl` uses precomputed data from this [MRI phantom Matlab package](http://bigwww.epfl.ch/algorithms/mriphantom) and the data is *not* included in the package as it takes up about 21 MB.
 The data is available for download in the native Julia format `jld` from <http://people.math.aau.dk/~robert/software/brain.zip>.

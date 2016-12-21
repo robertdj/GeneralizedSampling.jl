@@ -13,6 +13,7 @@ f = FourScalingFunc(xi, wname, J)
 T = Freq2Wave(xi, wname, J)
 wcoef = T \ f
 
+println("Reconstructing a ", wname, " function from its Fourier measurements.")
 println("Reconstructed coefficients is a unit vector:")
 display(wcoef)
 
@@ -28,5 +29,4 @@ using Plots
 
 p = plot(x, yw, label=wname)
 display(p)
-
 

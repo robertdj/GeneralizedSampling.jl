@@ -47,13 +47,40 @@ To evaluate ``w`` in the wavelet basis, the `IntervalWavelets package <https://g
 
 The third argument ``R`` controls the number of points in which each scaling function is evaluated -- se the documentation for :code:`IntervalWavelets` for examples.
 
+A simple example is the Gaussian density, since its Fourier transform is again a Gaussian density.
+Consider an approximation with :math:`2^5 = 32` Daubechies 4 scaling functions from 64 Fourier measurements:
+
+.. code-block:: julia
+
+    using GeneralizedSampling
+    xi = GeneralizedSampling.grid(64, 0.5);
+    T = Freq2Wave(xi, "db4", 5)
+    f = exp(-xi.^2);
+    w = T \ f;
+    using IntervalWavelets
+    x, y = weval(real(w), "db4", 10);
+
+Using the `Plots package <https://github.com/tbreloff/Plots.jl>`_ this can be plotted with the following commands:
+
+.. code-block:: julia
+
+    using Plots
+    plot(x, sqrt(pi)*exp(-(pi*x).^2), label="true")
+    plot!(x, y, label="approximation")
+
+.. image:: gaussian.png
+
+The undesired behavior in the ends can be resolved by increasing the number of Fourier measurements or using a different wavelet for reconstruction.
+
 Complete examples are found in the `examples` folder.
-The file :code:`truncated_cosine.jl` computes a representation in the Haar basis and can be called using
+The file :code:`truncated_cosine.jl` approximates a truncated cosine in the Haar basis and can be called using
 
 .. code-block:: julia
 
     tc_path = joinpath(Pkg.dir("GeneralizedSampling"), "examples", "truncated_cosine.jl")
     include(tc_path)
+
+.. image:: tcos.png
 
 
 **Note**: 

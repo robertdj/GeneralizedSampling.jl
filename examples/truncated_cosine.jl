@@ -1,7 +1,7 @@
 # ------------------------------------------------------------
 # Truncated cosine and its Fourier transform
 
-# [-1/2,1/2]
+# Support = [-1/2,1/2]
 function tcos(x)
 	if 0.0 <= x <= 0.5
 		return cos(2*pi*x)
@@ -19,8 +19,7 @@ function ftcos(xi)
 end
 
 
-# Overload tcos and ftcos to vector input
-@vectorize_1arg Float64 tcos
+# Overload ftcos to vector input
 @vectorize_1arg Float64 ftcos
 
 
@@ -31,7 +30,7 @@ using GeneralizedSampling
 
 J = 5
 M = 2^(J+2)
-# Both GeneralizedSampling and Winston (below) have a grid function
+# Both GeneralizedSampling and Plots (below) have a grid function
 xi = GeneralizedSampling.grid(M, 0.5)
 f = ftcos(xi)
 
@@ -48,7 +47,17 @@ x, yw = weval( real(wcoef), "haar", 10 )
 
 using Plots
 
-p = plot(x, yw, label="reconstruction")
-plot!(p, x, tcos(x), label="original")
+p = plot(x, tcos, 
+         linecolor=:red,
+         linewidth=2,
+         label="true"
+        )
+
+plot!(p, x, yw, 
+      linecolor=:black,
+      linewidth=2,
+      label="approximation"
+     )
+
 display(p)
 
