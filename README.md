@@ -8,6 +8,15 @@ GeneralizedSampling
 
 A Julia package implementing the generalized sampling framework by Anders Hansen, Ben Adcock et al. from Fourier measurements to Daubechies wavelets.
 
+**Note**: This package has not been updated in quite a while and will not run on current versions of Julia. 
+It is easy to try with an appropriate [Docker image](https://hub.docker.com/_/julia):
+
+```
+docker run --rm -it julia:0.4
+```
+
+I hope to get around to making *GeneralizedSampling* work on newer versions of Julia.
+
 
 ## Installation
 
@@ -30,6 +39,6 @@ I have tested the [GR backend](https://github.com/jheinen/GR.jl) with the exampl
 the *Plots* interaction with GR is described in these [Plots examples](https://juliaplots.github.io/examples/gr).
 
 The example file `examples/brain.jl` uses precomputed data from this [MRI phantom Matlab package](http://bigwww.epfl.ch/algorithms/mriphantom) and the data is *not* included in the package as it takes up about 21 MB.
-The data is available for download in the native Julia format `jld` from <http://people.math.aau.dk/~robert/software/brain.zip>.
+The data is available for download in the native Julia format `jld` from <http://dahl-jacobsen.dk/generalizedsampling/brain.zip>.
 Unzip the three `jld` files in the `examples` folder.
 
